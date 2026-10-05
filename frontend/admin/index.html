@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="sw">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="NAYA — dashboard ya ofisi">
+  <meta name="theme-color" content="#0A6E47">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <title>NAYA — Dashboard ya ofisi</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/shared/naya.css">
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+  <!-- Inapakia (kuhakiki session iliyohifadhiwa) -->
+  <div id="view-loading" class="loading" aria-live="polite">Inapakia…</div>
+
+  <!-- Login -->
+  <main id="view-login" class="login" hidden>
+    <section class="brand-panel" aria-hidden="true">
+      <div class="lockup">
+        <span class="wordmark">NAYA</span>
+        <span class="road"><span></span></span>
+        <span class="slogan">TWENDE PAMOJA</span>
+      </div>
+      <p class="brand-note">Bodaboda na bajaji za Urambo, mahali pamoja.</p>
+    </section>
+
+    <section class="form-panel">
+      <form id="login-form" class="login-form" novalidate>
+        <h1>Ingia ofisini</h1>
+        <p class="muted">Kwa wasimamizi wa NAYA tu.</p>
+
+        <label for="phone">Namba ya simu</label>
+        <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="username" placeholder="0712 345 678" required>
+
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required>
+
+        <p id="login-error" class="alert alert-danger" role="alert" hidden></p>
+        <button id="login-button" class="btn btn-primary" type="submit">Ingia</button>
+      </form>
+      <p class="status-line"><span id="login-health" class="dot dot-wait"></span><span id="login-health-text">Inaangalia mfumo…</span></p>
+    </section>
+  </main>
+
+  <!-- Seva haipatikani wakati wa kuhakiki session (session haifutwi) -->
+  <main id="view-offline" class="center-card" hidden>
+    <div class="card">
+      <h1>Hatukuweza kufika kwenye mfumo</h1>
+      <p class="muted" id="offline-reason">Angalia mtandao wako, kisha jaribu tena.</p>
+      <div class="actions">
+        <button id="retry-button" class="btn btn-primary" type="button">Jaribu tena</button>
+        <button id="offline-logout" class="btn btn-ghost" type="button">Toka</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- Dashboard -->
+  <div id="view-dashboard" hidden>
+    <header class="topbar">
+      <a class="topbar-brand" href="/admin/"><span class="wordmark-sm">NAYA</span><span class="topbar-area">Ofisi</span></a>
+      <div class="topbar-user">
+        <span id="me-name" class="me-name"></span>
+        <button id="logout-button" class="btn btn-ghost btn-small" type="button">Toka</button>
+      </div>
+    </header>
+
+    <main class="page">
+      <h1 id="greeting" class="greeting">Habari</h1>
+      <p class="muted" id="today"></p>
+
+      <section class="stat-strip" aria-label="Watumiaji">
+        <div class="stat"><span class="stat-value" id="stat-customers">–</span><span class="stat-label">Wateja</span></div>
+        <div class="stat"><span class="stat-value" id="stat-drivers">–</span><span class="stat-label">Madereva</span></div>
+        <div class="stat"><span class="stat-value" id="stat-new">–</span><span class="stat-label">Wapya leo</span></div>
+        <div class="stat"><span class="stat-value" id="stat-admins">–</span><span class="stat-label">Wasimamizi</span></div>
+      </section>
+
+      <p id="dashboard-error" class="alert alert-danger" role="alert" hidden></p>
+
+      <section class="panel" aria-labelledby="system-title">
+        <h2 id="system-title">Hali ya mfumo</h2>
+        <ul class="system-list">
+          <li><span id="sys-api" class="dot dot-wait"></span>Server ya NAYA</li>
+          <li><span id="sys-db" class="dot dot-wait"></span>Database (Supabase)</li>
+        </ul>
+        <p class="muted small" id="sys-version"></p>
+      </section>
+
+      <section class="panel" aria-labelledby="roadmap-title">
+        <h2 id="roadmap-title">Ujenzi wa NAYA</h2>
+        <ol class="roadmap">
+          <li class="done">Msingi, login na dashboard ya ofisi</li>
+          <li>Madereva: usajili, nyaraka na uthibitisho</li>
+          <li>Bei na maeneo ya Urambo</li>
+          <li>Kuomba safari na kumpata dereva</li>
+          <li>App ya dereva: online, maombi, mapato</li>
+          <li>Taarifa za papo hapo na notifications</li>
+          <li>Malipo kwa simu</li>
+          <li>Msaidizi wa AI</li>
+          <li>Ripoti na takwimu</li>
+        </ol>
+      </section>
+    </main>
+  </div>
+
+  <script src="admin.js" type="module"></script>
+</body>
+</html>

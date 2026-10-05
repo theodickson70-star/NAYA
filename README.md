@@ -1,33 +1,53 @@
-# Urambo Ride API
+# NAYA — Twende Pamoja
 
-Msingi mdogo unaofanya kazi. Tunaongeza kipande kimoja kwa wakati, kila kimoja kikiwa mtandaoni kabla ya kingine.
+Mfumo wa bodaboda na bajaji. Unajengwa phase moja baada ya nyingine; kila phase inakuwa mtandaoni (Railway) kabla ya inayofuata.
 
-| Hatua | Kipengele | Hali |
+| Phase | Kipengele | Hali |
 |---|---|---|
-| 1 | API kwenye Railway + Supabase, `GET /health` | ⬅ sasa |
-| 2 | Login ya admin + dashboard ndogo | |
-| 3 | Dispatcher anaingiza oda na kumpangia dereva | |
-| 4 | App ya dereva | |
+| 1 | API kwenye Railway + Supabase, `GET /health` | ✅ |
+| 2 | Msingi: usalama, migrations, login (simu + password), dashboard ya ofisi | ✅ sasa |
+| 3 | Madereva: usajili, nyaraka, uthibitisho | |
+| 4 | Bei (fare rules) na maeneo | |
+| 5 | Safari: kuomba, kumpata dereva, hali za safari, app ya mteja | |
+| 6 | App ya dereva: online, maombi, mapato | |
+| 7 | Realtime (Supabase Realtime) na notifications | |
+| 8 | Malipo kwa simu (M-Pesa, Airtel, Tigo, HaloPesa) | |
+| 9 | Msaidizi wa AI (Claude) unaotumia data halisi | |
+| 10 | Ripoti, CSV, takwimu, ukaguzi wa usalama | |
 
-## Mafaili
+## Muundo
 
 ```
-src/config.ts   Variables (DATABASE_URL, PORT)
-src/db.ts       Muunganisho na Supabase
-src/server.ts   Server + /health
-src/dashboard.ts Ukurasa wa hali ya mfumo (http://localhost:4000)
+src/server.ts          Inaanzisha server (PORT kutoka env, 0.0.0.0) na kuendesha migrations
+src/app.ts             Fastify: helmet, CORS, rate limit, JWT, routes, kurasa
+src/config/env.ts      Variables (inakataa kuanza kama za lazima hazipo)
+src/db/                Pool ya Supabase + migration runner
+src/routes/            /health, /api/auth/*, /api/admin/*
+src/services/          Mantiki (users, auth)
+src/middleware/        Uhakiki wa token na roles, makosa
+database/migrations/   SQL (tables zote ziko kwenye schema "naya")
+frontend/              Kurasa: / (mwanzo), /admin/ (ofisi)
+tests/                 Tests za API
 ```
 
-## Kwenye kompyuta yako
+Majibu yote ya API: `{ "success": true, "data": ... }` au `{ "success": false, "message": "..." }`.
+
+## Kwenye kompyuta yako (PowerShell)
 
 ```
 npm install
-copy .env.example .env      # weka DATABASE_URL yako halisi
-npm run dev                 # fungua http://localhost:4000
+copy .env.example .env          # weka DATABASE_URL na JWT_SECRET halisi
+npm run create-admin -- 0712345678 "Jina Kamili" "PasswordNdefu123"
+npm run dev                     # fungua http://localhost:8080/admin/
 ```
+
+`create-admin` ikitumika tena kwa namba ile ile, inabadilisha password na kutoa vifaa vyote vilivyoingia.
+
+Tests (kwenye database ya majaribio tu, kamwe ya production): `npm test`
 
 ## Railway
 
 - Build: `npm run build` · Start: `npm start` (tayari kwenye `railway.json`)
-- Variable moja tu: `DATABASE_URL` = Supabase **Session pooler** (port 5432)
-- Hakikisha: `https://<app>.up.railway.app/health` → `{"ok":true,"database":"ok"}`
+- Variables za lazima: `DATABASE_URL` (Supabase Session pooler, port 5432) na `JWT_SECRET`
+- Migrations zinaendeshwa zenyewe server inapoanza
+- Hakikisha: `/health` → `{"success":true,"status":"ok","database":"ok"}`, kisha `/admin/`

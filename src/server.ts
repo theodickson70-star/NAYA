@@ -1,22 +1,21 @@
-// Urambo Ride API — hatua 1: server inawaka na inaongea na Supabase.
-import Fastify from 'fastify';
-import { config } from './config.js';
-import { dashboardHtml } from './dashboard.js';
-import { checkDatabase, db } from './db.js';
+// NAYA — Twende Pamoja. Kuwasha server: migrations kwanza, kisha API.
+import { buildApp } from './app.js';
+import { env } from './config/env.js';
+import { db } from './db/pool.js';
+import { runMigrations } from './db/migrate.js';
 
-const app = Fastify({ logger: true });
+const app = await buildApp();
 
-// Dashboard ndogo: hali ya API na Supabase.
-app.get('/', async (_request, reply) => reply.type('text/html; charset=utf-8').send(dashboardHtml));
+try {
+  await runMigrations((message) => app.log.info(message));
+} catch (error) {
+  // Bila schema sahihi API haiwezi kufanya kazi — simama wazi badala ya kuendelea vibaya.
+  app.log.error((error as Error).message);
+  process.exit(1);
+}
 
-app.get('/health', async (_request, reply) => {
-  const database = await checkDatabase();
-  const ok = database === 'ok';
-  if (!ok) app.log.error(`[health] database: ${database}`);
-  return reply.status(ok ? 200 : 503).send({ ok, database: ok ? 'ok' : 'error', time: new Date().toISOString() });
-});
-
-await app.listen({ port: config.port, host: '0.0.0.0' });
+await app.listen({ port: env.port, host: '0.0.0.0' });
+app.log.info(`NAYA iko tayari kwenye port ${env.port}`);
 
 const shutdown = async () => {
   await app.close();
