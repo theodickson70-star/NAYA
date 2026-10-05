@@ -19,6 +19,14 @@ export function registerErrorHandling(app: FastifyInstance): void {
     if (statusCode === 429) {
       return reply.status(429).send({ success: false, message: 'Maombi mengi mno. Subiri kidogo kisha ujaribu tena.' });
     }
+    if (statusCode === 413) {
+      return reply.status(413).send({ success: false, message: 'Faili ni kubwa mno (mwisho MB 3)' });
+    }
+    if (statusCode === 415) {
+      return reply
+        .status(415)
+        .send({ success: false, message: 'Aina ya faili hairuhusiwi. Tuma picha (JPG, PNG, WEBP) au PDF.' });
+    }
     if (statusCode < 500) {
       return reply.status(statusCode).send({ success: false, message: 'Ombi si sahihi' });
     }

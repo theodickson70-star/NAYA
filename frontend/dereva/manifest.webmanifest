@@ -1,0 +1,17 @@
+{
+  "name": "NAYA Dereva",
+  "short_name": "NAYA Dereva",
+  "description": "App ya madereva wa NAYA — Twende Pamoja",
+  "lang": "sw",
+  "start_url": "/dereva/",
+  "scope": "/dereva/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F6F8F7",
+  "theme_color": "#06502F",
+  "icons": [
+    { "src": "/shared/brand/dereva-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/shared/brand/dereva-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/shared/brand/dereva-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

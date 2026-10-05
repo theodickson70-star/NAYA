@@ -41,7 +41,7 @@ h2 { font-size: 19px; }
 .small { font-size: 14px; }
 
 label { display: block; font-weight: 700; margin: 18px 0 6px; }
-input {
+input, select, textarea {
   width: 100%;
   font: inherit;
   padding: 12px 14px;
@@ -50,7 +50,8 @@ input {
   background: var(--white);
   color: var(--ink);
 }
-input:focus { outline: none; border-color: var(--naya-green); box-shadow: 0 0 0 3px rgba(10, 110, 71, 0.18); }
+textarea { resize: vertical; min-height: 96px; }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--naya-green); box-shadow: 0 0 0 3px rgba(10, 110, 71, 0.18); }
 
 .btn {
   font: inherit;
@@ -82,3 +83,17 @@ input:focus { outline: none; border-color: var(--naya-green); box-shadow: 0 0 0 
   * { animation: none !important; transition: none !important; }
 }
 .btn-link { display: inline-block; text-align: center; text-decoration: none; margin-top: 22px; }
+
+/* Lebo za hali (dereva, nyaraka) */
+.badge { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: 14px; font-weight: 700; white-space: nowrap; }
+.badge-ok { background: var(--naya-mint); color: var(--naya-green-dark); }
+.badge-warn { background: #FDF3D0; color: var(--warning-ink); }
+.badge-bad { background: var(--danger-bg); color: var(--danger); }
+.badge-muted { background: #EEF2F0; color: var(--muted); }
+
+.alert-warn { background: #FDF3D0; color: var(--warning-ink); }
+.alert-ok { background: var(--naya-mint); color: var(--naya-green-dark); }
+.btn-danger { background: var(--white); color: var(--danger); border-color: var(--danger); }
+.btn-danger:hover:not(:disabled) { background: var(--danger-bg); }
+.check { display: flex; align-items: center; gap: 10px; font-weight: 400; margin: 8px 0; }
+.check input { width: 20px; height: 20px; accent-color: var(--naya-green); }

@@ -26,25 +26,40 @@ export function createApi(storageKey) {
     }
   }
 
-  async function request(method, path, body) {
-    let res;
+  async function send(method, path, { json, file } = {}) {
+    const headers = token ? { authorization: `Bearer ${token}` } : {};
+    let body;
+    if (file) {
+      headers['content-type'] = file.type;
+      body = file;
+    } else if (json !== undefined) {
+      headers['content-type'] = 'application/json';
+      body = JSON.stringify(json);
+    }
     try {
-      res = await fetch(path, {
-        method,
-        headers: {
-          ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
-          ...(token ? { authorization: `Bearer ${token}` } : {}),
-        },
-        body: body !== undefined ? JSON.stringify(body) : undefined,
-      });
+      return await fetch(path, { method, headers, body });
     } catch {
       throw new ApiError('Hakuna mawasiliano na mfumo. Angalia mtandao wako.', 0);
     }
+  }
+
+  async function request(method, path, options) {
+    const res = await send(method, path, options);
     const json = await res.json().catch(() => null);
     if (!res.ok || !json || json.success === false) {
       throw new ApiError(json?.message ?? `Hitilafu ya mfumo (HTTP ${res.status}). Jaribu tena.`, res.status);
     }
     return json.data;
+  }
+
+  /** Faili linalohitaji token (mf. picha ya nyaraka) → Blob. */
+  async function blob(path) {
+    const res = await send('GET', path);
+    if (!res.ok) {
+      const json = await res.json().catch(() => null);
+      throw new ApiError(json?.message ?? 'Faili halikupatikana', res.status);
+    }
+    return res.blob();
   }
 
   return {
@@ -53,7 +68,10 @@ export function createApi(storageKey) {
     },
     setToken,
     get: (path) => request('GET', path),
-    post: (path, body) => request('POST', path, body ?? {}),
+    post: (path, body) => request('POST', path, { json: body ?? {} }),
+    put: (path, body) => request('PUT', path, { json: body ?? {} }),
+    upload: (path, file) => request('PUT', path, { file }),
+    blob,
   };
 }
 
@@ -66,4 +84,9 @@ export async function fetchHealth() {
   } catch {
     return { api: false, database: false, version: null };
   }
+}
+
+/** Andika maandishi kwa usalama (bila HTML) — kwa data inayotoka kwa watumiaji. */
+export function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 }

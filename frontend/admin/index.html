@@ -6,7 +6,8 @@
   <meta name="description" content="NAYA — dashboard ya ofisi">
   <meta name="theme-color" content="#0A6E47">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <title>NAYA — Dashboard ya ofisi</title>
+  <link rel="apple-touch-icon" href="/shared/brand/naya-apple-180.png">
+  <title>NAYA — Ofisi</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&display=swap" rel="stylesheet">
@@ -19,10 +20,9 @@
 
   <!-- Login -->
   <main id="view-login" class="login" hidden>
-    <section class="brand-panel" aria-hidden="true">
+    <section class="brand-panel">
       <div class="lockup">
-        <span class="wordmark">NAYA</span>
-        <span class="road"><span></span></span>
+        <img class="brand-wordmark" src="/shared/brand/naya-wordmark-white.svg" alt="NAYA" width="438" height="124">
         <span class="slogan">TWENDE PAMOJA</span>
       </div>
       <p class="brand-note">Bodaboda na bajaji za Urambo, mahali pamoja.</p>
@@ -58,25 +58,34 @@
     </div>
   </main>
 
-  <!-- Dashboard -->
-  <div id="view-dashboard" hidden>
+  <!-- Ndani ya ofisi -->
+  <div id="view-app" hidden>
     <header class="topbar">
-      <a class="topbar-brand" href="/admin/"><span class="wordmark-sm">NAYA</span><span class="topbar-area">Ofisi</span></a>
+      <a class="topbar-brand" href="#/">
+        <img src="/shared/brand/naya-icon.svg" alt="" width="34" height="34">
+        <img class="topbar-wordmark" src="/shared/brand/naya-wordmark-white.svg" alt="NAYA" width="88" height="25">
+        <span class="topbar-area">Ofisi</span>
+      </a>
+      <nav class="topnav" aria-label="Sehemu za ofisi">
+        <a href="#/" data-nav="overview">Muhtasari</a>
+        <a href="#/madereva" data-nav="drivers">Madereva <span id="nav-pending" class="nav-count" hidden></span></a>
+      </nav>
       <div class="topbar-user">
         <span id="me-name" class="me-name"></span>
         <button id="logout-button" class="btn btn-ghost btn-small" type="button">Toka</button>
       </div>
     </header>
 
-    <main class="page">
+    <!-- Muhtasari -->
+    <main id="page-overview" class="page" hidden>
       <h1 id="greeting" class="greeting">Habari</h1>
       <p class="muted" id="today"></p>
 
-      <section class="stat-strip" aria-label="Watumiaji">
+      <section class="stat-strip" aria-label="Takwimu">
         <div class="stat"><span class="stat-value" id="stat-customers">–</span><span class="stat-label">Wateja</span></div>
-        <div class="stat"><span class="stat-value" id="stat-drivers">–</span><span class="stat-label">Madereva</span></div>
+        <div class="stat"><span class="stat-value" id="stat-drivers">–</span><span class="stat-label">Madereva waliothibitishwa</span></div>
+        <a class="stat stat-link" href="#/madereva?hali=PENDING"><span class="stat-value" id="stat-pending">–</span><span class="stat-label">Wanasubiri uthibitisho</span></a>
         <div class="stat"><span class="stat-value" id="stat-new">–</span><span class="stat-label">Wapya leo</span></div>
-        <div class="stat"><span class="stat-value" id="stat-admins">–</span><span class="stat-label">Wasimamizi</span></div>
       </section>
 
       <p id="dashboard-error" class="alert alert-danger" role="alert" hidden></p>
@@ -94,7 +103,7 @@
         <h2 id="roadmap-title">Ujenzi wa NAYA</h2>
         <ol class="roadmap">
           <li class="done">Msingi, login na dashboard ya ofisi</li>
-          <li>Madereva: usajili, nyaraka na uthibitisho</li>
+          <li class="done">Madereva: usajili, nyaraka na uthibitisho</li>
           <li>Bei na maeneo ya Urambo</li>
           <li>Kuomba safari na kumpata dereva</li>
           <li>App ya dereva: online, maombi, mapato</li>
@@ -105,7 +114,36 @@
         </ol>
       </section>
     </main>
+
+    <!-- Orodha ya madereva -->
+    <main id="page-drivers" class="page" hidden>
+      <div class="page-head">
+        <h1>Madereva</h1>
+        <form id="driver-search" class="search" role="search">
+          <label class="sr-only" for="driver-q">Tafuta dereva</label>
+          <input id="driver-q" type="search" placeholder="Tafuta kwa jina, simu au plate">
+        </form>
+      </div>
+      <div id="driver-filters" class="filters" role="group" aria-label="Chuja kwa hali"></div>
+      <p id="drivers-error" class="alert alert-danger" role="alert" hidden></p>
+      <div id="driver-list" class="driver-list" aria-live="polite"></div>
+    </main>
+
+    <!-- Dereva mmoja -->
+    <main id="page-driver" class="page" hidden>
+      <a class="back-link" href="#/madereva">Rudi kwa madereva</a>
+      <p id="driver-error" class="alert alert-danger" role="alert" hidden></p>
+      <div id="driver-detail"></div>
+    </main>
   </div>
+
+  <dialog id="doc-viewer" class="doc-viewer" aria-labelledby="doc-viewer-title">
+    <div class="doc-viewer-head">
+      <h2 id="doc-viewer-title"></h2>
+      <button class="btn btn-ghost btn-small" type="button" data-close>Funga</button>
+    </div>
+    <div id="doc-viewer-body" class="doc-viewer-body"></div>
+  </dialog>
 
   <script src="admin.js" type="module"></script>
 </body>

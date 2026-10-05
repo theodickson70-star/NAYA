@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="sw">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="NAYA Dereva — jisajili na upate wateja wa bodaboda na bajaji">
+  <meta name="theme-color" content="#06502F">
+  <link rel="manifest" href="/dereva/manifest.webmanifest">
+  <link rel="icon" href="/shared/brand/naya-dereva-icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/shared/brand/dereva-apple-180.png">
+  <title>NAYA Dereva</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/shared/naya.css">
+  <link rel="stylesheet" href="dereva.css">
+</head>
+<body>
+  <div id="view-loading" class="loading" aria-live="polite">Inapakia…</div>
+
+  <!-- Kuingia / kujisajili -->
+  <main id="view-auth" class="auth" hidden>
+    <header class="auth-hero">
+      <img src="/shared/brand/naya-dereva-icon.svg" alt="" width="76" height="76">
+      <div>
+        <p class="auth-brand">NAYA <span>Dereva</span></p>
+        <p class="auth-pitch">Endesha na NAYA. Jisajili, pakia nyaraka zako, ofisi ikuthibitishe.</p>
+      </div>
+    </header>
+
+    <div class="auth-body">
+      <div class="segmented" role="tablist" aria-label="Chagua">
+        <button type="button" role="tab" id="tab-register" aria-selected="true" aria-controls="register-form">Jisajili</button>
+        <button type="button" role="tab" id="tab-login" aria-selected="false" aria-controls="login-form">Nina akaunti</button>
+      </div>
+
+      <form id="register-form" role="tabpanel" aria-labelledby="tab-register" novalidate>
+        <label for="reg-name">Jina kamili</label>
+        <input id="reg-name" autocomplete="name" placeholder="Kama lilivyo kwenye leseni" required>
+        <label for="reg-phone">Namba ya simu</label>
+        <input id="reg-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="0712 345 678" required>
+        <label for="reg-password">Tengeneza password</label>
+        <input id="reg-password" type="password" autocomplete="new-password" placeholder="Angalau herufi 8" required>
+        <p class="alert alert-danger" id="register-error" role="alert" hidden></p>
+        <button class="btn btn-primary btn-block" type="submit">Jisajili</button>
+      </form>
+
+      <form id="login-form" role="tabpanel" aria-labelledby="tab-login" novalidate hidden>
+        <label for="login-phone">Namba ya simu</label>
+        <input id="login-phone" type="tel" inputmode="tel" autocomplete="username" placeholder="0712 345 678" required>
+        <label for="login-password">Password</label>
+        <input id="login-password" type="password" autocomplete="current-password" required>
+        <p class="alert alert-danger" id="login-error" role="alert" hidden></p>
+        <button class="btn btn-primary btn-block" type="submit">Ingia</button>
+      </form>
+    </div>
+  </main>
+
+  <main id="view-offline" class="center" hidden>
+    <h1>Hatukuweza kufika kwenye mfumo</h1>
+    <p class="muted" id="offline-reason">Angalia mtandao wako, kisha jaribu tena.</p>
+    <button id="retry-button" class="btn btn-primary btn-block" type="button">Jaribu tena</button>
+  </main>
+
+  <!-- Ndani ya app -->
+  <div id="view-app" hidden>
+    <header class="bar">
+      <span class="bar-brand"><img src="/shared/brand/naya-dereva-icon.svg" alt="" width="32" height="32">NAYA <span>Dereva</span></span>
+      <button id="logout-button" class="btn btn-small bar-logout" type="button">Toka</button>
+    </header>
+    <main id="app-content" class="content" aria-live="polite"></main>
+  </div>
+
+  <input id="file-input" type="file" accept="image/*,application/pdf" hidden>
+  <script src="dereva.js" type="module"></script>
+</body>
+</html>
