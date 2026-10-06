@@ -218,12 +218,22 @@
               <div><label for="loc-lng">Longitude</label><input id="loc-lng" name="lng" inputmode="decimal" required></div>
             </div>
             <p class="muted small" id="coords-hint">Bonyeza ramani kujaza latitude na longitude.</p>
+            <button type="button" class="btn btn-ghost btn-gps" id="loc-gps">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg>
+              Tumia mahali nilipo sasa (GPS)
+            </button>
+            <p class="muted small" id="gps-hint" hidden></p>
             <p class="alert alert-danger" id="location-error" role="alert" hidden></p>
             <div class="actions">
               <button class="btn btn-primary" type="submit" id="location-save">Hifadhi eneo</button>
               <button class="btn btn-ghost" type="button" id="location-cancel" hidden>Ghairi</button>
             </div>
           </form>
+          <section class="suggest" id="location-suggest" aria-labelledby="suggest-title" hidden>
+            <h2 id="suggest-title">Maeneo ya kuanzia Urambo</h2>
+            <p class="muted small">Bonyeza jina, kisha weka mahali pake sahihi: simama hapo na ubonyeze <strong>GPS</strong>, au bonyeza ramani. Badilisha jina kama linajulikana kwa jina jingine.</p>
+            <div class="suggest-list" id="suggest-list"></div>
+          </section>
           <div id="location-list" class="location-list" aria-live="polite"></div>
         </div>
       </div>

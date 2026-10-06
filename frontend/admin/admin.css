@@ -272,3 +272,12 @@
 .login-form .btn { border-radius: 12px; background: linear-gradient(180deg, #0E7F53, var(--naya-green)); box-shadow: 0 10px 22px -8px rgba(10, 110, 71, 0.55); }
 .topbar { background: linear-gradient(120deg, var(--naya-green-dark), var(--naya-green)); }
 @media (max-width: 760px) { .brand-icon { width: 52px; height: 52px; margin-bottom: 16px; border-radius: 14px; } }
+
+/* Maeneo: GPS na orodha ya kuanzia Urambo */
+.btn-gps { display: inline-flex; align-items: center; gap: 8px; margin-top: 10px; width: 100%; justify-content: center; }
+.btn-gps svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.suggest { margin-top: 18px; padding: 16px; border-radius: var(--radius-md); background: #FFFBEA; border: 1px solid #F2DFA0; }
+.suggest h2 { font-size: 17px; margin: 0 0 4px; }
+.suggest-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.suggest-chip { font: inherit; font-size: 14px; font-weight: 700; padding: 7px 12px; border-radius: 999px; border: 1.5px solid #E2CB7A; background: var(--white); color: var(--ink); cursor: pointer; }
+.suggest-chip:hover { border-color: var(--naya-green); color: var(--naya-green); }

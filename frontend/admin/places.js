@@ -6,6 +6,35 @@ const $ = (id) => document.getElementById(id);
 // Katikati ya ramani mwanzoni tu (mji wa Urambo). Maeneo yenyewe yanawekwa na ofisi.
 const URAMBO_CENTER = [-5.0767, 32.0516];
 
+// Orodha ya kuanzia: majina ya maeneo yanayotumika sana mjini Urambo. HAYANA mahali (koordinati) —
+// ofisi inaweka mahali sahihi kwa GPS ukiwa pale, au kwa kubonyeza ramani. Hakuna eneo linalowekwa kwa kubahatisha.
+const URAMBO_SUGGESTIONS = [
+  ['Stendi Kuu ya Mabasi', 'STAND'],
+  ['Stesheni ya Treni Urambo', 'STAND'],
+  ['Soko Kuu', 'MARKET'],
+  ['Hospitali ya Wilaya ya Urambo', 'HOSPITAL'],
+  ['Urambo FDC (Chuo cha Maendeleo ya Wananchi)', 'SCHOOL'],
+  ['Ofisi ya Halmashauri ya Wilaya', 'OFFICE'],
+  ['Ofisi ya Mkuu wa Wilaya', 'OFFICE'],
+  ['Kituo cha Polisi', 'OFFICE'],
+  ['Mahakama ya Wilaya', 'OFFICE'],
+  ['Benki', 'OFFICE'],
+  ['Kituo cha Mafuta', 'OTHER'],
+  ['Msikiti Mkuu', 'WORSHIP'],
+  ['Kanisa Katoliki', 'WORSHIP'],
+  ['Shule ya Sekondari', 'SCHOOL'],
+  ['Kiloleni', 'NEIGHBORHOOD'],
+  ['Muungano', 'NEIGHBORHOOD'],
+  ['Vumilia', 'NEIGHBORHOOD'],
+  ['Songambele', 'NEIGHBORHOOD'],
+];
+
+// Bei zinazopendekezwa kwa kuanzia Urambo (zinajaza fomu tu — ofisi inakagua na kubonyeza Hifadhi).
+const URAMBO_FARES = {
+  BODABODA: { baseFare: 300, perKm: 400, minimumFare: 1000, roundingStep: 500, roadFactor: 1.3 },
+  BAJAJI: { baseFare: 1000, perKm: 500, minimumFare: 2000, roundingStep: 500, roadFactor: 1.3 },
+};
+
 let ctx = null; // { api, onAuthError }
 export function setup(context) {
   ctx = context;
@@ -58,6 +87,7 @@ async function refreshLocations(q = $('location-q').value.trim()) {
   try {
     locations = await ctx.api.get(`/api/admin/locations${q ? `?q=${encodeURIComponent(q)}` : ''}`);
     renderLocationList();
+    if (!q) renderSuggestions();
     renderMarkers();
   } catch (err) {
     fail(err, 'location-error');
@@ -140,6 +170,47 @@ function renderLocationList() {
     .join('');
 }
 
+function renderSuggestions() {
+  const have = new Set(locations.map((l) => l.name.trim().toLowerCase()));
+  const missing = URAMBO_SUGGESTIONS.filter(([name]) => !have.has(name.toLowerCase()));
+  $('location-suggest').hidden = missing.length === 0;
+  $('suggest-list').innerHTML = missing
+    .map(([name, category]) => `<button type="button" class="suggest-chip" data-suggest="${esc(name)}" data-category="${category}">${esc(name)}</button>`)
+    .join('');
+}
+
+/** Mahali halisi kutoka GPS ya simu/kompyuta hii (kwa usahihi: simama mahali penyewe, nje). */
+function useGps() {
+  const hint = $('gps-hint');
+  hint.hidden = false;
+  if (!navigator.geolocation) {
+    hint.textContent = 'Kifaa hiki hakina GPS. Bonyeza ramani badala yake.';
+    return;
+  }
+  const button = $('loc-gps');
+  button.disabled = true;
+  hint.textContent = 'Inatafuta mahali ulipo… (simama nje kwa usahihi zaidi)';
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      button.disabled = false;
+      const { latitude, longitude, accuracy } = pos.coords;
+      setPoint(latitude, longitude);
+      map?.setView([latitude, longitude], 17);
+      const m = Math.round(accuracy);
+      hint.textContent =
+        m <= 30
+          ? `Mahali pamepatikana (usahihi ±${m} m). Hakikisha jina, kisha hifadhi.`
+          : `Usahihi ni ±${m} m tu — si mzuri. Subiri kidogo nje ujaribu tena, au bonyeza ramani mahali sahihi.`;
+    },
+    (err) => {
+      button.disabled = false;
+      hint.textContent =
+        err.code === 1 ? 'Umezuia ruhusa ya mahali kwa ukurasa huu. Iruhusu kwenye mipangilio ya browser.' : 'GPS haikupata mahali. Jaribu tena ukiwa nje, au bonyeza ramani.';
+    },
+    { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
+  );
+}
+
 function startEdit(id) {
   const l = locations.find((x) => x.id === id);
   if (!l) return;
@@ -193,6 +264,17 @@ function bindLocationForm() {
   });
 
   $('location-cancel').addEventListener('click', resetForm);
+  $('loc-gps').addEventListener('click', useGps);
+  $('suggest-list').addEventListener('click', (event) => {
+    const chip = event.target.closest('[data-suggest]');
+    if (!chip) return;
+    if (editingId) resetForm();
+    $('loc-name').value = chip.dataset.suggest;
+    $('loc-category').value = chip.dataset.category;
+    $('coords-hint').textContent = 'Sasa weka mahali: simama hapo na ubonyeze GPS, au bonyeza ramani mahali sahihi.';
+    $('location-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    $('loc-area').focus();
+  });
 
   for (const id of ['loc-lat', 'loc-lng']) {
     $(id).addEventListener('change', () => {
@@ -272,7 +354,10 @@ function fareCard(type, rule) {
     </table>
     <p class="alert alert-danger" id="${type}-error" role="alert" hidden></p>
     <p class="alert alert-ok" id="${type}-saved" role="status" hidden>Bei zimehifadhiwa.</p>
-    <div class="actions"><button class="btn btn-primary" type="submit">Hifadhi bei za ${esc(VEHICLE_TYPES[type].toLowerCase())}</button></div>
+    <div class="actions">
+      <button class="btn btn-primary" type="submit">Hifadhi bei za ${esc(VEHICLE_TYPES[type].toLowerCase())}</button>
+      ${URAMBO_FARES[type] ? `<button class="btn btn-ghost" type="button" data-suggest-fare="${type}">Jaza bei zinazopendekezwa (Urambo)</button>` : ''}
+    </div>
   </form>`;
 }
 
@@ -322,6 +407,16 @@ function bindFareCard(type) {
     schedulePreview(type);
   });
   form.addEventListener('change', () => schedulePreview(type));
+  form.querySelector('[data-suggest-fare]')?.addEventListener('click', () => {
+    const f = URAMBO_FARES[type];
+    form.elements.baseFare.value = f.baseFare;
+    form.elements.perKm.value = f.perKm;
+    form.elements.minimumFare.value = f.minimumFare;
+    form.elements.roundingStep.value = String(f.roundingStep);
+    form.elements.roadFactor.value = f.roadFactor;
+    $(`${type}-saved`).hidden = true;
+    schedulePreview(type, 0);
+  });
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     $(`${type}-error`).hidden = true;
