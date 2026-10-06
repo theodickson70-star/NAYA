@@ -26,6 +26,11 @@ export const DOCUMENT_STATUS = {
 export const VEHICLE_TYPES = { BODABODA: 'Bodaboda', BAJAJI: 'Bajaji' };
 
 export const AUDIT_ACTIONS = {
+  'location.created': 'Eneo limeongezwa',
+  'location.updated': 'Eneo limebadilishwa',
+  'location.deactivated': 'Eneo limezimwa',
+  'location.activated': 'Eneo limewashwa',
+  'fare.updated': 'Bei zimebadilishwa',
   'driver.applied': 'Aliomba kuwa dereva',
   'driver.submitted': 'Alituma taarifa kwa uthibitisho',
   'driver.approved': 'Alithibitishwa',
@@ -45,4 +50,20 @@ export function formatDate(value, withTime = false) {
 export function formatPhone(phone) {
   if (!phone || phone.length !== 12) return phone ?? '';
   return `0${phone.slice(3, 6)} ${phone.slice(6, 9)} ${phone.slice(9)}`;
+}
+
+export const LOCATION_CATEGORIES = {
+  STAND: 'Stendi',
+  MARKET: 'Soko',
+  HOSPITAL: 'Hospitali / zahanati',
+  SCHOOL: 'Shule / chuo',
+  OFFICE: 'Ofisi / taasisi',
+  WORSHIP: 'Kanisa / msikiti',
+  NEIGHBORHOOD: 'Mtaa',
+  OTHER: 'Mengine',
+};
+
+/** 1700 → "TSh 1,700" */
+export function formatTsh(amount) {
+  return `TSh ${Math.round(Number(amount) || 0).toLocaleString('en-US')}`;
 }

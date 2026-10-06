@@ -97,3 +97,4 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--n
 .btn-danger:hover:not(:disabled) { background: var(--danger-bg); }
 .check { display: flex; align-items: center; gap: 10px; font-weight: 400; margin: 8px 0; }
 .check input { width: 20px; height: 20px; accent-color: var(--naya-green); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

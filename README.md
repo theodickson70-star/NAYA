@@ -7,8 +7,8 @@ Mfumo wa bodaboda na bajaji. Unajengwa phase moja baada ya nyingine; kila phase 
 | 1 | API kwenye Railway + Supabase, `GET /health` | ✅ |
 | 2 | Msingi: usalama, migrations, login (simu + password), dashboard ya ofisi | ✅ |
 | 3 | Madereva: usajili, chombo, nyaraka, uthibitisho wa ofisi, logo ya NAYA | ✅ |
-| 3.5 | App moja ya NAYA: abiria na dereva kwa akaunti moja, kuchagua na kubadili mode | ✅ sasa |
-| 4 | Bei (fare rules) na maeneo | |
+| 3.5 | App moja ya NAYA: abiria na dereva kwa akaunti moja, kuchagua na kubadili mode | ✅ |
+| 4 | Maeneo (ramani ya ofisi), bei kwa kila chombo, makadirio ya nauli kwa abiria (GPS au orodha) | ✅ sasa |
 | 5 | Safari: kuomba, kumpata dereva, hali za safari (mode ya Abiria) | |
 | 6 | Mode ya Dereva: online, maombi, mapato | |
 | 7 | Realtime (Supabase Realtime) na notifications | |
@@ -23,8 +23,8 @@ src/server.ts          Inaanzisha server (PORT kutoka env, 0.0.0.0) na kuendesha
 src/app.ts             Fastify: helmet, CORS, rate limit, JWT, routes, kurasa
 src/config/env.ts      Variables (inakataa kuanza kama za lazima hazipo)
 src/db/                Pool ya Supabase + migration runner
-src/routes/            /health, /api/auth/*, /api/account/*, /api/drivers/me/*, /api/admin/*
-src/services/          Mantiki (users, auth, account, drivers, files, audit)
+src/routes/            /health, /api/auth/*, /api/account/*, /api/drivers/me/*, /api/locations, /api/fares/*, /api/admin/*
+src/services/          Mantiki (users, auth, account, drivers, files, audit, places, fare-engine)
 src/middleware/        Uhakiki wa token na roles, makosa
 database/migrations/   SQL (tables zote ziko kwenye schema "naya")
 frontend/app/          App MOJA ya NAYA (abiria + dereva) — / na /dereva/ zinaelekeza hapa
@@ -46,6 +46,14 @@ Akaunti moja (namba ya simu) inatumika kama **Abiria** na **Dereva**:
 Roles: `USER` (mtumiaji wa app), `ADMIN`, `SUPER_ADMIN` (ofisi). Ofisi haiingii kwenye app, na watumiaji hawaingii ofisini.
 
 Majibu yote ya API: `{ "success": true, "data": ... }` au `{ "success": false, "message": "..." }`.
+
+## Maeneo na nauli
+
+- Ofisi inaweka **maeneo** kwenye ramani (`/admin/#/maeneo`) na **bei** kwa kila chombo (`/admin/#/bei`). Hakuna maeneo wala bei za kubuni.
+- Nauli = `max(nauli ya chini, bei ya kuanzia + bei kwa km × umbali wa barabara)`, ikizungushwa juu (mf. TSh 100).
+- Umbali wa barabara ≈ umbali wa moja kwa moja × kizidisho cha barabara (kawaida 1.3).
+- Abiria anaanzia mahali alipo (GPS) au eneo la orodha; GPS lazima iwe ndani ya km 30 ya maeneo ya huduma.
+- Ramani: Leaflet (kutoka npm, inatolewa na server hii) + picha za OpenStreetMap.
 
 ## Nyaraka za madereva
 

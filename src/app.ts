@@ -1,4 +1,5 @@
 // Kujenga NAYA API (bila kuiwasha) — server.ts na tests wanaitumia.
+import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import cors from '@fastify/cors';
@@ -15,8 +16,11 @@ import { adminRoutes } from './routes/admin.js';
 import { authRoutes } from './routes/auth.js';
 import { driverRoutes } from './routes/drivers.js';
 import { healthRoutes } from './routes/health.js';
+import { placeRoutes } from './routes/places.js';
 
 const FRONTEND_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
+// Ramani (Leaflet) inatolewa na server hii hii — hakuna script ya CDN ya nje.
+const LEAFLET_DIR = join(dirname(createRequire(import.meta.url).resolve('leaflet/package.json')), 'dist');
 
 export async function buildApp(options: { logger?: boolean } = {}): Promise<FastifyInstance> {
   const app = Fastify({
@@ -30,7 +34,8 @@ export async function buildApp(options: { logger?: boolean } = {}): Promise<Fast
     contentSecurityPolicy: {
       directives: {
         // blob: — ofisi na dereva wanaona picha za nyaraka zilizopakuliwa kwa token (si URL za wazi).
-        'img-src': ["'self'", 'data:', 'blob:'],
+        // tile.openstreetmap.org — picha za ramani ya maeneo (ofisi).
+        'img-src': ["'self'", 'data:', 'blob:', 'https://tile.openstreetmap.org', 'https://*.tile.openstreetmap.org'],
         'frame-src': ["'self'", 'blob:'],
       },
     },
@@ -46,9 +51,11 @@ export async function buildApp(options: { logger?: boolean } = {}): Promise<Fast
   await app.register(adminDriverRoutes);
   await app.register(accountRoutes);
   await app.register(driverRoutes);
+  await app.register(placeRoutes);
 
   // Kurasa za NAYA: /app/ (app moja ya abiria na dereva) na /admin/ (ofisi).
   await app.register(fastifyStatic, { root: FRONTEND_DIR, prefix: '/', index: ['index.html'] });
+  await app.register(fastifyStatic, { root: LEAFLET_DIR, prefix: '/vendor/leaflet/', decorateReply: false });
   app.get('/admin', async (_request, reply) => reply.redirect('/admin/'));
   app.get('/app', async (_request, reply) => reply.redirect('/app/'));
   // Mwanzo na anwani ya zamani ya app ya dereva → app moja ya NAYA.

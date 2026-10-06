@@ -1,12 +1,22 @@
 // App moja ya NAYA: akaunti moja → "Utatumiaje NAYA?" → mode ya Abiria au Dereva → Akaunti → Badili mode.
 import { createApi, escapeHtml as esc } from '/shared/api.js';
-import { DOCUMENT_ORDER, DOCUMENT_STATUS, DOCUMENTS, DRIVER_STATUS, formatDate, formatPhone, VEHICLE_TYPES } from '/shared/labels.js';
+import {
+  DOCUMENT_ORDER,
+  DOCUMENT_STATUS,
+  DOCUMENTS,
+  DRIVER_STATUS,
+  formatDate,
+  formatPhone,
+  formatTsh,
+  LOCATION_CATEGORIES,
+  VEHICLE_TYPES,
+} from '/shared/labels.js';
 
 const api = createApi('naya_app_token');
 const $ = (id) => document.getElementById(id);
 const views = ['view-loading', 'view-auth', 'view-role', 'view-offline', 'view-app'];
 const MAX_BYTES = 3 * 1024 * 1024;
-const VERSION = '0.4.0';
+const VERSION = '0.5.0';
 
 let account = null; // { user, activeMode, driverStatus, canDrive }
 let driver = null; // wasifu wa udereva (mode ya Dereva)
@@ -15,6 +25,9 @@ let editingVehicle = false;
 let uploadingType = null;
 let pendingUploadType = null;
 const thumbs = new Map();
+// Safari inayopangwa na abiria (Phase 4: makadirio ya nauli; kuagiza kunakuja Phase 5).
+const trip = { pickup: null, destination: null, estimate: null, estimateError: null, selected: null, gps: 'idle', loading: false };
+let places = null; // maeneo ya huduma (cache)
 
 // Akaunti ya zamani ya app ya dereva: mtu asilazimike kuingia upya.
 try {
@@ -145,6 +158,7 @@ async function switchMode(mode, { goHome } = {}) {
 function route() {
   if (!account) return;
   tab = location.hash.startsWith('#/akaunti') ? 'account' : 'home';
+  const picker = location.hash.match(/^#\/chagua\/(kwenda|kutoka)/)?.[1] ?? null;
   for (const a of document.querySelectorAll('[data-tab]')) {
     if (a.dataset.tab === tab) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
@@ -157,6 +171,7 @@ function route() {
   window.scrollTo(0, 0);
   if (tab === 'account') return renderAccount();
   if (driverMode) return loadDriver();
+  if (picker) return renderPicker(picker === 'kwenda' ? 'destination' : 'pickup');
   renderPassengerHome();
 }
 window.addEventListener('hashchange', route);
@@ -164,18 +179,44 @@ window.addEventListener('hashchange', route);
 const firstName = () => esc(account.user.fullName.split(' ')[0]);
 
 // ---------- Mode ya Abiria ----------
-function renderPassengerHome() {
+const PIN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>';
+const DOT = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="9"/></svg>';
+const GPS_MESSAGES = {
+  denied: 'Umezuia ruhusa ya mahali. Chagua unapoanzia kwenye orodha.',
+  unavailable: 'GPS haipatikani. Washa Location kwenye simu, au chagua unapoanzia kwenye orodha.',
+  timeout: 'GPS imechelewa kupata mahali ulipo. Chagua unapoanzia kwenye orodha.',
+};
+
+async function loadPlaces() {
+  if (places) return places;
+  places = await api.get('/api/locations');
+  return places;
+}
+
+function pickupLabel() {
+  if (trip.pickup?.type === 'gps') return 'Mahali ulipo sasa (GPS)';
+  if (trip.pickup?.type === 'location') return trip.pickup.name;
+  if (trip.gps === 'locating') return 'Inatafuta mahali ulipo…';
+  return 'Chagua unapoanzia';
+}
+
+async function renderPassengerHome() {
   const ds = account.driverStatus;
+  let planner;
+  try {
+    const list = await loadPlaces();
+    planner = list.length === 0 ? '<p class="muted">NAYA bado inaandaa maeneo ya Urambo. Jaribu tena baadaye.</p>' : tripPlanner();
+  } catch (err) {
+    if (handleError(err)) return;
+    planner = `<p class="alert alert-danger" role="alert">${esc(err.message)}</p>
+      <button class="btn btn-ghost" type="button" data-action="reload-places">Jaribu tena</button>`;
+  }
+  if (tab !== 'home' || account.activeMode !== 'PASSENGER' || location.hash.startsWith('#/chagua')) return;
   $('app-content').innerHTML = `
     <h1>Habari, ${firstName()}</h1>
-    <section class="card" aria-labelledby="where-title">
+    <section class="card trip" aria-labelledby="where-title">
       <h2 id="where-title">Unaenda wapi?</h2>
-      <div class="where" aria-disabled="true">
-        <span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg></span>
-        Weka unakoenda
-      </div>
-      <span class="badge badge-warn soon">Inakuja hivi karibuni</span>
-      <p class="muted">Kuagiza bodaboda na bajaji kupitia NAYA kunaanza hivi karibuni Urambo. Utaanza kuagiza hapa hapa.</p>
+      ${planner}
     </section>
     <section class="card">
       <h2>Safari zako</h2>
@@ -194,6 +235,136 @@ function renderPassengerHome() {
             <button class="btn btn-ghost btn-block" type="button" data-action="to-driver">Kuwa dereva</button>
           </section>`
     }`;
+}
+
+function tripPlanner() {
+  const gpsNote = GPS_MESSAGES[trip.gps] && !trip.pickup ? `<p class="alert alert-warn" role="status">${GPS_MESSAGES[trip.gps]}</p>` : '';
+  return `
+    <div class="route">
+      <a class="route-row" href="#/chagua/kutoka">
+        <span class="route-icon from">${DOT}</span>
+        <span><span class="route-label">Kutoka</span><span class="route-value${trip.pickup ? '' : ' empty'}">${esc(pickupLabel())}</span></span>
+      </a>
+      <a class="route-row" href="#/chagua/kwenda">
+        <span class="route-icon to">${PIN}</span>
+        <span><span class="route-label">Kwenda</span><span class="route-value${trip.destination ? '' : ' empty'}">${esc(trip.destination?.name ?? 'Weka unakoenda')}</span></span>
+      </a>
+    </div>
+    ${gpsNote}
+    ${estimateBlock()}`;
+}
+
+function estimateBlock() {
+  if (!trip.pickup || !trip.destination) return '';
+  if (trip.loading) return '<p class="muted">Inahesabu nauli…</p>';
+  if (trip.estimateError) return `<p class="alert alert-danger" role="alert">${esc(trip.estimateError)}</p>`;
+  if (!trip.estimate) return '';
+  const { options } = trip.estimate;
+  if (options.length === 0) return '<p class="muted">Bei za safari bado hazijawekwa na ofisi ya NAYA. Jaribu tena baadaye.</p>';
+  if (!options.some((o) => o.vehicleType === trip.selected)) trip.selected = options[0].vehicleType;
+  return `
+    <fieldset class="fares">
+      <legend>Chagua chombo</legend>
+      ${options
+        .map(
+          (o) => `<label class="fare-option">
+            <input type="radio" name="vehicle" value="${o.vehicleType}" ${o.vehicleType === trip.selected ? 'checked' : ''}>
+            <span class="fare-body">
+              <span><strong>${esc(VEHICLE_TYPES[o.vehicleType])}</strong><span class="muted">km ${o.distanceKm.toLocaleString('en-US')} · makadirio</span></span>
+              <span class="fare-amount">${formatTsh(o.fare)}</span>
+            </span>
+          </label>`,
+        )
+        .join('')}
+    </fieldset>
+    <button class="btn btn-primary btn-block" type="button" disabled>Agiza safari</button>
+    <p class="muted small" style="margin-top:8px">Kuagiza kunaanza hivi karibuni. Kwa sasa unaona nauli halisi ya safari yako.</p>`;
+}
+
+async function refreshEstimate() {
+  trip.estimate = null;
+  trip.estimateError = null;
+  // Bila mahali pa kuanzia (mf. GPS imezuiwa) bado chora upya, ili abiria aone ujumbe na achague kwenye orodha.
+  if (!trip.pickup || !trip.destination) return renderIfHome();
+  trip.loading = true;
+  renderIfHome();
+  try {
+    const pickup = trip.pickup.type === 'gps' ? { lat: trip.pickup.lat, lng: trip.pickup.lng } : { locationId: trip.pickup.id };
+    trip.estimate = await api.post('/api/fares/estimate', { pickup, destination: { locationId: trip.destination.id } });
+  } catch (err) {
+    if (handleError(err)) return;
+    trip.estimateError = err.message;
+    // Eneo limezimwa na ofisi → orodha mpya
+    if (err.status === 404) places = null;
+  } finally {
+    trip.loading = false;
+  }
+  renderIfHome();
+}
+
+function renderIfHome() {
+  if (account?.activeMode === 'PASSENGER' && tab === 'home' && !location.hash.startsWith('#/chagua')) renderPassengerHome();
+}
+
+/** GPS kupitia kivinjari; makosa yanageuzwa kuwa ujumbe rafiki (GPS_MESSAGES). */
+function locateMe() {
+  if (!navigator.geolocation) {
+    trip.gps = 'unavailable';
+    return Promise.resolve();
+  }
+  trip.gps = 'locating';
+  return new Promise((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        trip.gps = 'ok';
+        trip.pickup = { type: 'gps', lat: pos.coords.latitude, lng: pos.coords.longitude };
+        resolve();
+      },
+      (err) => {
+        trip.gps = err.code === 1 ? 'denied' : err.code === 3 ? 'timeout' : 'unavailable';
+        if (trip.pickup?.type === 'gps') trip.pickup = null;
+        resolve();
+      },
+      { enableHighAccuracy: true, timeout: 12_000, maximumAge: 60_000 },
+    );
+  });
+}
+
+async function renderPicker(kind) {
+  const isPickup = kind === 'pickup';
+  $('app-content').innerHTML = `
+    <a class="back-link" href="#/">Rudi</a>
+    <h1>${isPickup ? 'Unaanzia wapi?' : 'Unaenda wapi?'}</h1>
+    <label class="sr-only" for="place-q">Tafuta eneo</label>
+    <input id="place-q" type="search" placeholder="Tafuta: stendi, soko, hospitali…" autocomplete="off">
+    ${isPickup ? `<button class="place place-gps" type="button" data-gps>${DOT}<span><strong>Tumia mahali nilipo sasa</strong><span class="muted">GPS ya simu yako</span></span></button>` : ''}
+    <div id="place-list" class="place-list"><p class="muted">Inapakia maeneo…</p></div>`;
+  try {
+    await loadPlaces();
+  } catch (err) {
+    if (handleError(err)) return;
+    $('place-list').innerHTML = `<p class="alert alert-danger" role="alert">${esc(err.message)}</p>`;
+    return;
+  }
+  const draw = () => {
+    const q = $('place-q').value.trim().toLowerCase();
+    const matches = places.filter((p) => !q || p.name.toLowerCase().includes(q) || (p.area ?? '').toLowerCase().includes(q));
+    const other = isPickup ? trip.destination?.id : trip.pickup?.id;
+    $('place-list').innerHTML =
+      matches.length === 0
+        ? '<p class="muted">Hakuna eneo linalolingana. Jaribu jina jingine.</p>'
+        : matches
+            .filter((p) => p.id !== other)
+            .map(
+              (p) => `<button class="place" type="button" data-place="${p.id}">${PIN}<span><strong>${esc(p.name)}</strong><span class="muted">${esc(
+                LOCATION_CATEGORIES[p.category] ?? '',
+              )}${p.area ? ` · ${esc(p.area)}` : ''}</span></span></button>`,
+            )
+            .join('');
+  };
+  draw();
+  $('place-q').addEventListener('input', draw);
+  if (window.matchMedia('(min-width: 600px)').matches) $('place-q').focus();
 }
 
 function statusBadge(status) {
@@ -514,7 +685,26 @@ $('app-content').addEventListener('click', async (event) => {
     }
     return;
   }
+  const placeBtn = event.target.closest('[data-place]');
+  if (placeBtn) {
+    const place = places.find((p) => p.id === placeBtn.dataset.place);
+    const kind = location.hash.includes('kutoka') ? 'pickup' : 'destination';
+    if (kind === 'pickup') trip.pickup = { type: 'location', id: place.id, name: place.name };
+    else trip.destination = { id: place.id, name: place.name };
+    location.hash = '#/';
+    if (kind === 'destination' && !trip.pickup && trip.gps === 'idle') await locateMe();
+    return refreshEstimate();
+  }
+  if (event.target.closest('[data-gps]')) {
+    location.hash = '#/';
+    await locateMe();
+    return refreshEstimate();
+  }
   const action = event.target.closest('[data-action]')?.dataset.action;
+  if (action === 'reload-places') {
+    places = null;
+    return renderPassengerHome();
+  }
   if (action === 'refresh') return loadDriver();
   if (action === 'to-driver') {
     return switchMode('DRIVER', { goHome: true })
@@ -543,6 +733,10 @@ $('app-content').addEventListener('click', async (event) => {
   }
 });
 
+$('app-content').addEventListener('change', (event) => {
+  if (event.target.name === 'vehicle') trip.selected = event.target.value;
+});
+
 // Ukisubiri uthibitisho, hali inaangaliwa tena kila dakika moja.
 setInterval(() => {
   if (account?.activeMode === 'DRIVER' && tab === 'home' && driver?.driver.status === 'PENDING' && document.visibilityState === 'visible') {
@@ -563,6 +757,8 @@ async function logout() {
 function signOutLocally() {
   account = null;
   driver = null;
+  places = null;
+  Object.assign(trip, { pickup: null, destination: null, estimate: null, estimateError: null, selected: null, gps: 'idle', loading: false });
   editingVehicle = false;
   api.setToken(null);
   for (const { url } of thumbs.values()) URL.revokeObjectURL(url);

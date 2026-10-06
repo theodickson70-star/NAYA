@@ -11,6 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
   <link rel="stylesheet" href="/shared/naya.css">
   <link rel="stylesheet" href="admin.css">
 </head>
@@ -69,6 +70,8 @@
       <nav class="topnav" aria-label="Sehemu za ofisi">
         <a href="#/" data-nav="overview">Muhtasari</a>
         <a href="#/madereva" data-nav="drivers">Madereva <span id="nav-pending" class="nav-count" hidden></span></a>
+        <a href="#/maeneo" data-nav="locations">Maeneo</a>
+        <a href="#/bei" data-nav="fares">Bei</a>
       </nav>
       <div class="topbar-user">
         <span id="me-name" class="me-name"></span>
@@ -90,6 +93,12 @@
 
       <p id="dashboard-error" class="alert alert-danger" role="alert" hidden></p>
 
+      <section class="panel" aria-labelledby="setup-title">
+        <h2 id="setup-title">Maandalizi ya safari</h2>
+        <p class="muted small">Haya yakikamilika, abiria wanaona bei halisi kwenye app ("Unaenda wapi?").</p>
+        <ul class="setup-list" id="setup-list"></ul>
+      </section>
+
       <section class="panel" aria-labelledby="system-title">
         <h2 id="system-title">Hali ya mfumo</h2>
         <ul class="system-list">
@@ -105,7 +114,7 @@
           <li class="done">Msingi, login na dashboard ya ofisi</li>
           <li class="done">Madereva: usajili, nyaraka na uthibitisho</li>
           <li class="done">App moja ya NAYA: abiria na dereva, kubadili mode</li>
-          <li>Bei na maeneo ya Urambo</li>
+          <li class="done">Bei na maeneo ya Urambo</li>
           <li>Kuomba safari na kumpata dereva</li>
           <li>Mode ya dereva: online, maombi, mapato</li>
           <li>Taarifa za papo hapo na notifications</li>
@@ -128,6 +137,51 @@
       <div id="driver-filters" class="filters" role="group" aria-label="Chuja kwa hali"></div>
       <p id="drivers-error" class="alert alert-danger" role="alert" hidden></p>
       <div id="driver-list" class="driver-list" aria-live="polite"></div>
+    </main>
+
+    <!-- Maeneo -->
+    <main id="page-locations" class="page page-wide" hidden>
+      <div class="page-head">
+        <h1>Maeneo</h1>
+        <form id="location-search" class="search" role="search">
+          <label class="sr-only" for="location-q">Tafuta eneo</label>
+          <input id="location-q" type="search" placeholder="Tafuta eneo au mtaa">
+        </form>
+      </div>
+      <p class="muted">Bonyeza kwenye ramani kuweka mahali, kisha jaza jina. Abiria watachagua maeneo haya kwenye app.</p>
+      <div class="locations-layout">
+        <div id="location-map" class="map" role="application" aria-label="Ramani ya maeneo ya NAYA"></div>
+        <div>
+          <form id="location-form" class="decision" novalidate>
+            <h2 id="location-form-title">Ongeza eneo</h2>
+            <label for="loc-name">Jina la eneo</label>
+            <input id="loc-name" name="name" maxlength="80" placeholder="Mf. Stendi ya Mabasi" required>
+            <label for="loc-category">Aina</label>
+            <select id="loc-category" name="category"></select>
+            <label for="loc-area">Mtaa <span class="muted">(si lazima)</span></label>
+            <input id="loc-area" name="area" maxlength="80">
+            <div class="coords">
+              <div><label for="loc-lat">Latitude</label><input id="loc-lat" name="lat" inputmode="decimal" required></div>
+              <div><label for="loc-lng">Longitude</label><input id="loc-lng" name="lng" inputmode="decimal" required></div>
+            </div>
+            <p class="muted small" id="coords-hint">Bonyeza ramani kujaza latitude na longitude.</p>
+            <p class="alert alert-danger" id="location-error" role="alert" hidden></p>
+            <div class="actions">
+              <button class="btn btn-primary" type="submit" id="location-save">Hifadhi eneo</button>
+              <button class="btn btn-ghost" type="button" id="location-cancel" hidden>Ghairi</button>
+            </div>
+          </form>
+          <div id="location-list" class="location-list" aria-live="polite"></div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Bei -->
+    <main id="page-fares" class="page" hidden>
+      <h1>Bei za safari</h1>
+      <p class="muted">Nauli = bei ya kuanzia + (bei kwa km × umbali wa barabara), isipungue nauli ya chini, ikizungushwa juu. Umbali wa barabara ≈ umbali wa moja kwa moja × kizidisho cha barabara.</p>
+      <p class="alert alert-danger" id="fares-error" role="alert" hidden></p>
+      <div id="fare-cards" class="fare-cards"></div>
     </main>
 
     <!-- Dereva mmoja -->

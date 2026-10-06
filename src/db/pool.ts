@@ -4,6 +4,8 @@ import { env } from '../config/env.js';
 
 // BIGINT (fedha, TZS) → number.
 pg.types.setTypeParser(20, (value) => parseInt(value, 10));
+// NUMERIC (koordinati, kizidisho cha barabara) → number. Fedha zote ni INTEGER za TZS, si NUMERIC.
+pg.types.setTypeParser(1700, (value) => parseFloat(value));
 
 // Supabase inahitaji SSL. "sslmode" ndani ya URL ingezima chaguo letu la SSL, kwa hiyo tunaiondoa
 // na kuweka SSL hapa (encrypted; cheti cha Supabase hakihakikiwi dhidi ya CA).

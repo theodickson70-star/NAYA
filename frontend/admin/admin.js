@@ -1,6 +1,7 @@
 // Ofisi ya NAYA: login → muhtasari, madereva (orodha → dereva mmoja → kuthibitisha/kukataa).
 // Session inahifadhiwa; refresh haikutoi isipokuwa API imekataa token (401/403).
 import { createApi, escapeHtml as esc, fetchHealth } from '/shared/api.js';
+import * as places from './places.js';
 import {
   AUDIT_ACTIONS,
   DOCUMENT_ORDER,
@@ -15,7 +16,7 @@ import {
 const api = createApi('naya_admin_token');
 const $ = (id) => document.getElementById(id);
 const views = ['view-loading', 'view-login', 'view-offline', 'view-app'];
-const pages = ['page-overview', 'page-drivers', 'page-driver'];
+const pages = ['page-overview', 'page-drivers', 'page-driver', 'page-locations', 'page-fares'];
 let me = null;
 
 function show(view) {
@@ -88,9 +89,12 @@ function route() {
   let page = 'page-overview';
   if (parts[0] === 'madereva' && parts[1]) page = 'page-driver';
   else if (parts[0] === 'madereva') page = 'page-drivers';
+  else if (parts[0] === 'maeneo') page = 'page-locations';
+  else if (parts[0] === 'bei') page = 'page-fares';
   for (const p of pages) $(p).hidden = p !== page;
+  const navFor = { 'page-overview': 'overview', 'page-drivers': 'drivers', 'page-driver': 'drivers', 'page-locations': 'locations', 'page-fares': 'fares' };
   for (const a of document.querySelectorAll('[data-nav]')) {
-    const active = (a.dataset.nav === 'overview' && page === 'page-overview') || (a.dataset.nav === 'drivers' && page !== 'page-overview');
+    const active = a.dataset.nav === navFor[page];
     if (active) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
   }
@@ -98,6 +102,8 @@ function route() {
   if (page === 'page-overview') loadOverview();
   if (page === 'page-drivers') loadDrivers(params.get('hali') ?? driversState.status, params.get('q') ?? driversState.q);
   if (page === 'page-driver') loadDriver(parts[1]);
+  if (page === 'page-locations') places.loadLocations();
+  if (page === 'page-fares') places.loadFares();
 }
 window.addEventListener('hashchange', route);
 
@@ -129,12 +135,31 @@ async function loadOverview() {
     setDot('sys-api', 'ok');
     setDot('sys-db', data.system.database === 'ok' ? 'ok' : 'bad');
     $('sys-version').textContent = `NAYA ${data.system.version} · ${data.system.phase}`;
+    renderSetup(data);
   } catch (err) {
     if (handleAuthError(err)) return;
     showError('dashboard-error', err);
     setDot('sys-api', err.status === 0 ? 'bad' : 'ok');
     setDot('sys-db', 'wait');
   }
+}
+
+function renderSetup(data) {
+  const priced = data.setup.pricedVehicleTypes;
+  const items = [
+    [data.setup.activeLocations > 0, data.setup.activeLocations > 0 ? `Maeneo ${data.setup.activeLocations} yanatumika` : 'Ongeza maeneo ya Urambo', '#/maeneo', 'Maeneo'],
+    [priced.includes('BODABODA'), 'Bei za bodaboda', '#/bei', 'Bei'],
+    [priced.includes('BAJAJI'), 'Bei za bajaji', '#/bei', 'Bei'],
+    [data.drivers.APPROVED > 0, data.drivers.APPROVED > 0 ? `Madereva ${data.drivers.APPROVED} wamethibitishwa` : 'Thibitisha madereva', '#/madereva', 'Madereva'],
+  ];
+  $('setup-list').innerHTML = items
+    .map(
+      ([done, label, href, link]) =>
+        `<li><span class="setup-mark ${done ? 'ok' : 'todo'}" aria-hidden="true">${done ? '✓' : '!'}</span><span>${esc(label)}</span>${
+          done ? '' : `<a href="${href}">${link}</a>`
+        }</li>`,
+    )
+    .join('');
 }
 
 // ---------- Orodha ya madereva ----------
@@ -477,4 +502,5 @@ async function start() {
   }
 }
 
+places.setup({ api, onAuthError: handleAuthError });
 start();
