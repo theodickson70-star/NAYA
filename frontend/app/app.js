@@ -11,13 +11,15 @@ import {
   LOCATION_CATEGORIES,
   VEHICLE_TYPES,
 } from '/shared/labels.js';
+import { disablePush, enablePush, pushState } from '/shared/push.js';
+import { connectRealtime } from '/shared/realtime.js';
 import * as rides from './rides.js';
 
 const api = createApi('naya_app_token');
 const $ = (id) => document.getElementById(id);
 const views = ['view-loading', 'view-auth', 'view-role', 'view-offline', 'view-app'];
 const MAX_BYTES = 3 * 1024 * 1024;
-const VERSION = '0.6.0';
+const VERSION = '0.7.0';
 
 let account = null; // { user, activeMode, driverStatus, canDrive }
 let driver = null; // wasifu wa udereva (mode ya Dereva)
@@ -30,6 +32,7 @@ const thumbs = new Map();
 const trip = { pickup: null, destination: null, estimate: null, estimateError: null, selected: null, gps: 'idle', loading: false };
 let places = null; // maeneo ya huduma (cache)
 let tripHistory = null; // safari za abiria zilizopita (cache)
+let realtime = null; // muunganisho wa taarifa za papo hapo
 
 // Akaunti ya zamani ya app ya dereva: mtu asilazimike kuingia upya.
 try {
@@ -114,6 +117,7 @@ $('login-form').addEventListener('submit', (e) =>
 // ---------- Akaunti na mode ----------
 async function loadAccount() {
   account = await api.get('/api/account');
+  startRealtime();
   if (!account.activeMode) return showRoleChoice();
   show('view-app');
   route();
@@ -156,6 +160,36 @@ async function switchMode(mode, { goHome } = {}) {
   show('view-app');
   if (goHome && location.hash !== '#/') location.hash = '#/';
   else route();
+}
+
+// ---------- Taarifa za papo hapo ----------
+function startRealtime() {
+  if (realtime) return;
+  realtime = connectRealtime(api, {
+    onStatus: (up) => {
+      rides.setRealtime(up);
+      const dot = $('live-dot');
+      if (dot) {
+        dot.classList.toggle('on', up);
+        dot.title = up ? 'Taarifa za papo hapo zimeunganishwa' : 'Inaunganisha upya…';
+      }
+    },
+    onEvent: async (type) => {
+      if (!account) return;
+      if (type === 'account') {
+        // mf. ofisi imekuthibitisha kuwa dereva
+        try {
+          account = await api.get('/api/account');
+          driver = null;
+          if (tab === 'home') route();
+        } catch (err) {
+          handleError(err);
+        }
+        return;
+      }
+      rides.onRealtime(type);
+    },
+  });
 }
 
 // ---------- Njia (tabs) ----------
@@ -426,8 +460,54 @@ function renderAccount() {
       }</p>
     </section>
 
+    <section class="card" aria-labelledby="notify-title">
+      <h2 id="notify-title">Arifa</h2>
+      <p class="muted" id="push-status">Inaangalia…</p>
+      <p class="alert alert-danger" id="push-error" role="alert" hidden></p>
+      <div id="push-action"></div>
+      <ul class="notes" id="note-list"></ul>
+    </section>
+
     <button class="btn btn-ghost btn-out" type="button" data-action="logout">Toka</button>
     <p class="version">NAYA ${VERSION} · TWENDE PAMOJA</p>`;
+  loadNotificationSection();
+}
+
+const PUSH_TEXT = {
+  on: 'Arifa zimewashwa kwenye kifaa hiki. Simu italia safari ikibadilika, hata app ikiwa imefungwa.',
+  off: 'Arifa zimezimwa. Ziwashe ujue dereva akipatikana, au upate maombi ya safari ukiwa dereva.',
+  denied: 'Umezuia arifa kwenye browser hii. Zifungue kwenye mipangilio ya browser (Site settings → Notifications).',
+  'server-off': 'Arifa za simu bado hazijawashwa na NAYA. Utaziona hapa zikiwa tayari.',
+  unsupported: 'Browser hii haiwezi kupokea arifa. Tumia Chrome kwenye Android, au sakinisha app kwenye iPhone (Add to Home Screen).',
+};
+
+async function loadNotificationSection() {
+  const state = await pushState(api).catch(() => 'server-off');
+  if (tab !== 'account' || !$('push-status')) return;
+  $('push-status').textContent = PUSH_TEXT[state];
+  $('push-action').innerHTML =
+    state === 'off'
+      ? '<button class="btn btn-primary btn-block" type="button" data-action="push-on">Washa arifa</button>'
+      : state === 'on'
+        ? '<button class="btn btn-ghost btn-block" type="button" data-action="push-off">Zima arifa kwenye kifaa hiki</button>'
+        : '';
+  try {
+    const notes = await api.get('/api/notifications');
+    if (!$('note-list')) return;
+    $('note-list').innerHTML = notes.length
+      ? notes
+          .slice(0, 10)
+          .map(
+            (n) => `<li class="${n.readAt ? '' : 'unread'}"><strong>${esc(n.title)}</strong>${n.body ? `<br><span>${esc(n.body)}</span>` : ''}<br><span class="muted">${esc(
+              formatDate(n.createdAt, true),
+            )}</span></li>`,
+          )
+          .join('')
+      : '<li class="muted">Bado huna arifa.</li>';
+    if (notes.some((n) => !n.readAt)) api.post('/api/notifications/read').catch(() => {});
+  } catch (err) {
+    handleError(err);
+  }
 }
 
 // ---------- Mode ya Dereva ----------
@@ -750,6 +830,20 @@ $('app-content').addEventListener('click', async (event) => {
       .catch((err) => handleError(err));
   }
   if (action === 'logout') return logout();
+  if (action === 'push-on' || action === 'push-off') {
+    const button = event.target.closest('[data-action]');
+    button.disabled = true;
+    $('push-error').hidden = true;
+    try {
+      if (action === 'push-on') await enablePush(api);
+      else await disablePush(api);
+      toast(action === 'push-on' ? 'Arifa zimewashwa' : 'Arifa zimezimwa');
+    } catch (err) {
+      $('push-error').textContent = err.message;
+      $('push-error').hidden = false;
+    }
+    return loadNotificationSection();
+  }
   if (action === 'edit-vehicle') {
     editingVehicle = true;
     return renderDriver();
@@ -784,6 +878,8 @@ setInterval(() => {
 
 // ---------- Kutoka ----------
 async function logout() {
+  // Arifa za mtu aliyetoka zisiendelee kufika kwenye simu hii.
+  await disablePush(api).catch(() => {});
   try {
     await api.post('/api/auth/logout');
   } catch {
@@ -793,6 +889,8 @@ async function logout() {
 }
 
 function signOutLocally() {
+  realtime?.close();
+  realtime = null;
   rides.reset();
   tripHistory = null;
   account = null;
@@ -811,6 +909,8 @@ $('retry-button').addEventListener('click', start);
 
 rides.init({
   api,
+  pushState: () => pushState(api),
+  enablePush: () => enablePush(api),
   toast,
   handleError,
   firstName: () => firstName(),

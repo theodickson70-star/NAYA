@@ -1,0 +1,59 @@
+// Sehemu moja ya kumjulisha mtumiaji: tukio la papo hapo (app iliyo wazi) + arifa ya kudumu + Web Push (app iliyofungwa).
+// Inaitwa BAADA ya transaction kukamilika, na haitupi kosa kamwe — kushindwa kwa arifa hakuvunji safari.
+import { db, many } from '../db/pool.js';
+import { type EventType, publish } from '../realtime/hub.js';
+import { sendPush } from './push.js';
+
+export interface Notice {
+  userId: string;
+  event: EventType;
+  rideId?: string | null;
+  /** Kama ipo: inahifadhiwa kwenye arifa za mtumiaji na kutumwa kama Web Push. */
+  title?: string;
+  body?: string;
+  kind?: string;
+  urgent?: boolean;
+  ttlSeconds?: number;
+}
+
+export async function notify(n: Notice): Promise<void> {
+  try {
+    await publish({ type: n.event, userId: n.userId, rideId: n.rideId ?? null });
+    if (n.title) {
+      await db.query('INSERT INTO naya.notifications (user_id, kind, title, body, ride_id) VALUES ($1, $2, $3, $4, $5)', [
+        n.userId,
+        n.kind ?? n.event,
+        n.title,
+        n.body ?? null,
+        n.rideId ?? null,
+      ]);
+      await sendPush(n.userId, {
+        title: n.title,
+        body: n.body,
+        tag: n.kind ?? n.event,
+        urgent: n.urgent,
+        ttlSeconds: n.ttlSeconds,
+      });
+    }
+  } catch (error) {
+    console.error(`[notify] ${(error as Error).message}`);
+  }
+}
+
+/** Ofisi: kitu kimebadilika (safari, dereva) — dashboard na orodha zijisasishe. */
+export async function notifyAdmins(rideId?: string | null): Promise<void> {
+  await publish({ type: 'admin', admins: true, rideId: rideId ?? null });
+}
+
+export async function listNotifications(userId: string) {
+  return many(
+    db,
+    `SELECT id, kind, title, body, ride_id AS "rideId", read_at AS "readAt", created_at AS "createdAt"
+       FROM naya.notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20`,
+    [userId],
+  );
+}
+
+export async function markNotificationsRead(userId: string) {
+  await db.query('UPDATE naya.notifications SET read_at = now() WHERE user_id = $1 AND read_at IS NULL', [userId]);
+}

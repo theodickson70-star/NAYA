@@ -9,8 +9,8 @@ Mfumo wa bodaboda na bajaji. Unajengwa phase moja baada ya nyingine; kila phase 
 | 3 | Madereva: usajili, chombo, nyaraka, uthibitisho wa ofisi, logo ya NAYA | ✅ |
 | 3.5 | App moja ya NAYA: abiria na dereva kwa akaunti moja, kuchagua na kubadili mode | ✅ |
 | 4 | Maeneo (ramani ya ofisi), bei kwa kila chombo, makadirio ya nauli kwa abiria (GPS au orodha) | ✅ |
-| 5+6 | Safari kamili: kuagiza, kumpata dereva, online/offline, kukubali, nimefika → anza → maliza, nyota, mapato, ukurasa wa Safari ofisini | ✅ sasa |
-| 7 | Realtime (Supabase Realtime) na notifications | |
+| 5+6 | Safari kamili: kuagiza, kumpata dereva, online/offline, kukubali, nimefika → anza → maliza, nyota, mapato, ukurasa wa Safari ofisini | ✅ |
+| 7 | Realtime (papo hapo) na arifa za simu (Web Push), arifa ndani ya app, ofisi inajisasisha yenyewe | ✅ sasa |
 | 8 | Malipo kwa simu (M-Pesa, Airtel, Tigo, HaloPesa) | |
 | 9 | Msaidizi wa AI (Claude) unaotumia data halisi | |
 | 10 | Ripoti, CSV, takwimu, ukaguzi wa usalama | |
@@ -69,7 +69,18 @@ Dereva akighairi baada ya kukubali → safari inarudi SEARCHING (dereva mwingine
   kukubali kunafanyika chini ya row lock (madereva wawili hawawezi kupata safari moja).
 - **Nauli** inahesabiwa na server wakati wa kuagiza (haitoki kwenye app). Malipo kwa sasa ni taslimu.
 - Kila badiliko la hali linaandikwa kwenye `naya.ride_status_history`.
-- App inaangalia hali mpya kila sekunde 4 (Phase 7 italeta Supabase Realtime na notifications).
+- Mabadiliko yanafika papo hapo kupitia realtime (tazama chini). Mtandao ukikatika, app inarudi kuangalia kila sekunde 4 mpaka iunganike tena.
+
+## Realtime na arifa (Phase 7)
+
+- **Papo hapo:** app na ofisi zinafungua `GET /api/stream` (Server-Sent Events). Tiketi ya kuingia (`POST /api/stream/ticket`) inadumu sekunde 60
+  na haiwezi kutumika kama token ya kawaida. Ujumbe una aina na `rideId` tu — data yenyewe inasomwa tena kupitia API (ambayo inakagua ruhusa).
+- Server zaidi ya moja zinaambiana kupitia Postgres `LISTEN/NOTIFY` (channel `naya_events`), kwa hiyo hakuna huduma mpya inayohitajika.
+- Kitone kwenye kona ya juu: kijani = realtime imeunganika.
+- **Arifa za simu (Web Push):** dereva anaitwa ombi likiingia hata app ikiwa imefungwa; abiria anaarifiwa dereva akipatikana, akifika, n.k.
+  Inahitaji https (Railway), Chrome kwenye Android, au app iliyosakinishwa (Add to Home Screen) kwenye iPhone.
+  Mtumiaji anaiwasha kwenye **Akaunti → Arifa**. Arifa zote zinahifadhiwa pia kwenye `naya.notifications`.
+- Funguo za push (VAPID) hutengenezwa mara moja tu: `npm run vapid-keys`. Bila funguo hizi, realtime inafanya kazi lakini arifa za simu zimezimwa.
 
 ## Nyaraka za madereva
 
@@ -94,5 +105,6 @@ Tests (kwenye database ya majaribio tu, kamwe ya production): `npm test`
 
 - Build: `npm run build` · Start: `npm start` (tayari kwenye `railway.json`)
 - Variables za lazima: `DATABASE_URL` (Supabase Session pooler, port 5432) na `JWT_SECRET`
+- Kwa arifa za simu: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (kutoka `npm run vapid-keys`; usizibadilishe baadaye, la sivyo simu zote zitahitaji kuwasha arifa upya)
 - Migrations zinaendeshwa zenyewe server inapoanza
 - Hakikisha: `/health` → `{"success":true,"status":"ok","database":"ok"}`, kisha `/admin/`

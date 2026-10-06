@@ -1,5 +1,6 @@
 // Skrini za safari: abiria (kutafuta → dereva anakuja → safari → nyota) na dereva (online → ombi → safari → mapato).
-// Hali mpya inaangaliwa kila sekunde 4 ukurasa ukiwa wazi (Phase 7 italeta Supabase Realtime na notifications).
+// Hali mpya inafika papo hapo kupitia realtime (SSE). Polling inabaki kama kinga tu: kila sekunde 4 realtime
+// ikiwa imekatika, au kila sekunde 20 ikiwa imeunganishwa (pia ni "mapigo ya moyo" ya dereva aliye online).
 import { escapeHtml as esc } from '/shared/api.js';
 import { formatDate, formatPhone, formatTsh, VEHICLE_TYPES } from '/shared/labels.js';
 
@@ -7,6 +8,10 @@ let ctx = null; // { api, toast, handleError, isPassengerHome, isDriverHome, onP
 const $ = (id) => document.getElementById(id);
 
 let pollTimer = null;
+let realtimeUp = false;
+let lastFetch = 0;
+let pushStatus = null; // 'on' | 'off' | 'denied' | 'server-off' | 'unsupported'
+let audio = null;
 let tickTimer = null;
 let passengerRide = null;
 let driverData = null;
@@ -20,6 +25,9 @@ const photos = new Map();
 
 export function init(context) {
   ctx = context;
+  ctx.pushState().then((state) => {
+    pushStatus = state;
+  });
   $('app-content').addEventListener('click', onClick);
   $('app-content').addEventListener('change', onChange);
 }
@@ -30,6 +38,20 @@ export function stopPolling() {
   pollTimer = null;
   tickTimer = null;
 }
+
+/** Realtime imeunganika/imekatika — polling inabadilika kulingana na hilo. */
+export function setRealtime(up) {
+  realtimeUp = up;
+}
+
+/** Tukio la papo hapo kutoka server: chukua hali mpya ya skrini iliyo wazi. */
+export function onRealtime(type) {
+  if (ctx.isPassengerHome() && (type === 'ride' || passengerRide)) return refreshPassenger();
+  if (ctx.isDriverHome() && ['offer', 'ride', 'driver'].includes(type)) return refreshDriver();
+}
+
+// Polling ya kinga: sekunde 4 bila realtime, sekunde 20 ikiwa realtime iko hai.
+const pollDue = () => !realtimeUp || Date.now() - lastFetch >= 20_000;
 
 export function reset() {
   stopPolling();
@@ -113,6 +135,7 @@ export function renderPassengerRide(ride) {
       <h1>${esc(head[1])}</h1>
       <p>${esc(head[2])}</p>
     </section>
+    ${ride.status === 'SEARCHING' ? pushPrompt('Washa arifa ujue dereva akipatikana, hata ukifunga app.') : ''}
     ${d ? driverCardHtml(ride) : ''}
     <section class="card">${routeSummary(ride)}</section>
     ${
@@ -184,22 +207,36 @@ function loadDriverPhoto(rideId) {
 
 function ensurePassengerPolling() {
   if (pollTimer) return;
-  pollTimer = setInterval(async () => {
-    if (!ctx.isPassengerHome() || document.visibilityState !== 'visible') return;
-    try {
-      const ride = await fetchCurrentRide();
-      if (!ride) {
-        stopPolling();
-        passengerRide = null;
-        lastKey = '';
-        return ctx.onPassengerRideClosed();
-      }
-      if (ride.status !== passengerRide?.status) navigator.vibrate?.(200);
-      renderPassengerRide(ride);
-    } catch (err) {
-      ctx.handleError(err);
-    }
+  pollTimer = setInterval(() => {
+    if (!ctx.isPassengerHome() || document.visibilityState !== 'visible' || !pollDue()) return;
+    refreshPassenger();
   }, 4000);
+}
+
+async function refreshPassenger() {
+  lastFetch = Date.now();
+  try {
+    const ride = await fetchCurrentRide();
+    if (!ride) {
+      if (!passengerRide) return;
+      stopPolling();
+      passengerRide = null;
+      lastKey = '';
+      return ctx.onPassengerRideClosed();
+    }
+    if (ride.status !== passengerRide?.status) navigator.vibrate?.(200);
+    renderPassengerRide(ride);
+  } catch (err) {
+    ctx.handleError(err);
+  }
+}
+
+function pushPrompt(text) {
+  if (pushStatus !== 'off') return '';
+  return `<div class="push-prompt" role="note">
+    <p>${esc(text)}</p>
+    <button class="btn btn-ghost" type="button" data-ride="enable-push">Washa arifa</button>
+  </div>`;
 }
 
 async function closePassengerRide() {
@@ -227,7 +264,7 @@ export async function loadDriverDashboard() {
 }
 
 function driverKey(s) {
-  return [s.online, s.offer?.id, s.ride?.id, s.ride?.status, s.earnings.today.total, standPicker, cancelOpen, onlineError].join('|');
+  return [s.online, s.offer?.id, s.ride?.id, s.ride?.status, s.earnings.today.total, standPicker, cancelOpen, onlineError, pushStatus].join('|');
 }
 
 function renderDriverDashboard() {
@@ -269,13 +306,15 @@ function onlineHtml(s) {
       <p class="muted">Ukiwa online utapokea maombi ya safari yaliyo karibu nawe.</p>
       ${onlineError ? `<p class="alert alert-danger" role="alert">${esc(onlineError)}</p>` : ''}
       <button class="online-button" type="button" data-ride="go-online">NENDA ONLINE</button>
+      ${pushPrompt('Washa arifa ili simu ilie ombi la safari likiingia, hata app ikiwa imefungwa.')}
     </section>`;
   }
   return `<section class="go-online is-online" role="status">
     <span class="ride-pulse" aria-hidden="true"></span>
     <h1>Uko online</h1>
-    <p class="muted">Unasubiri maombi ya safari. Acha app wazi.</p>
+    <p class="muted">${pushStatus === 'on' ? 'Unasubiri maombi ya safari. Simu italia ombi likiingia.' : 'Unasubiri maombi ya safari. Acha app wazi.'}</p>
     ${onlineError ? `<p class="alert alert-danger" role="alert">${esc(onlineError)}</p>` : ''}
+    ${pushPrompt('Washa arifa ili usikose ombi hata ukifunga app.')}
     <button class="btn btn-ghost btn-block" type="button" data-ride="go-offline">Nenda offline</button>
   </section>`;
 }
@@ -293,8 +332,30 @@ function offerHtml(offer) {
   </section>`;
 }
 
+/** Kengele fupi ya ombi jipya (AudioContext inafunguliwa dereva anapobonyeza NENDA ONLINE). */
+function chime() {
+  if (!audio) return;
+  try {
+    const now = audio.currentTime;
+    for (const [i, freq] of [880, 1175, 880].entries()) {
+      const osc = audio.createOscillator();
+      const gain = audio.createGain();
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, now + i * 0.22);
+      gain.gain.exponentialRampToValueAtTime(0.4, now + i * 0.22 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.22 + 0.2);
+      osc.connect(gain).connect(audio.destination);
+      osc.start(now + i * 0.22);
+      osc.stop(now + i * 0.22 + 0.21);
+    }
+  } catch {
+    // sauti haipatikani — mtetemo unatosha
+  }
+}
+
 function startOfferCountdown(seconds) {
   navigator.vibrate?.([300, 150, 300]);
+  chime();
   let left = seconds;
   tickTimer = setInterval(() => {
     left -= 1;
@@ -367,12 +428,13 @@ function driverRideHtml(ride) {
 function ensureDriverPolling() {
   if (pollTimer) return;
   pollTimer = setInterval(() => {
-    if (!ctx.isDriverHome() || document.visibilityState !== 'visible') return;
+    if (!ctx.isDriverHome() || document.visibilityState !== 'visible' || !pollDue()) return;
     if (driverData?.online || driverData?.ride || driverData?.offer) refreshDriver();
   }, 4000);
 }
 
 async function refreshDriver() {
+  lastFetch = Date.now();
   try {
     const before = driverData?.offer?.id;
     driverData = await ctx.api.get('/api/driver/state');
@@ -483,7 +545,27 @@ async function onClick(event) {
 
   // Dereva
   if (action === 'reload') return loadDriverDashboard();
+  if (action === 'enable-push') {
+    el.disabled = true;
+    try {
+      await ctx.enablePush();
+      pushStatus = 'on';
+      ctx.toast('Arifa zimewashwa');
+    } catch (err) {
+      ctx.toast(err.message);
+      pushStatus = await ctx.pushState();
+    }
+    lastKey = '';
+    return passengerRide && ctx.isPassengerHome() ? renderPassengerRide(passengerRide) : renderDriverDashboard();
+  }
   if (action === 'go-online') {
+    // Kubonyeza huku kunafungua sauti ya kengele ya maombi (browsers zinahitaji mtumiaji aguse kwanza).
+    try {
+      audio ??= new (window.AudioContext || window.webkitAudioContext)();
+      audio.resume?.();
+    } catch {
+      audio = null;
+    }
     el.disabled = true;
     el.textContent = 'Inatafuta mahali ulipo…';
     try {

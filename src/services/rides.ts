@@ -11,6 +11,7 @@ import { badRequest, conflict, forbidden, isUniqueViolation, notFound } from '..
 import { writeAudit } from './audit.js';
 import { readDocument } from './drivers.js';
 import { straightLineKm } from './fare-engine.js';
+import { notify, notifyAdmins } from './notify.js';
 import { estimateTrip, findLocation, insideServiceArea } from './places.js';
 
 export type RideStatus = 'SEARCHING' | 'ACCEPTED' | 'ARRIVED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'NO_DRIVER';
@@ -54,6 +55,7 @@ interface RideRow {
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
+const tsh = (n: number) => `TSh ${Math.round(n).toLocaleString('en-US')}`;
 
 async function history(client: Db, rideId: string, from: RideStatus | null, to: RideStatus, actorId: string | null, note?: string) {
   await client.query(
@@ -73,27 +75,33 @@ const DISTANCE_SQL = (latCol: string, lngCol: string, latParam: string, lngParam
 
 /** Inaisha maombi yaliyopitwa na muda, kisha inajaribu kumpata dereva kwa kila safari inayotafuta. */
 export async function dispatchPending(): Promise<void> {
-  await db.query(`UPDATE naya.ride_offers SET status = 'EXPIRED', responded_at = now() WHERE status = 'PENDING' AND expires_at <= now()`);
+  const expired = await many<{ driver_id: string; ride_id: string }>(
+    db,
+    `UPDATE naya.ride_offers SET status = 'EXPIRED', responded_at = now() WHERE status = 'PENDING' AND expires_at <= now()
+     RETURNING driver_id, ride_id`,
+  );
+  for (const o of expired) await notify({ userId: o.driver_id, event: 'offer', rideId: o.ride_id });
   const rides = await many<{ id: string }>(db, `SELECT id FROM naya.rides WHERE status = 'SEARCHING' ORDER BY requested_at LIMIT 50`);
   for (const ride of rides) await dispatchRide(ride.id);
 }
 
 /** Kwa safari moja: kama hakuna ombi linalosubiri, mpe dereva aliye karibu zaidi; muda ukiisha → NO_DRIVER. */
 export async function dispatchRide(rideId: string): Promise<void> {
-  await transaction(async (client) => {
+  type Outcome = { offeredTo?: string; noDriver?: boolean; passengerId?: string; ride?: RideRow };
+  const outcome: Outcome = await transaction(async (client): Promise<Outcome> => {
     const ride = await one<RideRow & { search_age_s: number }>(
       client,
       `SELECT *, extract(epoch FROM now() - search_started_at)::float8 AS search_age_s
          FROM naya.rides WHERE id = $1 AND status = 'SEARCHING' FOR UPDATE SKIP LOCKED`,
       [rideId],
     );
-    if (!ride) return;
+    if (!ride) return {};
     await client.query(
       `UPDATE naya.ride_offers SET status = 'EXPIRED', responded_at = now() WHERE ride_id = $1 AND status = 'PENDING' AND expires_at <= now()`,
       [rideId],
     );
     const waiting = await one(client, `SELECT 1 FROM naya.ride_offers WHERE ride_id = $1 AND status = 'PENDING'`, [rideId]);
-    if (waiting) return;
+    if (waiting) return {};
 
     const candidates = await many<{ user_id: string; km: number }>(
       client,
@@ -120,14 +128,42 @@ export async function dispatchRide(rideId: string): Promise<void> {
          ON CONFLICT DO NOTHING RETURNING id`,
         [rideId, candidate.user_id, round1(candidate.km), OFFER_SECONDS],
       );
-      if (offered) return;
+      if (offered) return { offeredTo: candidate.user_id, ride };
     }
 
     if (ride.search_age_s > SEARCH_TIMEOUT_SECONDS) {
       await client.query(`UPDATE naya.rides SET status = 'NO_DRIVER', updated_at = now() WHERE id = $1`, [rideId]);
       await history(client, rideId, 'SEARCHING', 'NO_DRIVER', null, 'Hakuna dereva aliyepatikana');
+      return { noDriver: true, passengerId: ride.passenger_id };
     }
+    return {};
   });
+
+  if (outcome.offeredTo && outcome.ride) {
+    const r = outcome.ride;
+    await notify({
+      userId: outcome.offeredTo,
+      event: 'offer',
+      rideId,
+      kind: 'offer',
+      title: 'Ombi jipya la safari',
+      body: `${tsh(r.fare)} · ${r.pickup_name} → ${r.dest_name}`,
+      urgent: true,
+      ttlSeconds: OFFER_SECONDS,
+    });
+    await notifyAdmins(rideId);
+  }
+  if (outcome.noDriver && outcome.passengerId) {
+    await notify({
+      userId: outcome.passengerId,
+      event: 'ride',
+      rideId,
+      kind: 'no_driver',
+      title: 'Hakuna dereva aliyepatikana',
+      body: 'Samahani, hakuna dereva karibu kwa sasa. Jaribu tena baada ya dakika chache.',
+    });
+    await notifyAdmins(rideId);
+  }
 }
 
 // =================================================================== MAONESHO (views)
@@ -264,6 +300,7 @@ export async function requestRide(
     if (isUniqueViolation(error)) throw conflict('Una safari inayoendelea tayari.');
     throw error;
   }
+  await notifyAdmins(rideId);
   await dispatchRide(rideId);
   return passengerView(db, (await findRide(db, rideId))!);
 }
@@ -290,7 +327,7 @@ async function ownRide(client: Db, rideId: string, passengerId: string) {
 }
 
 export async function cancelByPassenger(passengerId: string, rideId: string, reason: string | null) {
-  await transaction(async (client) => {
+  const affected = await transaction(async (client) => {
     const ride = await ownRide(client, rideId, passengerId);
     if (ride.status === 'IN_PROGRESS') throw conflict('Safari imeshaanza. Huwezi kughairi sasa.');
     if (!['SEARCHING', 'ACCEPTED', 'ARRIVED'].includes(ride.status)) throw conflict('Safari hii imeshaisha.');
@@ -299,9 +336,26 @@ export async function cancelByPassenger(passengerId: string, rideId: string, rea
               passenger_closed = true, updated_at = now() WHERE id = $1`,
       [rideId, reason],
     );
-    await client.query(`UPDATE naya.ride_offers SET status = 'EXPIRED', responded_at = now() WHERE ride_id = $1 AND status = 'PENDING'`, [rideId]);
+    const offers = await many<{ driver_id: string }>(
+      client,
+      `UPDATE naya.ride_offers SET status = 'EXPIRED', responded_at = now() WHERE ride_id = $1 AND status = 'PENDING' RETURNING driver_id`,
+      [rideId],
+    );
     await history(client, rideId, ride.status, 'CANCELLED', passengerId, reason ?? 'Abiria ameghairi');
+    return { driverId: ride.driver_id, offerDrivers: offers.map((o) => o.driver_id), pickup: ride.pickup_name };
   });
+  if (affected.driverId) {
+    await notify({
+      userId: affected.driverId,
+      event: 'ride',
+      rideId,
+      kind: 'ride_cancelled',
+      title: 'Abiria ameghairi safari',
+      body: `Safari ya ${affected.pickup} imeghairiwa.`,
+    });
+  }
+  for (const d of affected.offerDrivers) await notify({ userId: d, event: 'offer', rideId });
+  await notifyAdmins(rideId);
   return passengerView(db, (await findRide(db, rideId))!);
 }
 
@@ -399,6 +453,7 @@ export async function setOnline(
     await client.query(`UPDATE naya.users SET active_mode = 'DRIVER' WHERE id = $1`, [driverId]);
   });
   if (declinedRide) await dispatchRide(declinedRide);
+  await notifyAdmins();
   return driverState(driverId);
 }
 
@@ -509,7 +564,22 @@ export async function acceptOffer(driverId: string, offerId: string) {
     if (isUniqueViolation(error)) throw conflict('Una safari nyingine inayoendelea.');
     throw error;
   }
-  return driverState(driverId);
+  const state = await driverState(driverId);
+  if (state.ride) {
+    const card = await driverCard(db, driverId);
+    const ride = (await findRide(db, state.ride.id))!;
+    await notify({
+      userId: ride.passenger_id,
+      event: 'ride',
+      rideId: ride.id,
+      kind: 'driver_found',
+      title: 'Dereva amepatikana',
+      body: `${card?.name ?? 'Dereva'} anakuja · ${card?.plateNumber ?? ''}`.trim(),
+      urgent: true,
+    });
+    await notifyAdmins(ride.id);
+  }
+  return state;
 }
 
 export async function declineOffer(driverId: string, offerId: string) {
@@ -546,12 +616,21 @@ export async function advanceRide(driverId: string, rideId: string, step: keyof 
     }
     await history(client, rideId, from, to, driverId);
   });
+  const ride = (await findRide(db, rideId))!;
+  const messages = {
+    arrive: { title: 'Dereva amefika!', body: `Anakusubiri ${ride.pickup_name}.`, urgent: true },
+    start: null,
+    complete: { title: `Umefika ${ride.dest_name}`, body: `Lipa dereva ${tsh(ride.fare)} taslimu. Asante kwa kusafiri na NAYA.`, urgent: false },
+  } as const;
+  const m = messages[step];
+  await notify({ userId: ride.passenger_id, event: 'ride', rideId, kind: `ride_${step}`, ...(m ?? {}) });
+  await notifyAdmins(rideId);
   return driverState(driverId);
 }
 
 /** Dereva akighairi kabla ya safari kuanza: safari inarudi kutafuta dereva mwingine. */
 export async function cancelByDriver(driverId: string, rideId: string, reason: string) {
-  await transaction(async (client) => {
+  const passengerId = await transaction(async (client) => {
     const ride = await findRide(client, rideId, true);
     if (!ride || ride.driver_id !== driverId) throw notFound('Safari haikupatikana');
     if (!['ACCEPTED', 'ARRIVED'].includes(ride.status)) throw conflict('Huwezi kughairi safari iliyoanza au kuisha.');
@@ -561,8 +640,18 @@ export async function cancelByDriver(driverId: string, rideId: string, reason: s
       [rideId],
     );
     await history(client, rideId, ride.status, 'SEARCHING', driverId, `Dereva ameghairi: ${reason}`);
+    return ride.passenger_id;
+  });
+  await notify({
+    userId: passengerId,
+    event: 'ride',
+    rideId,
+    kind: 'driver_cancelled',
+    title: 'Dereva ameghairi',
+    body: 'Usijali — tunakutafutia dereva mwingine sasa hivi.',
   });
   await dispatchRide(rideId);
+  await notifyAdmins(rideId);
   return driverState(driverId);
 }
 
@@ -669,7 +758,7 @@ export async function rideForAdmin(rideId: string) {
 }
 
 export async function cancelByAdmin(adminId: string, rideId: string, reason: string) {
-  await transaction(async (client) => {
+  const affected = await transaction(async (client) => {
     const ride = await findRide(client, rideId, true);
     if (!ride) throw notFound('Safari haikupatikana');
     if (!ACTIVE.includes(ride.status)) throw conflict('Safari hii imeshaisha.');
@@ -677,10 +766,20 @@ export async function cancelByAdmin(adminId: string, rideId: string, reason: str
       `UPDATE naya.rides SET status = 'CANCELLED', cancelled_by = 'ADMIN', cancel_reason = $2, cancelled_at = now(), updated_at = now() WHERE id = $1`,
       [rideId, reason],
     );
-    await client.query(`UPDATE naya.ride_offers SET status = 'EXPIRED', responded_at = now() WHERE ride_id = $1 AND status = 'PENDING'`, [rideId]);
+    const offers = await many<{ driver_id: string }>(
+      client,
+      `UPDATE naya.ride_offers SET status = 'EXPIRED', responded_at = now() WHERE ride_id = $1 AND status = 'PENDING' RETURNING driver_id`,
+      [rideId],
+    );
     await history(client, rideId, ride.status, 'CANCELLED', adminId, reason);
     await writeAudit(client, { actorId: adminId, action: 'ride.cancelled', targetType: 'ride', targetId: rideId, details: { reason } });
+    return { passengerId: ride.passenger_id, driverId: ride.driver_id, offerDrivers: offers.map((o) => o.driver_id) };
   });
+  const notice = { event: 'ride' as const, rideId, kind: 'ride_cancelled', title: 'Safari imeghairiwa na ofisi ya NAYA', body: reason };
+  await notify({ userId: affected.passengerId, ...notice });
+  if (affected.driverId) await notify({ userId: affected.driverId, ...notice });
+  for (const d of affected.offerDrivers) await notify({ userId: d, event: 'offer', rideId });
+  await notifyAdmins(rideId);
   return rideForAdmin(rideId);
 }
 

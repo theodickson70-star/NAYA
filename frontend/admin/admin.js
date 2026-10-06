@@ -1,6 +1,7 @@
 // Ofisi ya NAYA: login → muhtasari, madereva (orodha → dereva mmoja → kuthibitisha/kukataa).
 // Session inahifadhiwa; refresh haikutoi isipokuwa API imekataa token (401/403).
 import { createApi, escapeHtml as esc, fetchHealth } from '/shared/api.js';
+import { connectRealtime } from '/shared/realtime.js';
 import * as places from './places.js';
 import * as ridesAdmin from './rides-admin.js';
 import {
@@ -74,8 +75,31 @@ $('login-form').addEventListener('submit', async (event) => {
   }
 });
 
+let realtime = null;
+let liveTimer = null;
+
+/** Kitu kimebadilika (safari, dereva) → sasisha ukurasa ulio wazi (mara moja kwa matukio mengi ya karibu). */
+function onAdminEvent(_type, data) {
+  clearTimeout(liveTimer);
+  liveTimer = setTimeout(() => {
+    if (!me) return;
+    if (!$('page-overview').hidden) loadOverview();
+    else if (!$('page-rides').hidden) ridesAdmin.refreshList();
+    else if (!$('page-ride').hidden && data?.rideId && location.hash.endsWith(data.rideId)) ridesAdmin.loadRide(data.rideId);
+    else if (!$('page-drivers').hidden) loadDrivers(driversState.status, driversState.q);
+    if ($('page-overview').hidden) loadPendingCount();
+  }, 700);
+}
+
 function enterApp(user) {
   me = user;
+  realtime ??= connectRealtime(api, {
+    onEvent: onAdminEvent,
+    onStatus: (up) => {
+      $('admin-live').classList.toggle('on', up);
+      $('admin-live').title = up ? 'Live: inajisasisha yenyewe' : 'Inaunganisha upya…';
+    },
+  });
   $('me-name').textContent = user.fullName;
   show('view-app');
   route();
@@ -468,6 +492,8 @@ async function loadPendingCount() {
   try {
     const data = await api.get('/api/admin/dashboard');
     setPendingBadge(data.drivers.PENDING);
+    $('nav-active').textContent = data.rides.active;
+    $('nav-active').hidden = !data.rides.active;
   } catch {
     // si muhimu
   }
@@ -484,6 +510,8 @@ async function logout() {
 }
 
 function signOutLocally() {
+  realtime?.close();
+  realtime = null;
   me = null;
   api.setToken(null);
   releaseBlobs();

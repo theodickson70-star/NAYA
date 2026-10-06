@@ -5,6 +5,7 @@ import { type Db, db, many, one, transaction } from '../db/pool.js';
 import { conflict, forbidden, isUniqueViolation, notFound } from '../utils/http.js';
 import type { DocumentType, VehicleInput } from '../validators/drivers.js';
 import { auditFor, writeAudit } from './audit.js';
+import { notify, notifyAdmins } from './notify.js';
 import { deleteFile, readFile, storeFile } from './files.js';
 import { toPublicUser, type UserRow } from './users.js';
 
@@ -219,6 +220,7 @@ export async function submitForReview(userId: string) {
     );
     await writeAudit(client, { actorId: userId, action: 'driver.submitted', targetType: 'driver', targetId: userId });
   });
+  await notifyAdmins();
   return getDriverProfile(userId);
 }
 
@@ -309,6 +311,14 @@ export async function approveDriver(adminId: string, driverId: string) {
     );
     await writeAudit(client, { actorId: adminId, action: 'driver.approved', targetType: 'driver', targetId: driverId });
   });
+  await notify({
+    userId: driverId,
+    event: 'account',
+    kind: 'driver_approved',
+    title: 'Umethibitishwa kuwa dereva wa NAYA!',
+    body: 'Fungua NAYA, bonyeza NENDA ONLINE upokee safari.',
+  });
+  await notifyAdmins();
   return getDriverForAdmin(driverId);
 }
 
@@ -330,6 +340,8 @@ export async function rejectDriver(adminId: string, driverId: string, reason: st
       details: { reason, documents },
     });
   });
+  await notify({ userId: driverId, event: 'account', kind: 'driver_rejected', title: 'Ombi lako la udereva linahitaji marekebisho', body: reason });
+  await notifyAdmins();
   return getDriverForAdmin(driverId);
 }
 
@@ -344,6 +356,8 @@ export async function suspendDriver(adminId: string, driverId: string, reason: s
       details: { reason },
     });
   });
+  await notify({ userId: driverId, event: 'account', kind: 'driver_suspended', title: 'Udereva wako umesimamishwa', body: reason });
+  await notifyAdmins();
   return getDriverForAdmin(driverId);
 }
 
@@ -352,5 +366,7 @@ export async function reinstateDriver(adminId: string, driverId: string) {
     await transition(client, driverId, 'SUSPENDED', 'APPROVED', adminId, null);
     await writeAudit(client, { actorId: adminId, action: 'driver.reinstated', targetType: 'driver', targetId: driverId });
   });
+  await notify({ userId: driverId, event: 'account', kind: 'driver_reinstated', title: 'Umerudishwa kazini', body: 'Unaweza kwenda online na kupokea safari tena.' });
+  await notifyAdmins();
   return getDriverForAdmin(driverId);
 }

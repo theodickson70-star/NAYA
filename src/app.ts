@@ -17,7 +17,9 @@ import { authRoutes } from './routes/auth.js';
 import { driverRoutes } from './routes/drivers.js';
 import { healthRoutes } from './routes/health.js';
 import { placeRoutes } from './routes/places.js';
+import { pushRoutes } from './routes/push.js';
 import { rideRoutes } from './routes/rides.js';
+import { streamRoutes } from './routes/stream.js';
 
 const FRONTEND_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
 // Ramani (Leaflet) inatolewa na server hii hii — hakuna script ya CDN ya nje.
@@ -25,7 +27,20 @@ const LEAFLET_DIR = join(dirname(createRequire(import.meta.url).resolve('leaflet
 
 export async function buildApp(options: { logger?: boolean } = {}): Promise<FastifyInstance> {
   const app = Fastify({
-    logger: options.logger ?? true,
+    logger:
+      options.logger === false
+        ? false
+        : {
+            serializers: {
+              // Tiketi ya realtime iko kwenye URL (EventSource haiwezi kutuma headers) — isiandikwe kwenye logs.
+              req: (req) => ({
+                method: req.method,
+                url: req.url.replace(/([?&]ticket=)[^&]*/g, '$1[siri]'),
+                host: req.host,
+                remoteAddress: req.ip,
+              }),
+            },
+          },
     trustProxy: true, // Railway iko nyuma ya proxy — IP halisi ya mtumiaji kwa rate limit
     bodyLimit: 1_000_000,
   });
@@ -42,7 +57,24 @@ export async function buildApp(options: { logger?: boolean } = {}): Promise<Fast
     },
   });
   await app.register(cors, { origin: env.corsOrigins.length > 0 ? env.corsOrigins : false });
-  await app.register(rateLimit, { max: 300, timeWindow: '1 minute' });
+  // Mitandao ya simu Tanzania huweka watu wengi nyuma ya IP moja (CGNAT). Kwa hiyo mtumiaji aliyeingia anahesabiwa
+  // kwa akaunti yake (token iliyothibitishwa), si kwa IP; asiyeingia anahesabiwa kwa IP.
+  await app.register(rateLimit, {
+    max: 300,
+    timeWindow: '1 minute',
+    keyGenerator: (request) => {
+      const header = request.headers.authorization;
+      if (header?.startsWith('Bearer ')) {
+        try {
+          const payload = app.jwt.verify<{ sub?: string }>(header.slice(7));
+          if (payload.sub) return `user:${payload.sub}`;
+        } catch {
+          // token mbaya → hesabu kwa IP
+        }
+      }
+      return `ip:${request.ip}`;
+    },
+  });
   await registerJwt(app);
   registerErrorHandling(app);
 
@@ -54,6 +86,8 @@ export async function buildApp(options: { logger?: boolean } = {}): Promise<Fast
   await app.register(driverRoutes);
   await app.register(placeRoutes);
   await app.register(rideRoutes);
+  await app.register(streamRoutes);
+  await app.register(pushRoutes);
 
   // Kurasa za NAYA: /app/ (app moja ya abiria na dereva) na /admin/ (ofisi).
   await app.register(fastifyStatic, { root: FRONTEND_DIR, prefix: '/', index: ['index.html'] });

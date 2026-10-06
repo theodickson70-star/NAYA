@@ -222,3 +222,6 @@
   .ride-row .col-people, .ride-row .col-time { display: none; }
   .people { grid-template-columns: 1fr; }
 }
+
+.live-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: rgba(255, 255, 255, 0.4); margin-left: 4px; }
+.live-dot.on { background: #7CE3A8; box-shadow: 0 0 0 3px rgba(124, 227, 168, 0.3); }

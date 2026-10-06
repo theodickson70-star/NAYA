@@ -50,6 +50,9 @@ export async function loadRides() {
   }, 10_000);
 }
 
+/** Kwa matukio ya papo hapo: sasisha orodha bila kuanzisha upya kipima-muda. */
+export const refreshList = () => drawList();
+
 async function drawList() {
   try {
     const rides = await ctx.api.get(`/api/admin/rides?scope=${scope}`);

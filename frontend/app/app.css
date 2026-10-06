@@ -307,3 +307,15 @@ input, select, textarea { font-size: 17px; padding: 13px 14px; }
 .trip-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; white-space: nowrap; }
 .driver-plate { display: flex; align-items: center; gap: 12px; margin: 14px 0 0; flex-wrap: wrap; }
 .driver-plate .muted { font-size: 15px; }
+
+/* ---- Arifa ---- */
+.push-prompt { margin-top: 16px; padding: 14px; border-radius: 14px; background: #FDF3D0; color: var(--warning-ink); text-align: left; display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.push-prompt p { margin: 0; flex: 1 1 200px; font-size: 15px; }
+.push-prompt .btn { background: var(--white); border-color: var(--warning-ink); color: var(--warning-ink); }
+.live-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--offline); margin-right: 6px; vertical-align: 1px; }
+.live-dot.on { background: #7CE3A8; box-shadow: 0 0 0 3px rgba(124, 227, 168, 0.3); }
+.notes { list-style: none; margin: 8px 0 0; padding: 0; }
+.notes li { padding: 10px 0; border-top: 1px solid var(--line); }
+.notes li:first-child { border-top: 0; }
+.notes li.unread strong::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--naya-green); margin-right: 8px; vertical-align: 2px; }
+.notes .muted { font-size: 14px; }

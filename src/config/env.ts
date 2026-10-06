@@ -44,6 +44,10 @@ export const env = {
   supabaseAnonKey: read('SUPABASE_ANON_KEY'),
   supabaseServiceRoleKey: read('SUPABASE_SERVICE_ROLE_KEY'),
   anthropicApiKey: read('ANTHROPIC_API_KEY'),
+  // Web Push (arifa app ikiwa imefungwa). Zitengeneze kwa: npm run vapid-keys
+  vapidPublicKey: read('VAPID_PUBLIC_KEY'),
+  vapidPrivateKey: read('VAPID_PRIVATE_KEY'),
+  vapidSubject: read('VAPID_SUBJECT') ?? 'mailto:admin@naya.co.tz',
 };
 
 if (problems.length > 0) {

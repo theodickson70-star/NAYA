@@ -1,6 +1,6 @@
 {
   "name": "naya-api",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "type": "module",
   "description": "NAYA — Twende Pamoja. API ya usafiri wa bodaboda na bajaji.",
@@ -11,6 +11,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
     "migrate": "tsx src/scripts/migrate.ts",
     "create-admin": "tsx src/scripts/create-admin.ts",
+    "vapid-keys": "tsx src/scripts/vapid-keys.ts",
     "test": "tsx --test --test-concurrency=1 tests/*.test.ts"
   },
   "dependencies": {
@@ -21,11 +22,13 @@
     "@fastify/static": "^10.1.5",
     "@types/node": "^26.6.4",
     "@types/pg": "^8.23.1",
+    "@types/web-push": "^3.6.4",
     "bcryptjs": "^3.0.3",
     "fastify": "^5.12.5",
     "leaflet": "^1.9.4",
     "pg": "^8.23.1",
     "typescript": "^7.0.2",
+    "web-push": "^3.6.7",
     "zod": "^4.6.5"
   },
   "engines": {

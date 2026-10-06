@@ -11,6 +11,7 @@ interface TokenPayload {
   sub: string;
   role: UserRole;
   tv: number; // token_version wakati token ilipotolewa
+  purpose?: 'stream'; // tiketi ya muda mfupi ya /api/stream — HAIRUHUSIWI kama token ya kawaida
 }
 
 declare module '@fastify/jwt' {
@@ -43,6 +44,7 @@ export async function authenticate(request: FastifyRequest, _reply: FastifyReply
   } catch {
     throw unauthorized('Muda wa kuingia umeisha au token si sahihi. Ingia tena.');
   }
+  if (payload.purpose) throw unauthorized('Token si sahihi. Ingia tena.');
   const user = await findUserById(db, payload.sub);
   if (!user || user.token_version !== payload.tv) throw unauthorized('Umetoka. Ingia tena.');
   if (user.status !== 'ACTIVE') throw forbidden('Akaunti hii imesimamishwa. Wasiliana na NAYA.');
@@ -58,3 +60,23 @@ export function requireRole(...roles: UserRole[]) {
 }
 
 export const ADMIN_ROLES: UserRole[] = ['ADMIN', 'SUPER_ADMIN'];
+
+/** Tiketi ya sekunde 60 ya kufungua /api/stream (EventSource haiwezi kutuma header ya Authorization). */
+export function issueStreamTicket(app: FastifyInstance, user: UserRow): string {
+  return app.jwt.sign({ sub: user.id, role: user.role, tv: user.token_version, purpose: 'stream' }, { expiresIn: '60s' });
+}
+
+/** Hakiki tiketi ya stream: sahihi, ya kusudi la stream, na mtumiaji bado yuko hai (hajatoka wala kusimamishwa). */
+export async function verifyStreamTicket(app: FastifyInstance, ticket: string): Promise<UserRow> {
+  let payload: TokenPayload;
+  try {
+    payload = app.jwt.verify<TokenPayload>(ticket);
+  } catch {
+    throw unauthorized('Tiketi ya taarifa za papo hapo imeisha muda.');
+  }
+  if (payload.purpose !== 'stream') throw unauthorized('Tiketi si sahihi.');
+  const user = await findUserById(db, payload.sub);
+  if (!user || user.token_version !== payload.tv) throw unauthorized('Umetoka. Ingia tena.');
+  if (user.status !== 'ACTIVE') throw forbidden('Akaunti hii imesimamishwa.');
+  return user;
+}

@@ -3,6 +3,7 @@ import { buildApp } from './app.js';
 import { env } from './config/env.js';
 import { db } from './db/pool.js';
 import { runMigrations } from './db/migrate.js';
+import { startListener, stopListener } from './realtime/hub.js';
 import { dispatchPending } from './services/rides.js';
 
 const app = await buildApp();
@@ -16,6 +17,8 @@ try {
 }
 
 await app.listen({ port: env.port, host: '0.0.0.0' });
+// Taarifa za papo hapo kutoka servers nyingine (Postgres LISTEN/NOTIFY).
+await startListener({ info: (m) => app.log.info(m), warn: (m) => app.log.warn(m) });
 app.log.info(`NAYA iko tayari kwenye port ${env.port}`);
 
 // Kumpata dereva: kila sekunde 3 maombi yaliyopitwa na muda yanaenda kwa dereva anayefuata.
@@ -35,6 +38,7 @@ const dispatcher = setInterval(async () => {
 
 const shutdown = async () => {
   clearInterval(dispatcher);
+  await stopListener();
   await app.close();
   await db.end();
   process.exit(0);

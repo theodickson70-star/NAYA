@@ -13,9 +13,14 @@ const url = new URL(env.databaseUrl);
 url.searchParams.delete('sslmode');
 const isLocal = ['localhost', '127.0.0.1'].includes(url.hostname);
 
-export const db = new pg.Pool({
+/** Mipangilio ya muunganisho — pool, na client maalum ya LISTEN (realtime). */
+export const connectionConfig: pg.ClientConfig = {
   connectionString: url.toString(),
   ssl: isLocal ? false : { rejectUnauthorized: false },
+};
+
+export const db = new pg.Pool({
+  ...connectionConfig,
   max: 10,
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 10_000,
