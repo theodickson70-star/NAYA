@@ -22,8 +22,9 @@ import { assertSubscriptionOk, describeSubscription, getSettings, SUBSCRIPTION_O
 export type RideStatus = 'SEARCHING' | 'ACCEPTED' | 'ARRIVED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'NO_DRIVER';
 type VehicleType = 'BODABODA' | 'BAJAJI';
 
-export const OFFER_SECONDS = 20; // muda wa dereva kukubali ombi
-export const SEARCH_TIMEOUT_SECONDS = 180; // baada ya hapo bila dereva → NO_DRIVER
+export const OFFER_SECONDS = 180; // dakika 3: muda wa dereva kukubali ombi (akikataa, linaenda kwa anayefuata papo hapo)
+export const SEARCH_TIMEOUT_SECONDS = 600; // dakika 10 bila dereva → NO_DRIVER (madereva ~3 wanaweza kujaribiwa)
+export const NEARBY_LIMIT = 3; // "NAYA karibu nawe": madereva wangapi wa kila chombo abiria anawaona
 export const MAX_PICKUP_KM = 10; // dereva awe ndani ya umbali huu kutoka kwa abiria
 export const DRIVER_STALE_SECONDS = 120; // dereva asiyeonekana kwa muda huu hapewi maombi
 export const PIN_MAX_ATTEMPTS = 5; // PIN ya safari ikikosewa mara hizi, dereva hawezi kuanza safari (wasiliana na ofisi)
@@ -285,6 +286,38 @@ async function driverView(client: Db, r: RideRow) {
 
 const findRide = (client: Db, id: string, lock = false) =>
   one<RideRow>(client, `SELECT * FROM naya.rides WHERE id = $1${lock ? ' FOR UPDATE' : ''}`, [id]);
+
+// =================================================================== NAYA KARIBU NAWE
+
+/**
+ * Madereva walio karibu na abiria (kabla hajaagiza): hadi 3 kwa kila chombo — wale tu wanaoweza kupewa safari sasa hivi.
+ * Faragha ya dereva: hakuna jina wala namba; mahali panazungushwa hadi ~mita 100, na kila dereva ana namba ya muda tu.
+ */
+export async function nearbyDrivers(userId: string, point: { lat: number; lng: number }) {
+  const { graceDays } = await getSettings();
+  const rows = await many<{ vehicle_type: VehicleType; lat: number; lng: number; km: number; rank: number }>(
+    db,
+    `WITH c AS (
+       SELECT d.vehicle_type, d.last_lat AS lat, d.last_lng AS lng, ${DISTANCE_SQL('d.last_lat', 'd.last_lng', '$1', '$2')} AS km
+         FROM naya.drivers d JOIN naya.users u ON u.id = d.user_id
+        WHERE d.status = 'APPROVED' AND d.is_online AND u.status = 'ACTIVE' AND d.vehicle_type IS NOT NULL
+          AND d.last_lat IS NOT NULL AND d.last_seen_at > now() - make_interval(secs => $3::float8)
+          AND d.user_id <> $4
+          AND ${SUBSCRIPTION_OK_SQL('d', '$5')}
+          AND NOT EXISTS (SELECT 1 FROM naya.rides r WHERE r.driver_id = d.user_id AND r.status IN ('ACCEPTED', 'ARRIVED', 'IN_PROGRESS'))
+     )
+     SELECT * FROM (
+       SELECT c.*, row_number() OVER (PARTITION BY vehicle_type ORDER BY km) AS rank FROM c WHERE km <= $6
+     ) x WHERE rank <= $7 ORDER BY vehicle_type, km`,
+    [point.lat, point.lng, DRIVER_STALE_SECONDS, userId, graceDays, MAX_PICKUP_KM, NEARBY_LIMIT],
+  );
+  const round3 = (n: number) => Math.round(n * 1000) / 1000;
+  const group = (type: VehicleType) =>
+    rows
+      .filter((r) => r.vehicle_type === type)
+      .map((r) => ({ key: `${type[0]}${r.rank}`, lat: round3(r.lat), lng: round3(r.lng), distanceKm: round1(r.km), etaMinutes: etaMinutes(r.km) }));
+  return { BODABODA: group('BODABODA'), BAJAJI: group('BAJAJI') };
+}
 
 // =================================================================== ABIRIA
 
@@ -556,6 +589,7 @@ export async function driverState(driverId: string) {
     offer = {
       id: offerRow.id,
       secondsLeft: Math.floor(offerRow.seconds_left),
+      totalSeconds: OFFER_SECONDS,
       distanceToPickupKm: offerRow.distance_km,
       ride: { ...baseView(ride) },
     };

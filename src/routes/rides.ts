@@ -17,6 +17,7 @@ import {
   driverPhotoForPassenger,
   driverState,
   listRidesForAdmin,
+  nearbyDrivers,
   passengerHistory,
   ratePassenger,
   rateDriver,
@@ -72,6 +73,10 @@ export async function rideRoutes(app: FastifyInstance): Promise<void> {
     const ride = await requestRide(uid(request), requestSchema.parse(request.body));
     request.log.info({ rideId: ride.id }, 'safari mpya imeagizwa');
     return reply.status(201).send(ok(ride));
+  });
+  app.get('/api/rides/nearby', { ...user, config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (request) => {
+    const point = z.object({ lat: z.coerce.number().min(-12.5).max(-0.5), lng: z.coerce.number().min(29).max(41) }).parse(request.query);
+    return ok(await nearbyDrivers(uid(request), point));
   });
   app.get('/api/rides/current', user, async (request) => ok(await currentRideForPassenger(uid(request))));
   app.get('/api/rides/history', user, async (request) => ok(await passengerHistory(uid(request))));

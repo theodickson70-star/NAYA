@@ -14,6 +14,7 @@ import {
 import { disablePush, enablePush, pushState } from '/shared/push.js';
 import { connectRealtime } from '/shared/realtime.js';
 import { introSeen, setupIntro } from './intro.js';
+import { nearbyMap } from '/shared/map.js';
 import * as rides from './rides.js';
 import { finishSplash, previewSound, setSoundEnabled, soundEnabled, splashActive, splashReady } from './splash.js';
 
@@ -409,6 +410,7 @@ function startRealtime() {
 function route() {
   if (!account) return;
   rides.stopPolling();
+  stopNearby();
   tab = location.hash.startsWith('#/akaunti') ? 'account' : 'home';
   const picker = location.hash.match(/^#\/chagua\/(kwenda|kutoka)/)?.[1] ?? null;
   for (const a of document.querySelectorAll('[data-tab]')) {
@@ -510,6 +512,11 @@ async function renderPassengerHome() {
     <section class="card trip trip-card" aria-labelledby="where-title">
       ${planner}
     </section>
+    <section class="card nearby-card" aria-labelledby="nearby-title">
+      <div class="nearby-head"><h2 id="nearby-title">NAYA karibu nawe</h2><span class="nearby-live"><i></i>Live</span></div>
+      <p class="nearby-summary" id="nearby-summary">Inatafuta bodaboda zilizo karibu…</p>
+      <div class="nearby-map" id="nearby-map" role="img" aria-label="Ramani ya bodaboda na bajaji zilizo karibu nawe"></div>
+    </section>
     <section class="card">
       <h2>Safari zako</h2>
       ${rides.historyHtml(tripHistory)}
@@ -527,6 +534,88 @@ async function renderPassengerHome() {
             <button class="btn btn-ghost btn-block" type="button" data-action="to-driver">Kuwa dereva</button>
           </section>`
     }`;
+  mountNearby();
+}
+
+// ---------- NAYA karibu nawe: bodaboda 3 (na bajaji) zilizo karibu na abiria, zinasasishwa kila sekunde 15 ----------
+const nearby = { map: null, timer: null, data: null, key: '' };
+
+function nearbyPoint() {
+  if (trip.pickup?.type === 'gps') return { lat: trip.pickup.lat, lng: trip.pickup.lng };
+  if (trip.pickup?.type === 'location') {
+    const p = places?.find((x) => x.id === trip.pickup.id);
+    if (p) return { lat: p.lat, lng: p.lng };
+  }
+  return null;
+}
+
+function stopNearby() {
+  clearInterval(nearby.timer);
+  nearby.timer = null;
+  nearby.map?.destroy();
+  nearby.map = null;
+}
+
+function paintNearby() {
+  const box = $('nearby-summary');
+  if (!box || !nearby.data) return;
+  const boda = nearby.data.BODABODA;
+  const bajaji = nearby.data.BAJAJI;
+  box.innerHTML = boda.length
+    ? `<strong>Bodaboda ${boda.length}</strong> ${boda.length === 1 ? 'iko' : 'ziko'} karibu nawe · iliyo karibu zaidi inafika baada ya <strong>dakika ~${boda[0].etaMinutes}</strong>${
+        bajaji.length ? ` · bajaji ${bajaji.length}` : ''
+      }`
+    : bajaji.length
+      ? `Hakuna bodaboda karibu kwa sasa · <strong>bajaji ${bajaji.length}</strong> ${bajaji.length === 1 ? 'iko' : 'ziko'} karibu`
+      : 'Hakuna dereva online karibu nawe kwa sasa. Ukiagiza, tutakutafutia kwa dakika 10.';
+  nearby.map?.setDrivers(nearby.data);
+}
+
+async function refreshNearby(point) {
+  try {
+    nearby.data = await api.get(`/api/rides/nearby?lat=${point.lat}&lng=${point.lng}`);
+    if (onPassengerHome()) paintNearby();
+  } catch (err) {
+    handleError(err);
+  }
+}
+
+async function mountNearby() {
+  stopNearby();
+  const point = nearbyPoint();
+  const mapEl = $('nearby-map');
+  if (!mapEl) return;
+  if (!point && trip.gps === 'idle') {
+    // Mara ya kwanza nyumbani: tafuta mahali ulipo (ndiyo pia "Kutoka" ya safari), kisha onyesha madereva walio karibu.
+    $('nearby-summary').textContent = 'Inatafuta mahali ulipo…';
+    locateMe().then(() => {
+      if (onPassengerHome()) renderPassengerHome();
+    });
+    return;
+  }
+  if (!point) {
+    mapEl.hidden = true;
+    $('nearby-summary').textContent =
+      trip.gps === 'locating' ? 'Inatafuta mahali ulipo…' : 'Washa GPS, au chagua unapoanzia, uone bodaboda zilizo karibu nawe.';
+    return;
+  }
+  const key = `${point.lat},${point.lng}`;
+  if (key !== nearby.key) nearby.data = null; // mahali pamebadilika
+  nearby.key = key;
+  paintNearby(); // onyesha mara moja kutoka kumbukumbu, kisha sasisha
+  try {
+    const m = await nearbyMap(mapEl, point);
+    if (!m || !mapEl.isConnected) return m?.destroy();
+    nearby.map = m;
+    if (nearby.data) m.setDrivers(nearby.data);
+  } catch {
+    mapEl.hidden = true;
+  }
+  refreshNearby(point);
+  nearby.timer = setInterval(() => {
+    if (!onPassengerHome() || !$('nearby-map')) return stopNearby();
+    if (document.visibilityState === 'visible') refreshNearby(point);
+  }, 15_000);
 }
 
 function tripPlanner() {

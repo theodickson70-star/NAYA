@@ -773,3 +773,30 @@ input, select, textarea { font-size: 17px; padding: 13px 14px; border-radius: va
 .switch input:checked + span + i { background: var(--g700); }
 .switch input:checked + span + i::after { transform: translateX(24px); }
 .switch input:focus-visible + span + i { outline: 3px solid var(--gold); outline-offset: 2px; }
+
+/* ---------- NAYA karibu nawe ---------- */
+.nearby-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.nearby-head h2 { margin: 0; }
+.nearby-live { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: var(--g700); background: var(--g100); padding: 4px 10px; border-radius: 999px; }
+.nearby-live i { width: 7px; height: 7px; border-radius: 50%; background: var(--g500); animation: live-green 1.8s ease-out infinite; }
+@keyframes live-green { 0% { box-shadow: 0 0 0 0 rgba(18, 160, 100, 0.55); } 100% { box-shadow: 0 0 0 7px rgba(18, 160, 100, 0); } }
+.nearby-summary { margin: 8px 0 0; color: var(--muted); font-size: 15.5px; }
+.nearby-summary strong { color: var(--ink); }
+.nearby-map { height: 210px; margin-top: 12px; border-radius: 18px; overflow: hidden; position: relative; z-index: 0; background: var(--g100); }
+.nearby-map.leaflet-container {
+  background-color: #E4EFE8;
+  background-image:
+    linear-gradient(90deg, transparent 46%, #FFFFFF 46%, #FFFFFF 54%, transparent 54%),
+    linear-gradient(0deg, transparent 46%, #FFFFFF 46%, #FFFFFF 54%, transparent 54%),
+    linear-gradient(32deg, transparent 49%, rgba(255, 255, 255, 0.85) 49%, rgba(255, 255, 255, 0.85) 51.5%, transparent 51.5%);
+  background-size: 132px 132px, 96px 96px, 300px 300px;
+}
+.me-marker i { display: block; width: 22px; height: 22px; border-radius: 50%; background: #2F80ED; border: 4px solid var(--white); box-shadow: 0 0 0 0 rgba(47, 128, 237, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3); animation: me-pulse 2s ease-out infinite; }
+@keyframes me-pulse { to { box-shadow: 0 0 0 16px rgba(47, 128, 237, 0), 0 2px 6px rgba(0, 0, 0, 0.3); } }
+.bajaji-marker { background: var(--g700); }
+.bajaji-marker svg { stroke: var(--white); }
+.leaflet-marker-icon.moto-marker { transition: transform 1.2s var(--ease-out); }
+
+/* Muda wa ombi la dereva (dakika 3): "2:59" */
+.offer-timer { width: 66px; height: 66px; font-size: 17px; }
+.offer-timer::before { inset: 6px; }

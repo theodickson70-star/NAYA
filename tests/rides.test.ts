@@ -137,13 +137,28 @@ describe('NAYA Phase 5+6 — safari', () => {
     assert.equal((await call('POST', '/api/driver/online', { online: true, locationId: locationIds[0] }, 'd3')).status, 200);
   });
 
+  it('NAYA karibu nawe: abiria anaona madereva walio karibu (bila majina wala namba), aliye karibu zaidi kwanza', async () => {
+    const res = await call('GET', `/api/rides/nearby?lat=${A.lat}&lng=${A.lng}`, undefined, 'p1');
+    assert.equal(res.status, 200, res.json.message);
+    const boda = res.json.data.BODABODA;
+    assert.ok(boda.length >= 2 && boda.length <= 3);
+    assert.ok(boda[0].distanceKm <= boda[1].distanceKm);
+    assert.ok(boda[0].distanceKm < 0.3 && boda[0].etaMinutes >= 1);
+    assert.ok(res.json.data.BAJAJI.length >= 1);
+    const text = JSON.stringify(res.json.data);
+    for (const secret of ['Dereva Karibu', 'Dereva Mbali', '255722', 'MC ']) assert.equal(text.includes(secret), false, secret);
+    assert.equal((await call('GET', '/api/rides/nearby?lat=-6.8&lng=99', undefined, 'p1')).status, 400);
+    assert.equal((await call('GET', `/api/rides/nearby?lat=${A.lat}&lng=${A.lng}`)).status, 401);
+  });
+
   it('ombi linaenda kwa dereva wa aina sahihi aliye karibu zaidi', async () => {
     const res = await call('POST', '/api/rides', requestBody(), 'p1');
     rideId = res.json.data.id;
     const s1 = await state('d1');
     assert.ok(s1.offer, 'd1 hakupata ombi');
     assert.equal(s1.offer.ride.id, rideId);
-    assert.ok(s1.offer.secondsLeft > 10 && s1.offer.secondsLeft <= 20);
+    assert.ok(s1.offer.secondsLeft > 170 && s1.offer.secondsLeft <= 180, `secondsLeft ${s1.offer.secondsLeft}`);
+    assert.equal(s1.offer.totalSeconds, 180);
     assert.equal((await state('d2')).offer, null);
     assert.equal((await state('d3')).offer, null); // bajaji haipewi ombi la bodaboda
   });

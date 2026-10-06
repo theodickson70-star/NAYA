@@ -62,18 +62,22 @@ Majibu yote ya API: `{ "success": true, "data": ... }` au `{ "success": false, "
 
 ```
 SEARCHING → ACCEPTED → ARRIVED → IN_PROGRESS → COMPLETED
-          ↘ NO_DRIVER (hakuna dereva ndani ya dakika 3)
+          ↘ NO_DRIVER (hakuna dereva ndani ya dakika 10)
           ↘ CANCELLED (abiria kabla ya safari kuanza, au ofisi)
 Dereva akighairi baada ya kukubali → safari inarudi SEARCHING (dereva mwingine anatafutwa).
 ```
 
 - **Kumpata dereva:** server inaendesha dispatch kila sekunde 3 (`src/server.ts`). Ombi linaenda kwa dereva aliyethibitishwa, aliye online,
-  mwenye chombo sahihi, aliye karibu zaidi (ndani ya km 10). Ana sekunde 20 kukubali; akikataa au muda ukiisha, anayefuata anapewa.
+  mwenye chombo sahihi, aliye karibu zaidi (ndani ya km 10). Ana **dakika 3** kukubali (app inamkumbusha kwa kengele kila sekunde 20); akikataa, anayefuata anapewa papo hapo. Bila dereva kwa dakika 10 → NO_DRIVER.
 - **Usalama wa data:** unique indexes zinazuia dereva au abiria kuwa na safari mbili zinazoendelea; dereva ana ombi moja tu linalosubiri;
   kukubali kunafanyika chini ya row lock (madereva wawili hawawezi kupata safari moja).
 - **Nauli** inahesabiwa na server wakati wa kuagiza (haitoki kwenye app). Malipo kwa sasa ni taslimu.
 - Kila badiliko la hali linaandikwa kwenye `naya.ride_status_history`.
 - Mabadiliko yanafika papo hapo kupitia realtime (tazama chini). Mtandao ukikatika, app inarudi kuangalia kila sekunde 4 mpaka iunganike tena.
+
+- **NAYA karibu nawe:** abiria akifungua app anaona kwenye ramani bodaboda 3 (na bajaji 3) zilizo karibu zaidi zinazoweza kupewa safari
+  sasa hivi, na dakika za iliyo karibu kufika (`GET /api/rides/nearby`). Faragha ya dereva: hakuna jina wala namba, mahali
+  panazungushwa hadi ~mita 100. Inasasishwa kila sekunde 15.
 
 ## Realtime na arifa (Phase 7)
 
