@@ -4,131 +4,277 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="description" content="NAYA — bodaboda na bajaji. Twende Pamoja.">
-  <meta name="theme-color" content="#0A6E47">
+  <meta name="theme-color" content="#06502F">
   <link rel="manifest" href="/app/manifest.webmanifest">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/shared/brand/naya-apple-180.png">
   <title>NAYA — Twende Pamoja</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&display=swap" rel="stylesheet">
+  <link rel="preload" href="/shared/fonts/bricolage-grotesque.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/shared/fonts/atkinson-hyperlegible-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/shared/fonts.css">
+  <link rel="preload" as="image" href="/shared/img/naya-hero.webp" type="image/webp">
   <link rel="stylesheet" href="/shared/naya.css">
   <link rel="stylesheet" href="app.css">
+  <script src="boot.js"></script>
 </head>
 <body>
-  <div id="view-loading" class="loading" aria-live="polite">
-    <img src="/shared/brand/naya-icon.svg" alt="" width="72" height="72">
+  <!-- ================= Kufunguka: logo inang'aa → inazunguka na chembe → jina linajitokeza ================= -->
+  <div id="view-loading" class="splash" role="status" aria-label="NAYA inafunguka">
+    <div class="splash-glow" aria-hidden="true"></div>
+    <div class="splash-stage" aria-hidden="true">
+      <div class="splash-rings"><i></i><i></i><i></i></div>
+      <div class="splash-orbit"><b></b><b></b><b></b><b></b><b></b><b></b></div>
+      <svg class="splash-icon" viewBox="0 0 512 512">
+        <rect class="tile" width="512" height="512" rx="112"/>
+        <g class="y" fill="none" stroke-width="64" stroke-linecap="round" stroke-linejoin="round">
+          <path pathLength="1" d="M158 132 L256 266 L354 132"/>
+          <path pathLength="1" d="M256 266 V388"/>
+        </g>
+        <circle class="hub" cx="256" cy="266" r="44" stroke-width="16"/>
+      </svg>
+    </div>
+    <div class="splash-brand" aria-hidden="true">
+      <svg class="splash-word" viewBox="-12 -12 438 124">
+        <g fill="none" stroke="#FFFFFF" stroke-width="22" stroke-linecap="round" stroke-linejoin="round">
+          <path pathLength="1" d="M0 100 V0 L66 100 V0"/>
+          <path pathLength="1" d="M100 100 L142 0 L184 100 M117 64 H167"/>
+          <path pathLength="1" d="M212 0 L256 56 L300 0 M256 56 V100"/>
+          <path pathLength="1" d="M330 100 L372 0 L414 100 M347 64 H397"/>
+        </g>
+        <circle class="word-dot" cx="256" cy="56" r="17" fill="#F2B705"/>
+      </svg>
+      <p class="splash-tag">Twende Pamoja</p>
+      <p class="splash-role">Dereva</p>
+      <span class="splash-line"></span>
+    </div>
+    <div class="splash-foot">
+      <div class="splash-progress"><span></span></div>
+      <p class="splash-status" id="splash-status">Inakuandaa NAYA…</p>
+    </div>
   </div>
 
-  <!-- Kuingia / kujisajili: akaunti moja ya NAYA -->
+  <!-- ================= Utangulizi (mara ya kwanza tu) ================= -->
+  <main id="view-intro" class="intro" hidden>
+    <button class="intro-skip" type="button" id="intro-skip">Ruka</button>
+    <div class="intro-track" id="intro-track">
+      <section class="intro-slide" aria-labelledby="intro-1">
+        <div class="intro-art art-photo">
+          <img src="/shared/img/naya-hero.webp" alt="Bodaboda na bajaji za NAYA barabarani" width="791" height="466">
+        </div>
+        <div class="intro-copy">
+          <h2 id="intro-1">Usafiri rahisi, salama na wa kuaminika</h2>
+          <p>Agiza bodaboda au bajaji kwa sekunde chache. Unajua nauli kabla hujapanda.</p>
+        </div>
+      </section>
+      <section class="intro-slide" aria-labelledby="intro-2">
+        <div class="intro-art art-map" aria-hidden="true">
+          <svg viewBox="0 0 360 260">
+            <defs>
+              <linearGradient id="mapbg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#E8F4EE"/><stop offset="1" stop-color="#D3EADF"/></linearGradient>
+            </defs>
+            <rect width="360" height="260" rx="28" fill="url(#mapbg)"/>
+            <g stroke="#FFFFFF" stroke-width="14" stroke-linecap="round" fill="none" opacity="0.95">
+              <path d="M-10 70 H370"/><path d="M-10 170 H370"/><path d="M90 -10 V270"/><path d="M250 -10 V270"/>
+              <path d="M-10 250 L120 120 L200 40 L380 -20" stroke-width="10"/>
+            </g>
+            <g fill="#BFE0CF"><rect x="18" y="92" width="56" height="60" rx="10"/><rect x="108" y="190" width="126" height="54" rx="10"/><rect x="268" y="86" width="74" height="68" rx="10"/><rect x="108" y="10" width="40" height="44" rx="8"/></g>
+            <path class="map-route" pathLength="1" d="M50 230 C 70 170, 90 170, 90 140 S 120 70, 170 70 S 250 90, 250 120 S 290 170, 312 170" fill="none" stroke="#0A6E47" stroke-width="7" stroke-linecap="round"/>
+            <g class="map-pin pin-a"><circle cx="50" cy="230" r="11" fill="#FFFFFF" stroke="#0A6E47" stroke-width="5"/></g>
+            <g class="map-pin pin-b"><path d="M312 170 c-14 0 -24 -10 -24 -24 c0 -18 24 -38 24 -38 s24 20 24 38 c0 14 -10 24 -24 24z" transform="translate(0 -6)" fill="#F2B705"/><circle cx="312" cy="140" r="8" fill="#FFFFFF"/></g>
+            <g class="map-moto"><circle r="17" fill="#F2B705" stroke="#FFFFFF" stroke-width="4"/><g fill="none" stroke="#10201A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" transform="translate(-11 -11) scale(0.92)"><circle cx="5.5" cy="16" r="3"/><circle cx="18.5" cy="16" r="3"/><path d="M5.5 16l4-6h5l2.5 4h1.5"/><path d="M13 6.5h3l2 4"/></g></g>
+            <g class="map-eta"><rect x="196" y="18" width="146" height="44" rx="14" fill="#FFFFFF"/><circle cx="218" cy="40" r="6" fill="#12A064"/><text x="232" y="46" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="17" fill="#10201A">Dakika 3</text></g>
+          </svg>
+        </div>
+        <div class="intro-copy">
+          <h2 id="intro-2">Mwone dereva wako akija</h2>
+          <p>Ramani ya moja kwa moja, muda wa kufika, na PIN ya safari kwa usalama wako.</p>
+        </div>
+      </section>
+      <section class="intro-slide" aria-labelledby="intro-3">
+        <div class="intro-art art-drive" aria-hidden="true">
+          <div class="drive-ring"><i></i><i></i></div>
+          <div class="drive-button">Nenda<br>online</div>
+          <div class="drive-chip chip-a"><b>TSh 2,400</b><span>Safari mpya</span></div>
+          <div class="drive-chip chip-b"><b>Leo</b><span>TSh 18,700</span></div>
+        </div>
+        <div class="intro-copy">
+          <h2 id="intro-3">Una chombo? Endesha na NAYA</h2>
+          <p>Akaunti ile ile. Pokea safari zilizo karibu nawe na ufuatilie mapato yako kila siku.</p>
+        </div>
+      </section>
+    </div>
+    <div class="intro-foot">
+      <div class="intro-dots" id="intro-dots" aria-hidden="true"><i class="on"></i><i></i><i></i></div>
+      <button class="intro-next" type="button" id="intro-next" aria-label="Endelea">
+        <span class="intro-next-label">Anza sasa</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </button>
+    </div>
+  </main>
+
+  <!-- ================= Kuingia / kujisajili: akaunti moja ya NAYA ================= -->
   <main id="view-auth" class="auth" hidden>
     <header class="auth-hero">
-      <img class="auth-wordmark" src="/shared/brand/naya-wordmark-white.svg" alt="NAYA" width="438" height="124">
-      <p class="auth-slogan">TWENDE PAMOJA</p>
-      <p class="auth-pitch">Bodaboda na bajaji za Urambo. Akaunti moja — safiri au endesha.</p>
+      <img class="auth-photo" src="/shared/img/naya-hero.webp" alt="" width="791" height="466">
+      <div class="auth-shade" aria-hidden="true"></div>
+      <div class="auth-brand">
+        <img class="auth-icon" src="/shared/brand/naya-icon-light.svg" alt="" width="64" height="64">
+        <img class="auth-wordmark" src="/shared/brand/naya-wordmark-white.svg" alt="NAYA" width="438" height="124">
+        <p class="auth-slogan">Twende Pamoja</p>
+      </div>
+      <svg class="wave" viewBox="0 0 400 60" preserveAspectRatio="none" aria-hidden="true"><path d="M0 34 C 90 4, 170 4, 240 26 S 360 62, 400 22 V60 H0 Z"/></svg>
     </header>
 
     <div class="auth-body">
+      <h1 class="auth-title" id="auth-title">Karibu NAYA</h1>
+      <p class="auth-pitch">Bodaboda na bajaji za Urambo. Akaunti moja — safiri au endesha.</p>
+
       <div class="segmented" role="tablist" aria-label="Chagua">
+        <span class="segmented-pill" aria-hidden="true"></span>
         <button type="button" role="tab" id="tab-register" aria-selected="true" aria-controls="register-form">Jisajili</button>
         <button type="button" role="tab" id="tab-login" aria-selected="false" aria-controls="login-form">Nina akaunti</button>
       </div>
 
-      <form id="register-form" role="tabpanel" aria-labelledby="tab-register" novalidate>
-        <label for="reg-name">Jina kamili</label>
-        <input id="reg-name" autocomplete="name" placeholder="Mf. Juma Hamisi" required>
-        <label for="reg-phone">Namba ya simu</label>
-        <input id="reg-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="0712 345 678" required>
-        <label for="reg-password">Tengeneza password</label>
-        <input id="reg-password" type="password" autocomplete="new-password" placeholder="Angalau herufi 8" required>
+      <form id="register-form" class="auth-form" role="tabpanel" aria-labelledby="tab-register" novalidate>
+        <label class="field" for="reg-name">
+          <svg class="field-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
+          <span class="field-main"><span class="field-label">Jina kamili</span>
+          <input id="reg-name" autocomplete="name" placeholder="Mf. Juma Hamisi" required></span>
+        </label>
+        <label class="field" for="reg-phone">
+          <svg class="field-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>
+          <span class="field-main"><span class="field-label">Namba ya simu</span>
+          <input id="reg-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="0712 345 678" required></span>
+        </label>
+        <label class="field" for="reg-password">
+          <svg class="field-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1.3"/></svg>
+          <span class="field-main"><span class="field-label">Tengeneza password</span>
+          <input id="reg-password" type="password" autocomplete="new-password" placeholder="Angalau herufi 8" required></span>
+          <button class="field-eye" type="button" data-eye="reg-password" aria-label="Onyesha password"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        </label>
         <p class="alert alert-danger" id="register-error" role="alert" hidden></p>
-        <button class="btn btn-primary btn-block" type="submit">Jisajili</button>
+        <button class="btn btn-primary btn-block btn-arrow" type="submit">Jisajili</button>
       </form>
 
-      <form id="login-form" role="tabpanel" aria-labelledby="tab-login" novalidate hidden>
-        <label for="login-phone">Namba ya simu</label>
-        <input id="login-phone" type="tel" inputmode="tel" autocomplete="username" placeholder="0712 345 678" required>
-        <label for="login-password">Password</label>
-        <input id="login-password" type="password" autocomplete="current-password" required>
+      <form id="login-form" class="auth-form" role="tabpanel" aria-labelledby="tab-login" novalidate hidden>
+        <label class="field" for="login-phone">
+          <svg class="field-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>
+          <span class="field-main"><span class="field-label">Namba ya simu</span>
+          <input id="login-phone" type="tel" inputmode="tel" autocomplete="username" placeholder="0712 345 678" required></span>
+        </label>
+        <label class="field" for="login-password">
+          <svg class="field-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1.3"/></svg>
+          <span class="field-main"><span class="field-label">Password</span>
+          <input id="login-password" type="password" autocomplete="current-password" placeholder="Andika password yako" required></span>
+          <button class="field-eye" type="button" data-eye="login-password" aria-label="Onyesha password"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        </label>
+        <div class="form-row"><button class="link-button" type="button" id="forgot-link">Umesahau password?</button></div>
         <p class="alert alert-danger" id="login-error" role="alert" hidden></p>
-        <button class="btn btn-primary btn-block" type="submit">Ingia</button>
-        <button class="link-button" type="button" id="forgot-link">Umesahau password?</button>
+        <button class="btn btn-primary btn-block btn-arrow" type="submit">Ingia</button>
       </form>
 
       <!-- Umesahau password: namba ya simu → code ya SMS + password mpya -->
-      <form id="forgot-form" novalidate hidden>
+      <form id="forgot-form" class="auth-form" novalidate hidden>
         <h2 class="forgot-title">Badilisha password</h2>
         <div id="forgot-step-phone">
           <p class="muted">Tutakutumia SMS yenye namba ya tarakimu 6.</p>
-          <label for="forgot-phone">Namba ya simu uliyosajili</label>
-          <input id="forgot-phone" type="tel" inputmode="tel" autocomplete="username" placeholder="0712 345 678">
+          <label class="field" for="forgot-phone">
+            <svg class="field-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>
+            <span class="field-main"><span class="field-label">Namba ya simu uliyosajili</span>
+            <input id="forgot-phone" type="tel" inputmode="tel" autocomplete="username" placeholder="0712 345 678"></span>
+          </label>
         </div>
         <div id="forgot-step-code" hidden>
           <p class="muted" id="forgot-sent-to"></p>
-          <label for="forgot-code">Namba kutoka kwenye SMS</label>
-          <input id="forgot-code" class="code-input" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" placeholder="••••••">
-          <label for="forgot-password">Password mpya</label>
-          <input id="forgot-password" type="password" autocomplete="new-password" placeholder="Angalau herufi 8">
+          <p class="otp-label" id="forgot-code-label">Namba kutoka kwenye SMS</p>
+          <div class="otp">
+            <input id="forgot-code" class="otp-input" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" aria-labelledby="forgot-code-label">
+            <div class="otp-boxes" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+          </div>
+          <label class="field" for="forgot-password">
+            <svg class="field-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1.3"/></svg>
+            <span class="field-main"><span class="field-label">Password mpya</span>
+            <input id="forgot-password" type="password" autocomplete="new-password" placeholder="Angalau herufi 8"></span>
+            <button class="field-eye" type="button" data-eye="forgot-password" aria-label="Onyesha password"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+          </label>
           <button class="link-button" type="button" id="forgot-resend" disabled>Tuma tena</button>
         </div>
         <p class="alert alert-danger" id="forgot-error" role="alert" hidden></p>
-        <button class="btn btn-primary btn-block" type="submit" id="forgot-submit">Tuma namba kwa SMS</button>
+        <button class="btn btn-primary btn-block btn-arrow" type="submit" id="forgot-submit">Tuma namba kwa SMS</button>
         <button class="link-button" type="button" id="forgot-back">Rudi kuingia</button>
       </form>
     </div>
   </main>
 
-  <!-- Mara ya kwanza: "Utatumiaje NAYA?" -->
-  <main id="view-role" class="role" hidden>
-    <img src="/shared/brand/naya-icon.svg" alt="" width="64" height="64">
-    <h1>Utatumiaje NAYA?</h1>
-    <p class="muted">Chagua aina ya akaunti. Unaweza kubadilisha baadaye kwenye Akaunti.</p>
-    <form id="role-form" class="role-options">
-      <label class="role-card">
-        <input type="radio" name="mode" value="PASSENGER">
-        <span class="role-body">
-          <span class="role-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg></span>
-          <span><strong>Abiria</strong><span>Agiza safari, ufike unapoenda.</span></span>
-        </span>
-      </label>
-      <label class="role-card">
-        <input type="radio" name="mode" value="DRIVER">
-        <span class="role-body">
-          <span class="role-icon role-icon-driver" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="5" cy="16.5" r="3"/><circle cx="19" cy="16.5" r="3"/><path d="M5 16.5l4-6.5h5l2.5 4H19"/><path d="M13 6.5h3l2 4"/></svg></span>
-          <span><strong>Dereva</strong><span>Endesha, pokea maombi ya safari, fuatilia mapato.</span></span>
-        </span>
-      </label>
-      <p class="alert alert-danger" id="role-error" role="alert" hidden></p>
-      <button class="btn btn-primary btn-block" id="role-continue" type="submit" disabled>Endelea</button>
-    </form>
+  <!-- ================= Kuthibitisha namba ya simu (SMS) ================= -->
+  <main id="view-verify" class="sheet-view verify" hidden>
+    <header class="mini-hero">
+      <div class="mini-hero-art" aria-hidden="true">
+        <span class="sms-bubble"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 10h8M8 13h5"/></svg></span>
+      </div>
+      <svg class="wave" viewBox="0 0 400 60" preserveAspectRatio="none" aria-hidden="true"><path d="M0 34 C 90 4, 170 4, 240 26 S 360 62, 400 22 V60 H0 Z"/></svg>
+    </header>
+    <div class="sheet-body">
+      <h1>Thibitisha namba yako</h1>
+      <p class="muted" id="verify-sent-to">Tumekutumia SMS yenye namba ya tarakimu 6.</p>
+      <form id="verify-form" novalidate>
+        <p class="otp-label" id="verify-code-label">Namba kutoka kwenye SMS</p>
+        <div class="otp">
+          <input id="verify-code" class="otp-input" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" aria-labelledby="verify-code-label">
+          <div class="otp-boxes" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        </div>
+        <p class="alert alert-danger" id="verify-error" role="alert" hidden></p>
+        <button class="btn btn-primary btn-block btn-arrow" type="submit" id="verify-submit" disabled>Thibitisha</button>
+      </form>
+      <button class="link-button" type="button" id="verify-resend" disabled>Tuma SMS tena</button>
+      <p class="muted small-print">Si namba yako? <button class="link-button inline" type="button" id="verify-logout">Toka, ujisajili upya</button></p>
+    </div>
   </main>
 
-  <!-- Kuthibitisha namba ya simu (SMS) -->
-  <main id="view-verify" class="role verify" hidden>
-    <img src="/shared/brand/naya-icon.svg" alt="" width="64" height="64">
-    <h1>Thibitisha namba yako</h1>
-    <p class="muted" id="verify-sent-to">Tumekutumia SMS yenye namba ya tarakimu 6.</p>
-    <form id="verify-form" novalidate>
-      <label for="verify-code">Namba kutoka kwenye SMS</label>
-      <input id="verify-code" class="code-input" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" placeholder="••••••">
-      <p class="alert alert-danger" id="verify-error" role="alert" hidden></p>
-      <button class="btn btn-primary btn-block" type="submit" id="verify-submit" disabled>Thibitisha</button>
-    </form>
-    <button class="link-button" type="button" id="verify-resend" disabled>Tuma SMS tena</button>
-    <p class="muted small-print">Si namba yako? <button class="link-button inline" type="button" id="verify-logout">Toka, ujisajili upya</button></p>
+  <!-- ================= Mara ya kwanza: "Utatumiaje NAYA?" ================= -->
+  <main id="view-role" class="sheet-view role" hidden>
+    <header class="mini-hero">
+      <img class="mini-hero-photo" src="/shared/img/naya-hero-sm.webp" alt="" width="396" height="233">
+      <svg class="wave" viewBox="0 0 400 60" preserveAspectRatio="none" aria-hidden="true"><path d="M0 34 C 90 4, 170 4, 240 26 S 360 62, 400 22 V60 H0 Z"/></svg>
+    </header>
+    <div class="sheet-body">
+      <h1>Utatumiaje NAYA?</h1>
+      <p class="muted">Chagua aina ya akaunti. Unaweza kubadilisha baadaye kwenye Akaunti.</p>
+      <form id="role-form" class="role-options">
+        <label class="role-card">
+          <input type="radio" name="mode" value="PASSENGER">
+          <span class="role-body">
+            <span class="role-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg></span>
+            <span><strong>Abiria</strong><span>Agiza safari, ufike unapoenda.</span></span>
+            <span class="role-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
+          </span>
+        </label>
+        <label class="role-card">
+          <input type="radio" name="mode" value="DRIVER">
+          <span class="role-body">
+            <span class="role-icon role-icon-driver" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="5" cy="16.5" r="3"/><circle cx="19" cy="16.5" r="3"/><path d="M5 16.5l4-6.5h5l2.5 4H19"/><path d="M13 6.5h3l2 4"/></svg></span>
+            <span><strong>Dereva</strong><span>Endesha, pokea maombi ya safari, fuatilia mapato.</span></span>
+            <span class="role-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
+          </span>
+        </label>
+        <p class="alert alert-danger" id="role-error" role="alert" hidden></p>
+        <button class="btn btn-primary btn-block btn-arrow" id="role-continue" type="submit" disabled>Endelea</button>
+      </form>
+    </div>
   </main>
 
-  <main id="view-offline" class="center" hidden>
+  <main id="view-offline" class="center offline" hidden>
+    <img src="/shared/brand/naya-icon.svg" alt="" width="64" height="64">
     <h1>Hatukuweza kufika kwenye mfumo</h1>
     <p class="muted" id="offline-reason">Internet haipo. Tafadhali hakikisha umeunganishwa.</p>
     <button id="retry-button" class="btn btn-primary btn-block" type="button">Jaribu tena</button>
   </main>
 
-  <!-- Ndani ya app -->
+  <!-- ================= Ndani ya app ================= -->
   <div id="view-app" hidden>
     <header class="bar">
       <span class="bar-brand">
-        <img id="bar-icon" src="/shared/brand/naya-icon.svg" alt="" width="32" height="32">
+        <img id="bar-icon" src="/shared/brand/naya-icon-light.svg" alt="" width="34" height="34">
         <img class="bar-wordmark" src="/shared/brand/naya-wordmark-white.svg" alt="NAYA" width="76" height="22">
       </span>
       <span class="bar-right"><span id="live-dot" class="live-dot" title="Inaunganisha…"></span><span id="mode-chip" class="mode-chip"></span></span>

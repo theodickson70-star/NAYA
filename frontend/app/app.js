@@ -13,13 +13,15 @@ import {
 } from '/shared/labels.js';
 import { disablePush, enablePush, pushState } from '/shared/push.js';
 import { connectRealtime } from '/shared/realtime.js';
+import { introSeen, setupIntro } from './intro.js';
 import * as rides from './rides.js';
+import { finishSplash, splashActive, splashReady } from './splash.js';
 
 const api = createApi('naya_app_token');
 const $ = (id) => document.getElementById(id);
-const views = ['view-loading', 'view-auth', 'view-verify', 'view-role', 'view-offline', 'view-app'];
+const views = ['view-loading', 'view-intro', 'view-auth', 'view-verify', 'view-role', 'view-offline', 'view-app'];
 const MAX_BYTES = 3 * 1024 * 1024;
-const VERSION = '0.9.0';
+const VERSION = '0.9.5';
 
 let account = null; // { user, activeMode, driverStatus, canDrive }
 let driver = null; // wasifu wa udereva (mode ya Dereva)
@@ -43,9 +45,65 @@ try {
   // storage imezuiwa
 }
 
+// Skrini moja inaonekana kwa wakati mmoja. Animation ya kufunguka ikiwa bado inaendelea, skrini inayofuata inasubiri
+// iishe (kisha zinapishana kwa ulaini).
+let pendingView = null;
 function show(view) {
-  for (const v of views) $(v).hidden = v !== view;
+  if (view !== 'view-loading' && splashActive()) {
+    const waiting = pendingView !== null;
+    pendingView = view;
+    if (!waiting) {
+      splashReady().then(() => {
+        const next = pendingView;
+        pendingView = null;
+        finishSplash();
+        reveal(next);
+      });
+    }
+    return;
+  }
+  reveal(view);
 }
+
+function reveal(view) {
+  for (const v of views) {
+    const el = $(v);
+    if (v === 'view-loading' && el.classList.contains('splash-out')) continue; // inafifia yenyewe
+    const visible = v === view;
+    if (visible && el.hidden) {
+      el.classList.remove('view-enter');
+      void el.offsetWidth; // anza animation upya
+      el.classList.add('view-enter');
+    }
+    el.hidden = !visible;
+  }
+}
+
+/** Kisanduku cha namba 6 za SMS: kinaonyesha tarakimu zilizoandikwa kwenye input iliyofichika. */
+function syncOtp(input) {
+  const boxes = input.parentElement.querySelectorAll('.otp-boxes span');
+  const v = input.value;
+  boxes.forEach((b, i) => {
+    b.textContent = v[i] ?? '';
+    b.classList.toggle('filled', i < v.length);
+    b.classList.toggle('active', document.activeElement === input && i === Math.min(v.length, 5));
+  });
+}
+for (const input of document.querySelectorAll('.otp-input')) {
+  for (const type of ['input', 'focus', 'blur']) input.addEventListener(type, () => syncOtp(input));
+}
+
+// Onyesha / ficha password
+document.addEventListener('click', (event) => {
+  const eye = event.target.closest('[data-eye]');
+  if (!eye) return;
+  event.preventDefault();
+  const input = $(eye.dataset.eye);
+  const showing = input.type === 'text';
+  input.type = showing ? 'password' : 'text';
+  eye.classList.toggle('on', !showing);
+  eye.setAttribute('aria-label', showing ? 'Onyesha password' : 'Ficha password');
+});
 
 function toast(message) {
   for (const old of document.querySelectorAll('.toast')) old.remove();
@@ -75,6 +133,8 @@ function selectTab(name) {
   $('tab-login').setAttribute('aria-selected', String(!register));
   $('register-form').hidden = !register;
   $('login-form').hidden = register;
+  document.querySelector('#view-auth .segmented').dataset.active = register ? 'register' : 'login';
+  $('auth-title').textContent = register ? 'Karibu NAYA' : 'Karibu tena';
 }
 $('tab-register').addEventListener('click', () => selectTab('register'));
 $('tab-login').addEventListener('click', () => selectTab('login'));
@@ -189,6 +249,7 @@ $('forgot-form').addEventListener('submit', async (event) => {
       showForgot(false);
       $('forgot-code').value = '';
       $('forgot-password').value = '';
+      syncOtp($('forgot-code'));
       toast('Password imebadilishwa');
       await loadAccount();
     }
@@ -206,6 +267,7 @@ function showVerify() {
   show('view-verify');
   $('verify-sent-to').textContent = `Tumetuma SMS yenye namba ya tarakimu 6 kwenda ${formatPhone(account.user.phone)}.`;
   $('verify-code').value = '';
+  syncOtp($('verify-code'));
   $('verify-submit').disabled = true;
   $('verify-error').hidden = true;
   countdown('verify-resend', 60, 'Tuma SMS tena', verify);
@@ -230,6 +292,7 @@ $('verify-form').addEventListener('submit', async (event) => {
     if (handleError(err, 'verify-error')) return;
     $('verify-code').value = '';
     $('verify-code').focus();
+    syncOtp($('verify-code'));
   }
 });
 $('verify-resend').addEventListener('click', async () => {
@@ -343,9 +406,19 @@ function route() {
   }
   const driverMode = account.activeMode === 'DRIVER';
   document.querySelector('.bar').classList.toggle('driver', driverMode);
-  $('bar-icon').src = driverMode ? '/shared/brand/naya-dereva-icon.svg' : '/shared/brand/naya-icon.svg';
+  $('bar-icon').src = driverMode ? '/shared/brand/naya-dereva-icon.svg' : '/shared/brand/naya-icon-light.svg';
+  document.body.classList.toggle('mode-driver', driverMode);
+  try {
+    localStorage.setItem('naya_last_mode', account.activeMode);
+  } catch {
+    // storage imezuiwa
+  }
+  const content = $('app-content');
+  content.classList.remove('page-enter');
+  void content.offsetWidth;
+  content.classList.add('page-enter');
   $('mode-chip').textContent = driverMode ? 'Dereva' : 'Abiria';
-  document.querySelector('meta[name="theme-color"]').content = driverMode ? '#06502F' : '#0A6E47';
+  document.querySelector('meta[name="theme-color"]').content = driverMode ? '#043A22' : '#06502F';
   window.scrollTo(0, 0);
   if (tab === 'account') return renderAccount();
   if (driverMode) return loadDriver();
@@ -355,6 +428,16 @@ function route() {
 window.addEventListener('hashchange', route);
 
 const firstName = () => esc(account.user.fullName.split(' ')[0]);
+const greeting = () => {
+  const h = Number(new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hour12: false, timeZone: 'Africa/Dar_es_Salaam' }).format(new Date()));
+  return h < 12 ? 'Habari za asubuhi' : h < 16 ? 'Habari za mchana' : 'Habari za jioni';
+};
+const VEHICLE_ICON = {
+  BODABODA:
+    '<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="11" cy="33" r="7"/><circle cx="37" cy="33" r="7"/><path d="M11 33l8-13h10l5 8h3"/><path d="M26 12h6l4 8"/><path d="M19 20l-3-5h-5"/></svg>',
+  BAJAJI:
+    '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M7 33V18a8 8 0 0 1 8-8h14l9 11v12"/><path d="M7 21h31"/><path d="M22 10v11"/><circle cx="13" cy="34" r="5"/><circle cx="35" cy="34" r="5"/><path d="M18 34h12"/></svg>',
+};
 
 // ---------- Mode ya Abiria ----------
 const PIN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>';
@@ -408,9 +491,12 @@ async function renderPassengerHome() {
   }
   if (tab !== 'home' || account.activeMode !== 'PASSENGER' || location.hash.startsWith('#/chagua')) return;
   $('app-content').innerHTML = `
-    <h1>Habari, ${firstName()}</h1>
-    <section class="card trip" aria-labelledby="where-title">
-      <h2 id="where-title">Unaenda wapi?</h2>
+    <section class="home-hero">
+      <p class="home-hello">${greeting()}, ${firstName()}</p>
+      <h1 id="where-title">Unaenda wapi?</h1>
+      <img class="home-hero-photo" src="/shared/img/naya-hero-sm.webp" alt="" width="396" height="233">
+    </section>
+    <section class="card trip trip-card" aria-labelledby="where-title">
       ${planner}
     </section>
     <section class="card">
@@ -465,7 +551,8 @@ function estimateBlock() {
           (o) => `<label class="fare-option">
             <input type="radio" name="vehicle" value="${o.vehicleType}" ${o.vehicleType === trip.selected ? 'checked' : ''}>
             <span class="fare-body">
-              <span><strong>${esc(VEHICLE_TYPES[o.vehicleType])}</strong><span class="muted">km ${o.distanceKm.toLocaleString('en-US')} · makadirio</span></span>
+              <span class="fare-icon">${VEHICLE_ICON[o.vehicleType] ?? ''}</span>
+              <span class="fare-main"><strong>${esc(VEHICLE_TYPES[o.vehicleType])}</strong><span class="muted">km ${o.distanceKm.toLocaleString('en-US')} · makadirio</span></span>
               <span class="fare-amount">${formatTsh(o.fare)}</span>
             </span>
           </label>`,
@@ -1113,8 +1200,17 @@ rides.init({
 });
 
 // ---------- Mwanzo ----------
+function showWelcome() {
+  if (introSeen()) return show('view-auth');
+  show('view-intro');
+}
+setupIntro(() => {
+  selectTab('register');
+  show('view-auth');
+});
+
 async function start() {
-  if (!api.token) return show('view-auth');
+  if (!api.token) return showWelcome();
   show('view-loading');
   try {
     await loadAccount();

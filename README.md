@@ -12,7 +12,8 @@ Mfumo wa bodaboda na bajaji. Unajengwa phase moja baada ya nyingine; kila phase 
 | 5+6 | Safari kamili: kuagiza, kumpata dereva, online/offline, kukubali, nimefika → anza → maliza, nyota, mapato, ukurasa wa Safari ofisini | ✅ |
 | 7 | Realtime (papo hapo) na arifa za simu (Web Push), arifa ndani ya app, ofisi inajisasisha yenyewe | ✅ |
 | 8 | Ada ya mwezi ya madereva, ramani ya live ya dereva, PIN ya safari, kushiriki safari, dharura (SOS) | ✅ |
-| 9 | SMS (Beem): kuthibitisha namba ya simu, "Umesahau password?", SMS za taarifa muhimu | ✅ sasa |
+| 9 | SMS (Beem): kuthibitisha namba ya simu, "Umesahau password?", SMS za taarifa muhimu | ✅ |
+| 9.5 | Muonekano mpya: animation ya logo wakati wa kufungua, utangulizi wa slaidi 3, skrini mpya za kuingia na kila skrini ya app | ✅ sasa |
 | 10 | APK ya Android (Play Store) | |
 | 11 | Malipo kwa simu (M-Pesa, Airtel, Mixx/Tigo, HaloPesa) | |
 | 12 | Msaidizi wa AI (Claude) unaotumia data halisi | |
@@ -126,6 +127,18 @@ SMS zikiwa zimewashwa:
 - Ofisi → Muhtasari → **SMS**: salio la Beem, SMS za leo na mwezi huu, na zilizoshindwa.
 
 Bila funguo za Beem, SMS zimezimwa: hakuna anayeombwa kuthibitisha namba, na "Umesahau password?" inamwambia mtu awasiliane na ofisi.
+
+## Muonekano (Phase 9.5)
+
+- **Kufungua app:** logo inang'aa, inazunguka na chembe za dhahabu na kijani, kisha jina NAYA linajichora (`frontend/app/splash.js`
+  + CSS). Mara ya kwanza kwenye kikao ni sekunde ~3; refresh baadaye ni fupi. Mode ya mwisho ikiwa Dereva, logo ni ya njano.
+- **Utangulizi:** slaidi 3 za kuteleza kwa kidole, mara ya kwanza tu (`frontend/app/intro.js`).
+- **Logo:** `naya-icon-light.svg` (nyeupe) juu ya kijani — app ya abiria; `naya-dereva-icon.svg` (njano) — mode ya Dereva;
+  `naya-icon.svg` (kijani) — favicon na ofisi.
+- **Herufi** (Bricolage Grotesque, Atkinson Hyperlegible) zinatolewa na server yenyewe (`frontend/shared/fonts/`, leseni OFL) —
+  hakuna Google Fonts; zinapakia haraka kwenye mitandao ya simu.
+- Picha ya bodaboda na bajaji: `frontend/shared/img/naya-hero.webp`.
+- Simu zote: imejaribiwa upana 320px hadi kompyuta; heshima kwa "punguza mwendo" (reduced motion) ya simu.
 
 ## Nyaraka za madereva
 

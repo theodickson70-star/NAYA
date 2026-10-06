@@ -8,9 +8,9 @@
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/shared/brand/naya-apple-180.png">
   <title>NAYA — Ofisi</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&display=swap" rel="stylesheet">
+  <link rel="preload" href="/shared/fonts/bricolage-grotesque.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/shared/fonts/atkinson-hyperlegible-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/shared/fonts.css">
   <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
   <link rel="stylesheet" href="/shared/naya.css">
   <link rel="stylesheet" href="admin.css">
@@ -22,7 +22,9 @@
   <!-- Login -->
   <main id="view-login" class="login" hidden>
     <section class="brand-panel">
+      <img class="brand-photo" src="/shared/img/naya-hero.webp" alt="" width="791" height="466">
       <div class="lockup">
+        <img class="brand-icon" src="/shared/brand/naya-icon-light.svg" alt="" width="72" height="72">
         <img class="brand-wordmark" src="/shared/brand/naya-wordmark-white.svg" alt="NAYA" width="438" height="124">
         <span class="slogan">TWENDE PAMOJA</span>
       </div>

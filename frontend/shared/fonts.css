@@ -1,0 +1,24 @@
+/* Herufi za NAYA zinatolewa na server yetu wenyewe (si Google Fonts):
+   zinapakia haraka kwenye mitandao ya simu, zinafanya kazi bila mtandao wa nje, na hakuna mtu wa tatu anayeona nani anafungua app.
+   Leseni: SIL Open Font License (faili za OFL ziko kwenye folda hii). */
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 200 800;
+  src: url(/shared/fonts/bricolage-grotesque.woff2) format('woff2-variations'), url(/shared/fonts/bricolage-grotesque.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Atkinson Hyperlegible';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url(/shared/fonts/atkinson-hyperlegible-400.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Atkinson Hyperlegible';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url(/shared/fonts/atkinson-hyperlegible-700.woff2) format('woff2');
+}

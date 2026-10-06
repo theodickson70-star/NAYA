@@ -452,12 +452,12 @@ function onlineHtml(s) {
   }
   return `<section class="go-online is-online" role="status">
     <span class="ride-pulse" aria-hidden="true"></span>
-    ${subscriptionNoteHtml(sub)}
     <h1>Uko online</h1>
     <p class="muted">${pushStatus === 'on' ? 'Unasubiri maombi ya safari. Simu italia ombi likiingia.' : 'Unasubiri maombi ya safari. Acha app wazi.'}</p>
     ${onlineError ? `<p class="alert alert-danger" role="alert">${esc(onlineError)}</p>` : ''}
     ${pushPrompt('Washa arifa ili usikose ombi hata ukifunga app.')}
     <button class="btn btn-ghost btn-block" type="button" data-ride="go-offline">Nenda offline</button>
+    ${subscriptionNoteHtml(sub)}
   </section>`;
 }
 
@@ -490,7 +490,7 @@ function subscriptionBlockHtml(sub) {
 function offerHtml(offer) {
   const r = offer.ride;
   return `<section class="offer" role="alertdialog" aria-labelledby="offer-title">
-    <div class="offer-top"><h1 id="offer-title">Ombi jipya la safari</h1><span class="offer-timer" id="offer-seconds">${offer.secondsLeft}</span></div>
+    <div class="offer-top"><h1 id="offer-title">Ombi jipya la safari</h1><span class="offer-timer" id="offer-seconds" style="--p:${offer.secondsLeft / 20}">${offer.secondsLeft}</span></div>
     <p class="offer-fare">${formatTsh(r.fare)}</p>
     <p class="muted">${esc(VEHICLE_TYPES[r.vehicleType])} · safari ya km ${r.distanceKm} · abiria yuko km ${offer.distanceToPickupKm} kutoka kwako</p>
     ${routeSummary(r).replace(/<p class="ride-meta">[\s\S]*<\/p>/, '')}
@@ -525,10 +525,14 @@ function startOfferCountdown(seconds) {
   navigator.vibrate?.([300, 150, 300]);
   chime();
   let left = seconds;
+  const total = 20; // OFFER_SECONDS ya server
+  const ring = (n) => $('offer-seconds')?.style.setProperty('--p', String(Math.max(0, n) / total));
+  ring(left);
   tickTimer = setInterval(() => {
     left -= 1;
     const el = $('offer-seconds');
     if (el) el.textContent = Math.max(0, left);
+    ring(left);
     if (left <= 0) {
       clearInterval(tickTimer);
       refreshDriver();
