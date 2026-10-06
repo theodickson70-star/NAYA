@@ -17,9 +17,9 @@ import * as rides from './rides.js';
 
 const api = createApi('naya_app_token');
 const $ = (id) => document.getElementById(id);
-const views = ['view-loading', 'view-auth', 'view-role', 'view-offline', 'view-app'];
+const views = ['view-loading', 'view-auth', 'view-verify', 'view-role', 'view-offline', 'view-app'];
 const MAX_BYTES = 3 * 1024 * 1024;
-const VERSION = '0.8.0';
+const VERSION = '0.9.0';
 
 let account = null; // { user, activeMode, driverStatus, canDrive }
 let driver = null; // wasifu wa udereva (mode ya Dereva)
@@ -114,9 +114,147 @@ $('login-form').addEventListener('submit', (e) =>
   ),
 );
 
+// ---------- Umesahau password (SMS) ----------
+const forgot = { phone: '', step: 'phone', timer: null };
+
+function showForgot(open) {
+  $('login-form').hidden = open;
+  $('forgot-form').hidden = !open;
+  document.querySelector('#view-auth .segmented').hidden = open;
+  if (open) {
+    forgot.step = 'phone';
+    $('forgot-step-phone').hidden = false;
+    $('forgot-step-code').hidden = true;
+    $('forgot-submit').textContent = 'Tuma namba kwa SMS';
+    $('forgot-error').hidden = true;
+    $('forgot-phone').value = $('login-phone').value;
+    $('forgot-phone').focus();
+  } else clearInterval(forgot.timer);
+}
+
+/** Hesabu ya kurudi nyuma kwenye kitufe cha "Tuma tena". */
+function countdown(buttonId, seconds, label, holder) {
+  clearInterval(holder.timer);
+  const button = $(buttonId);
+  let left = seconds;
+  const tick = () => {
+    button.disabled = left > 0;
+    button.textContent = left > 0 ? `${label} (sekunde ${left})` : label;
+    left -= 1;
+    if (left < -1) clearInterval(holder.timer);
+  };
+  tick();
+  holder.timer = setInterval(tick, 1000);
+}
+
+async function requestReset() {
+  const { retryAfter } = await api.post('/api/auth/password/forgot', { phone: forgot.phone });
+  countdown('forgot-resend', retryAfter, 'Tuma tena', forgot);
+}
+
+$('forgot-link').addEventListener('click', () => showForgot(true));
+$('forgot-back').addEventListener('click', () => showForgot(false));
+$('forgot-resend').addEventListener('click', async () => {
+  $('forgot-error').hidden = true;
+  try {
+    await requestReset();
+    toast('SMS imetumwa tena');
+  } catch (err) {
+    handleError(err, 'forgot-error');
+  }
+});
+$('forgot-code').addEventListener('input', (e) => {
+  e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
+});
+$('forgot-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const button = $('forgot-submit');
+  $('forgot-error').hidden = true;
+  button.disabled = true;
+  try {
+    if (forgot.step === 'phone') {
+      forgot.phone = $('forgot-phone').value;
+      await requestReset();
+      forgot.step = 'code';
+      $('forgot-step-phone').hidden = true;
+      $('forgot-step-code').hidden = false;
+      $('forgot-sent-to').textContent = `Kama ${forgot.phone} imesajiliwa NAYA, utapokea SMS sasa hivi. Andika namba yake na password mpya.`;
+      button.textContent = 'Badilisha password';
+      $('forgot-code').focus();
+    } else {
+      const password = $('forgot-password').value;
+      await api.post('/api/auth/password/reset', { phone: forgot.phone, code: $('forgot-code').value, password });
+      const result = await api.post('/api/auth/login', { phone: forgot.phone, password, portal: 'app' });
+      api.setToken(result.token);
+      showForgot(false);
+      $('forgot-code').value = '';
+      $('forgot-password').value = '';
+      toast('Password imebadilishwa');
+      await loadAccount();
+    }
+  } catch (err) {
+    handleError(err, 'forgot-error');
+  } finally {
+    button.disabled = false;
+  }
+});
+
+// ---------- Kuthibitisha namba ya simu (SMS) ----------
+const verify = { timer: null };
+
+function showVerify() {
+  show('view-verify');
+  $('verify-sent-to').textContent = `Tumetuma SMS yenye namba ya tarakimu 6 kwenda ${formatPhone(account.user.phone)}.`;
+  $('verify-code').value = '';
+  $('verify-submit').disabled = true;
+  $('verify-error').hidden = true;
+  countdown('verify-resend', 60, 'Tuma SMS tena', verify);
+  $('verify-code').focus();
+}
+
+$('verify-code').addEventListener('input', (e) => {
+  e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
+  $('verify-submit').disabled = e.target.value.length !== 6;
+});
+$('verify-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const button = $('verify-submit');
+  $('verify-error').hidden = true;
+  button.disabled = true;
+  try {
+    await api.post('/api/auth/phone/verify', { code: $('verify-code').value });
+    clearInterval(verify.timer);
+    toast('Namba imethibitishwa');
+    await loadAccount();
+  } catch (err) {
+    if (handleError(err, 'verify-error')) return;
+    $('verify-code').value = '';
+    $('verify-code').focus();
+  }
+});
+$('verify-resend').addEventListener('click', async () => {
+  $('verify-error').hidden = true;
+  try {
+    const { retryAfter } = await api.post('/api/auth/phone/send-code');
+    countdown('verify-resend', retryAfter, 'Tuma SMS tena', verify);
+    toast('SMS imetumwa tena');
+  } catch (err) {
+    if (err.status === 429 && /sekunde (\d+)/.test(err.message)) {
+      countdown('verify-resend', Number(err.message.match(/sekunde (\d+)/)[1]), 'Tuma SMS tena', verify);
+    }
+    handleError(err, 'verify-error');
+  }
+});
+$('verify-logout').addEventListener('click', () => {
+  clearInterval(verify.timer);
+  signOutLocally();
+  selectTab('register');
+});
+
 // ---------- Akaunti na mode ----------
 async function loadAccount() {
   account = await api.get('/api/account');
+  if (account.verificationRequired) return showVerify();
   startRealtime();
   if (!account.activeMode) return showRoleChoice();
   show('view-app');

@@ -48,7 +48,17 @@ export const env = {
   vapidPublicKey: read('VAPID_PUBLIC_KEY'),
   vapidPrivateKey: read('VAPID_PRIVATE_KEY'),
   vapidSubject: read('VAPID_SUBJECT') ?? 'mailto:admin@naya.co.tz',
+  // SMS kupitia Beem Africa (kuthibitisha namba, kurejesha password, taarifa muhimu). Bila funguo hizi, SMS zimezimwa.
+  beemApiKey: read('BEEM_API_KEY'),
+  beemSecretKey: read('BEEM_SECRET_KEY'),
+  /** Jina la mtumaji lililoidhinishwa na Beem (herufi ≤ 11). "INFO" ni la majaribio la Beem. */
+  beemSenderId: read('BEEM_SENDER_ID') ?? 'INFO',
+  /** Si lazima: anwani ya API ya SMS ya Beem (kwa majaribio tu; usiweke kwenye Railway). */
+  beemBaseUrl: (read('BEEM_BASE_URL') ?? 'https://apisms.beem.africa').replace(/\/$/, ''),
 };
+
+if (env.beemSenderId.length > 11) problems.push('BEEM_SENDER_ID isizidi herufi 11');
+if (!!env.beemApiKey !== !!env.beemSecretKey) problems.push('Weka BEEM_API_KEY na BEEM_SECRET_KEY zote mbili (au usiweke zote)');
 
 if (problems.length > 0) {
   console.error('[config] Mipangilio haijakamilika:');

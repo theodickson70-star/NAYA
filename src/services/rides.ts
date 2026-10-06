@@ -16,6 +16,7 @@ import { straightLineKm } from './fare-engine.js';
 import { notify, notifyAdmins } from './notify.js';
 import { estimateTrip, findLocation, insideServiceArea } from './places.js';
 import { openSosFor } from './safety.js';
+import { assertPhoneVerified } from './verification.js';
 import { assertSubscriptionOk, describeSubscription, getSettings, SUBSCRIPTION_OK_SQL } from './subscriptions.js';
 
 export type RideStatus = 'SEARCHING' | 'ACCEPTED' | 'ARRIVED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'NO_DRIVER';
@@ -291,6 +292,7 @@ export async function requestRide(
   passengerId: string,
   input: { pickup: { locationId: string } | { lat: number; lng: number }; destination: { locationId: string }; vehicleType: VehicleType },
 ) {
+  await assertPhoneVerified(db, passengerId);
   const online = await one(db, 'SELECT 1 FROM naya.drivers WHERE user_id = $1 AND is_online', [passengerId]);
   if (online) throw conflict('Uko online kama dereva. Nenda offline kwanza ili kuagiza safari.');
 
@@ -465,6 +467,7 @@ export async function setOnline(
       [driverId],
     );
     if (passengerRide) throw conflict('Una safari inayoendelea kama abiria. Imalize kwanza.');
+    await assertPhoneVerified(client, driverId);
     await assertSubscriptionOk(client, driverId);
     let point: { lat: number; lng: number };
     if (input.locationId) {

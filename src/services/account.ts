@@ -4,6 +4,7 @@ import { db, transaction } from '../db/pool.js';
 import { notFound } from '../utils/http.js';
 import { driverStatusOf, ensureDriverProfile } from './drivers.js';
 import { assertCanSwitchMode, dispatchRide } from './rides.js';
+import { smsEnabled } from './sms.js';
 import { findUserById, toPublicUser, type AppMode, type UserRow } from './users.js';
 
 export async function getAccount(user: UserRow) {
@@ -15,6 +16,10 @@ export async function getAccount(user: UserRow) {
     driverStatus,
     /** Dereva aliyethibitishwa tu ndiye atapokea safari (phases za safari). */
     canDrive: driverStatus === 'APPROVED',
+    phoneVerified: !!user.phone_verified_at,
+    /** SMS zikiwa zimewashwa, mtumiaji mpya anathibitisha namba kabla ya kuendelea. */
+    verificationRequired: smsEnabled() && !user.phone_verified_at,
+    smsEnabled: smsEnabled(),
   };
 }
 

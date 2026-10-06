@@ -1,8 +1,9 @@
 // Sehemu moja ya kumjulisha mtumiaji: tukio la papo hapo (app iliyo wazi) + arifa ya kudumu + Web Push (app iliyofungwa).
 // Inaitwa BAADA ya transaction kukamilika, na haitupi kosa kamwe — kushindwa kwa arifa hakuvunji safari.
-import { db, many } from '../db/pool.js';
+import { db, many, one } from '../db/pool.js';
 import { type EventType, publish } from '../realtime/hub.js';
 import { sendPush } from './push.js';
+import { sendSms, smsEnabled } from './sms.js';
 
 export interface Notice {
   userId: string;
@@ -14,6 +15,8 @@ export interface Notice {
   kind?: string;
   urgent?: boolean;
   ttlSeconds?: number;
+  /** Kama ipo: inatumwa pia kama SMS (kwa taarifa muhimu tu — kila SMS inalipiwa). */
+  sms?: string;
 }
 
 export async function notify(n: Notice): Promise<void> {
@@ -34,6 +37,10 @@ export async function notify(n: Notice): Promise<void> {
         urgent: n.urgent,
         ttlSeconds: n.ttlSeconds,
       });
+    }
+    if (n.sms && smsEnabled()) {
+      const user = await one<{ phone: string }>(db, 'SELECT phone FROM naya.users WHERE id = $1', [n.userId]);
+      if (user) await sendSms(user.phone, n.sms, n.kind ?? n.event);
     }
   } catch (error) {
     console.error(`[notify] ${(error as Error).message}`);

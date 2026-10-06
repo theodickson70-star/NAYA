@@ -121,8 +121,20 @@
         <ul class="system-list">
           <li><span id="sys-api" class="dot dot-wait"></span>Server ya NAYA</li>
           <li><span id="sys-db" class="dot dot-wait"></span>Database (Supabase)</li>
+          <li><span id="sys-sms" class="dot dot-wait"></span><span id="sys-sms-text">SMS (Beem)</span></li>
         </ul>
         <p class="muted small" id="sys-version"></p>
+      </section>
+
+      <section class="panel" aria-labelledby="sms-title" id="sms-panel" hidden>
+        <h2 id="sms-title">SMS</h2>
+        <section class="stat-strip stat-strip-sms" aria-label="SMS">
+          <div class="stat"><span class="stat-value" id="sms-balance">–</span><span class="stat-label">Salio la Beem</span></div>
+          <div class="stat"><span class="stat-value" id="sms-today">–</span><span class="stat-label">Zilizotumwa leo</span></div>
+          <div class="stat"><span class="stat-value" id="sms-month">–</span><span class="stat-label">Mwezi huu</span></div>
+        </section>
+        <p class="alert alert-warn" id="sms-failed" hidden></p>
+        <ul class="history" id="sms-recent"></ul>
       </section>
 
       <section class="panel" aria-labelledby="roadmap-title">
@@ -136,6 +148,7 @@
           <li class="done">Mode ya dereva: online, maombi, mapato</li>
           <li class="done">Taarifa za papo hapo na arifa za simu</li>
           <li class="done">Ada ya mwezi, ramani ya live na usalama wa safari</li>
+          <li class="done">SMS: kuthibitisha namba na kurejesha password</li>
           <li>Malipo kwa simu</li>
           <li>Msaidizi wa AI</li>
           <li>Ripoti na takwimu</li>

@@ -11,10 +11,12 @@ Mfumo wa bodaboda na bajaji. Unajengwa phase moja baada ya nyingine; kila phase 
 | 4 | Maeneo (ramani ya ofisi), bei kwa kila chombo, makadirio ya nauli kwa abiria (GPS au orodha) | ✅ |
 | 5+6 | Safari kamili: kuagiza, kumpata dereva, online/offline, kukubali, nimefika → anza → maliza, nyota, mapato, ukurasa wa Safari ofisini | ✅ |
 | 7 | Realtime (papo hapo) na arifa za simu (Web Push), arifa ndani ya app, ofisi inajisasisha yenyewe | ✅ |
-| 8 | Ada ya mwezi ya madereva, ramani ya live ya dereva, PIN ya safari, kushiriki safari, dharura (SOS) | ✅ sasa |
-| 9 | Malipo kwa simu (M-Pesa, Airtel, Mixx/Tigo, HaloPesa) | |
-| 10 | Msaidizi wa AI (Claude) unaotumia data halisi | |
-| 11 | Ripoti, CSV, takwimu, ukaguzi wa usalama | |
+| 8 | Ada ya mwezi ya madereva, ramani ya live ya dereva, PIN ya safari, kushiriki safari, dharura (SOS) | ✅ |
+| 9 | SMS (Beem): kuthibitisha namba ya simu, "Umesahau password?", SMS za taarifa muhimu | ✅ sasa |
+| 10 | APK ya Android (Play Store) | |
+| 11 | Malipo kwa simu (M-Pesa, Airtel, Mixx/Tigo, HaloPesa) | |
+| 12 | Msaidizi wa AI (Claude) unaotumia data halisi | |
+| 13 | Ripoti, CSV, takwimu, ukaguzi wa usalama | |
 
 ## Muundo
 
@@ -106,6 +108,25 @@ Dereva akighairi baada ya kukubali → safari inarudi SEARCHING (dereva mwingine
 - **Dharura (SOS):** abiria au dereva anabonyeza *Dharura* → ofisi inaona bango jekundu na kengele papo hapo (Ofisi → Dharura),
   pamoja na namba za simu za wote wawili na mahali. App pia ina kitufe cha kupiga Polisi (112).
 
+## SMS kupitia Beem (Phase 9)
+
+1. Fungua akaunti ya [Beem](https://beem.africa), nunua SMS, na omba **Sender ID** (mf. `NAYA`). Mpaka iidhinishwe, tumia `INFO`.
+2. Beem → Profile → *Authentication Information*: nakili **API Key** na **Secret Key**.
+3. Weka kwenye `.env` NA Railway → Variables: `BEEM_API_KEY`, `BEEM_SECRET_KEY`, `BEEM_SENDER_ID`.
+
+SMS zikiwa zimewashwa:
+- **Mtumiaji mpya** anapokea SMS yenye namba ya tarakimu 6 na kuithibitisha kabla ya kuendelea. Bila namba iliyothibitishwa,
+  hawezi kuagiza safari, kwenda online, wala kutuma ombi la udereva. Watumiaji waliojisajili kabla ya Phase 9 hawaombwi kuthibitisha.
+- **Umesahau password?** (skrini ya kuingia): namba ya simu → SMS → namba + password mpya. Vifaa vyote vilivyoingia vinatolewa.
+  Jibu ni lile lile kama namba imesajiliwa au la (mtu asijue namba zipi ziko NAYA).
+- **Usalama wa namba za SMS:** zinadumu dakika 10, majaribio 5, sekunde 60 kati ya SMS mbili na SMS 5 kwa saa kwa namba moja.
+  Database inahifadhi HMAC ya namba tu; kumbukumbu ya SMS (`naya.sms_log`) ina aina na matokeo tu, si maandishi.
+- **SMS za taarifa muhimu** (zinalipiwa, kwa hiyo chache tu): dereva amethibitishwa, ombi la udereva linahitaji marekebisho,
+  ada inakaribia kuisha, ada imeisha.
+- Ofisi → Muhtasari → **SMS**: salio la Beem, SMS za leo na mwezi huu, na zilizoshindwa.
+
+Bila funguo za Beem, SMS zimezimwa: hakuna anayeombwa kuthibitisha namba, na "Umesahau password?" inamwambia mtu awasiliane na ofisi.
+
 ## Nyaraka za madereva
 
 Picha na PDF za nyaraka zinahifadhiwa ndani ya Supabase (table `naya.document_files`), kwa hiyo hazipotei Railway ikideploy upya.
@@ -129,6 +150,7 @@ Tests (kwenye database ya majaribio tu, kamwe ya production): `npm test`
 
 - Build: `npm run build` · Start: `npm start` (tayari kwenye `railway.json`)
 - Variables za lazima: `DATABASE_URL` (Supabase Session pooler, port 5432) na `JWT_SECRET`
+- Kwa SMS: `BEEM_API_KEY`, `BEEM_SECRET_KEY`, `BEEM_SENDER_ID`
 - Kwa arifa za simu: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (kutoka `npm run vapid-keys`; usizibadilishe baadaye, la sivyo simu zote zitahitaji kuwasha arifa upya)
 - Migrations zinaendeshwa zenyewe server inapoanza
 - Hakikisha: `/health` → `{"success":true,"status":"ok","database":"ok"}`, kisha `/admin/`

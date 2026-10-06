@@ -32,3 +32,8 @@ export const loginSchema = z.object({
   phone: phoneSchema,
   password: z.string({ error: 'Weka password' }).min(1, 'Weka password').max(128),
 });
+
+export const codeSchema = z
+  .string({ error: 'Weka namba uliyopokea kwa SMS' })
+  .trim()
+  .regex(/^\d{6}$/, 'Namba ya SMS ina tarakimu 6');

@@ -2,10 +2,10 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { ADMIN_ROLES, authenticate, issueToken } from '../middleware/auth.js';
-import { login, logout, registerUser } from '../services/auth.js';
+import { forgotPassword, login, logout, registerUser, resetPassword, sendVerificationCode, verifyPhone } from '../services/auth.js';
 import { toPublicUser, type UserRole } from '../services/users.js';
 import { ok } from '../utils/http.js';
-import { loginSchema, registerSchema } from '../validators/auth.js';
+import { codeSchema, loginSchema, passwordSchema, phoneSchema, registerSchema } from '../validators/auth.js';
 
 /** Mahali mtu anaingia panaamua roles zinazoruhusiwa: ofisi = admin tu; app ya NAYA = watumiaji tu.
  *  ("driver"/"customer" ni majina ya zamani ya app — yanaelekezwa kwenye app moja.) */
@@ -42,4 +42,25 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.get('/api/auth/me', { preHandler: authenticate }, async (request) => ok(toPublicUser(request.currentUser)));
+
+  // ---- Kuthibitisha namba ya simu (SMS) ----
+  app.post('/api/auth/phone/send-code', { preHandler: authenticate, ...authLimit }, async (request) =>
+    ok(await sendVerificationCode(request.currentUser)),
+  );
+  app.post('/api/auth/phone/verify', { preHandler: authenticate, ...authLimit }, async (request) => {
+    const { code } = z.object({ code: codeSchema }).parse(request.body);
+    return ok(await verifyPhone(request.currentUser, code));
+  });
+
+  // ---- Umesahau password? (SMS) ----
+  app.post('/api/auth/password/forgot', authLimit, async (request) => {
+    const { phone } = z.object({ phone: phoneSchema }).parse(request.body);
+    return ok(await forgotPassword(phone));
+  });
+  app.post('/api/auth/password/reset', authLimit, async (request) => {
+    const input = z.object({ phone: phoneSchema, code: codeSchema, password: passwordSchema }).parse(request.body);
+    const result = await resetPassword(input);
+    request.log.info('password imebadilishwa kwa SMS');
+    return ok(result);
+  });
 }

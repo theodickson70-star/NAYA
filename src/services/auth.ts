@@ -1,7 +1,9 @@
 // Usajili na kuingia kwa namba ya simu + password.
 import bcrypt from 'bcryptjs';
-import { db } from '../db/pool.js';
+import { db, one, transaction } from '../db/pool.js';
 import { AppError, conflict, forbidden, isUniqueViolation, unauthorized } from '../utils/http.js';
+import { consumeOtp, issueOtp, OTP_RESEND_SECONDS } from './otp.js';
+import { smsEnabled } from './sms.js';
 import {
   bumpTokenVersion,
   findUserByPhone,
@@ -26,6 +28,8 @@ export async function registerUser(input: { fullName: string; phone: string; pas
       role: 'USER',
       passwordHash: await hashPassword(input.password),
     });
+    // SMS zikiwa zimewashwa: code ya kuthibitisha namba inatumwa mara moja (bila kuchelewesha jibu).
+    if (smsEnabled()) void issueOtp(user!.phone, 'VERIFY_PHONE', { silent: true }).catch(() => {});
     return user!;
   } catch (error) {
     if (isUniqueViolation(error)) throw conflict('Namba hii ya simu tayari imesajiliwa. Ingia badala yake.');
@@ -48,4 +52,53 @@ export async function login(input: { phone: string; password: string }, allowedR
 
 export async function logout(userId: string): Promise<void> {
   await bumpTokenVersion(db, userId);
+}
+
+// ------------------------------------------------------------------ Namba ya simu na password kwa SMS
+
+const SMS_OFF = 'Huduma ya SMS bado haijawashwa. Wasiliana na ofisi ya NAYA.';
+
+/** Tuma (tena) code ya kuthibitisha namba ya mtumiaji aliyeingia. */
+export async function sendVerificationCode(user: UserRow) {
+  if (user.phone_verified_at) throw conflict('Namba yako tayari imethibitishwa.');
+  if (!smsEnabled()) throw new AppError(503, SMS_OFF);
+  const { retryAfter } = await issueOtp(user.phone, 'VERIFY_PHONE');
+  return { sent: true, retryAfter };
+}
+
+export async function verifyPhone(user: UserRow, code: string) {
+  if (user.phone_verified_at) return { verified: true };
+  await transaction(async (client) => {
+    await consumeOtp(client, user.phone, 'VERIFY_PHONE', code);
+    await client.query('UPDATE naya.users SET phone_verified_at = now(), updated_at = now() WHERE id = $1', [user.id]);
+  });
+  return { verified: true };
+}
+
+/**
+ * "Umesahau password?" — jibu ni lile lile kama namba imesajiliwa au la (mtu asijue namba zipi zipo).
+ * SMS inatumwa nyuma ya pazia, kwa hiyo muda wa jibu nao haufichui chochote.
+ */
+export async function forgotPassword(phone: string) {
+  if (!smsEnabled()) throw new AppError(503, SMS_OFF);
+  const user = await one<{ status: string }>(db, 'SELECT status FROM naya.users WHERE phone = $1', [phone]);
+  if (user?.status === 'ACTIVE') void issueOtp(phone, 'RESET_PASSWORD', { silent: true }).catch(() => {});
+  return { retryAfter: OTP_RESEND_SECONDS };
+}
+
+/** Code sahihi → password mpya; vifaa vyote vilivyoingia vinatolewa; namba inahesabiwa imethibitishwa. */
+export async function resetPassword(input: { phone: string; code: string; password: string }) {
+  const passwordHash = await hashPassword(input.password);
+  await transaction(async (client) => {
+    await consumeOtp(client, input.phone, 'RESET_PASSWORD', input.code);
+    const updated = await one(
+      client,
+      `UPDATE naya.users SET password_hash = $2, token_version = token_version + 1,
+              phone_verified_at = coalesce(phone_verified_at, now()), updated_at = now()
+        WHERE phone = $1 AND status = 'ACTIVE' RETURNING id`,
+      [input.phone, passwordHash],
+    );
+    if (!updated) throw new AppError(400, 'Namba si sahihi au imeisha muda. Omba namba mpya.');
+  });
+  return { reset: true };
 }

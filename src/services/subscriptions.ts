@@ -294,6 +294,7 @@ export async function runSubscriptionChecks(): Promise<void> {
       kind: 'subscription_due',
       title: 'Ada yako ya mwezi inakaribia kuisha',
       body: `Inaisha ${formatDay(d.paid_until)}. Lipa ${fee} mapema ili usikose safari.`,
+      sms: `NAYA: Ada yako ya mwezi inaisha ${formatDay(d.paid_until)}. Lipa ${fee} mapema ili usikose safari.`,
     });
   }
 
@@ -314,6 +315,7 @@ export async function runSubscriptionChecks(): Promise<void> {
           ? `Una siku ${settings.graceDays} za kulipa ${fee} kabla hujaacha kupokea safari.`
           : `Lipa ${fee} ili uendelee kupokea safari.`,
       urgent: true,
+      sms: `NAYA: Ada yako ya mwezi imeisha. Lipa ${fee} ili uendelee kupokea safari. ${settings.paymentInstructions}`.slice(0, 300),
     });
   }
 

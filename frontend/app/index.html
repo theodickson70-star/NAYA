@@ -52,6 +52,28 @@
         <input id="login-password" type="password" autocomplete="current-password" required>
         <p class="alert alert-danger" id="login-error" role="alert" hidden></p>
         <button class="btn btn-primary btn-block" type="submit">Ingia</button>
+        <button class="link-button" type="button" id="forgot-link">Umesahau password?</button>
+      </form>
+
+      <!-- Umesahau password: namba ya simu → code ya SMS + password mpya -->
+      <form id="forgot-form" novalidate hidden>
+        <h2 class="forgot-title">Badilisha password</h2>
+        <div id="forgot-step-phone">
+          <p class="muted">Tutakutumia SMS yenye namba ya tarakimu 6.</p>
+          <label for="forgot-phone">Namba ya simu uliyosajili</label>
+          <input id="forgot-phone" type="tel" inputmode="tel" autocomplete="username" placeholder="0712 345 678">
+        </div>
+        <div id="forgot-step-code" hidden>
+          <p class="muted" id="forgot-sent-to"></p>
+          <label for="forgot-code">Namba kutoka kwenye SMS</label>
+          <input id="forgot-code" class="code-input" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" placeholder="••••••">
+          <label for="forgot-password">Password mpya</label>
+          <input id="forgot-password" type="password" autocomplete="new-password" placeholder="Angalau herufi 8">
+          <button class="link-button" type="button" id="forgot-resend" disabled>Tuma tena</button>
+        </div>
+        <p class="alert alert-danger" id="forgot-error" role="alert" hidden></p>
+        <button class="btn btn-primary btn-block" type="submit" id="forgot-submit">Tuma namba kwa SMS</button>
+        <button class="link-button" type="button" id="forgot-back">Rudi kuingia</button>
       </form>
     </div>
   </main>
@@ -79,6 +101,21 @@
       <p class="alert alert-danger" id="role-error" role="alert" hidden></p>
       <button class="btn btn-primary btn-block" id="role-continue" type="submit" disabled>Endelea</button>
     </form>
+  </main>
+
+  <!-- Kuthibitisha namba ya simu (SMS) -->
+  <main id="view-verify" class="role verify" hidden>
+    <img src="/shared/brand/naya-icon.svg" alt="" width="64" height="64">
+    <h1>Thibitisha namba yako</h1>
+    <p class="muted" id="verify-sent-to">Tumekutumia SMS yenye namba ya tarakimu 6.</p>
+    <form id="verify-form" novalidate>
+      <label for="verify-code">Namba kutoka kwenye SMS</label>
+      <input id="verify-code" class="code-input" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" placeholder="••••••">
+      <p class="alert alert-danger" id="verify-error" role="alert" hidden></p>
+      <button class="btn btn-primary btn-block" type="submit" id="verify-submit" disabled>Thibitisha</button>
+    </form>
+    <button class="link-button" type="button" id="verify-resend" disabled>Tuma SMS tena</button>
+    <p class="muted small-print">Si namba yako? <button class="link-button inline" type="button" id="verify-logout">Toka, ujisajili upya</button></p>
   </main>
 
   <main id="view-offline" class="center" hidden>

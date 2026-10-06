@@ -7,6 +7,7 @@ import type { DocumentType, VehicleInput } from '../validators/drivers.js';
 import { auditFor, writeAudit } from './audit.js';
 import { notify, notifyAdmins } from './notify.js';
 import { startTrialIfNeeded } from './subscriptions.js';
+import { assertPhoneVerified } from './verification.js';
 import { deleteFile, readFile, storeFile } from './files.js';
 import { toPublicUser, type UserRow } from './users.js';
 
@@ -214,6 +215,7 @@ export async function submitForReview(userId: string) {
     if (!check.vehicleComplete) throw conflict('Jaza taarifa za chombo chako kwanza.');
     if (check.missingDocuments.length > 0) throw conflict('Pakia nyaraka zote zinazohitajika kwanza.');
     if (check.rejectedDocuments.length > 0) throw conflict('Badilisha nyaraka zilizokataliwa kwanza.');
+    await assertPhoneVerified(client, userId);
     await client.query(
       `UPDATE naya.drivers SET status = 'PENDING', submitted_at = now(), rejection_reason = NULL, updated_at = now()
         WHERE user_id = $1`,
@@ -319,6 +321,7 @@ export async function approveDriver(adminId: string, driverId: string) {
     kind: 'driver_approved',
     title: 'Umethibitishwa kuwa dereva wa NAYA!',
     body: 'Fungua NAYA, bonyeza NENDA ONLINE upokee safari.',
+    sms: 'NAYA: Hongera! Umethibitishwa kuwa dereva wa NAYA. Fungua app ya NAYA na ubonyeze NENDA ONLINE upokee safari.',
   });
   await notifyAdmins();
   return getDriverForAdmin(driverId);
@@ -342,7 +345,14 @@ export async function rejectDriver(adminId: string, driverId: string, reason: st
       details: { reason, documents },
     });
   });
-  await notify({ userId: driverId, event: 'account', kind: 'driver_rejected', title: 'Ombi lako la udereva linahitaji marekebisho', body: reason });
+  await notify({
+    userId: driverId,
+    event: 'account',
+    kind: 'driver_rejected',
+    title: 'Ombi lako la udereva linahitaji marekebisho',
+    body: reason,
+    sms: `NAYA: Ombi lako la udereva linahitaji marekebisho: ${reason.slice(0, 90)}. Fungua app ya NAYA urekebishe.`,
+  });
   await notifyAdmins();
   return getDriverForAdmin(driverId);
 }

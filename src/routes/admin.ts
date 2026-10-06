@@ -6,6 +6,7 @@ import { countDriversByStatus } from '../services/drivers.js';
 import { setupStatus } from '../services/places.js';
 import { rideStats } from '../services/rides.js';
 import { openSosCount } from '../services/safety.js';
+import { smsEnabled, smsOverview } from '../services/sms.js';
 import { subscriptionStats } from '../services/subscriptions.js';
 import { countNewUsersSince, countUsersByRole } from '../services/users.js';
 import { ok } from '../utils/http.js';
@@ -40,7 +41,11 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       rides,
       subscriptions,
       sosOpen,
+      sms: { enabled: smsEnabled() },
       system: { database: database === 'ok' ? 'ok' : 'error', version: VERSION, phase: PHASE },
     });
   });
+
+  /** SMS (Beem): imewashwa?, salio, na SMS za karibuni (aina na matokeo tu — si maandishi). */
+  app.get('/api/admin/sms', adminOnly, async () => ok(await smsOverview()));
 }

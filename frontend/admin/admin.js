@@ -187,11 +187,47 @@ async function loadOverview() {
     $('stat-sub-expired').textContent = n(data.subscriptions.expiredDrivers);
     $('stat-sos').textContent = n(data.sosOpen);
     safetyAdmin.setOpenCount(data.sosOpen);
+    setDot('sys-sms', data.sms.enabled ? 'ok' : 'wait');
+    $('sys-sms-text').textContent = data.sms.enabled ? 'SMS (Beem) zimewashwa' : 'SMS (Beem) hazijawashwa — weka BEEM_API_KEY na BEEM_SECRET_KEY';
+    if (data.sms.enabled) loadSms();
+    else $('sms-panel').hidden = true;
   } catch (err) {
     if (handleAuthError(err)) return;
     showError('dashboard-error', err);
     setDot('sys-api', err.status === 0 ? 'bad' : 'ok');
     setDot('sys-db', 'wait');
+  }
+}
+
+const SMS_KINDS = {
+  otp_verify_phone: 'Kuthibitisha namba',
+  otp_reset_password: 'Kubadilisha password',
+  driver_approved: 'Dereva amethibitishwa',
+  driver_rejected: 'Ombi la dereva — marekebisho',
+  subscription_due: 'Ada inakaribia kuisha',
+  subscription_expired: 'Ada imeisha',
+};
+
+async function loadSms() {
+  try {
+    const sms = await api.get('/api/admin/sms');
+    $('sms-panel').hidden = false;
+    const n = (v) => Number(v).toLocaleString('sw-TZ');
+    $('sms-balance').textContent = sms.balance == null ? '?' : n(sms.balance);
+    $('sms-today').textContent = n(sms.sentToday);
+    $('sms-month').textContent = n(sms.sentThisMonth);
+    $('sms-failed').hidden = !sms.failedToday;
+    $('sms-failed').textContent = `SMS ${sms.failedToday} zimeshindwa leo. Angalia salio la Beem na Sender ID (${sms.senderId}).`;
+    $('sms-recent').innerHTML = sms.recent
+      .slice(0, 8)
+      .map(
+        (m) => `<li><span><strong>${esc(SMS_KINDS[m.kind] ?? m.kind)}</strong> · ${esc(formatPhone(m.phone))}</span><span class="muted">${
+          m.status === 'SENT' ? 'Imetumwa' : 'Imeshindwa'
+        } · ${esc(formatDate(m.createdAt, true))}</span>${m.error ? `<span class="note">${esc(m.error)}</span>` : ''}</li>`,
+      )
+      .join('');
+  } catch (err) {
+    handleAuthError(err);
   }
 }
 

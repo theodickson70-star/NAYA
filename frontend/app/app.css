@@ -351,3 +351,13 @@ input, select, textarea { font-size: 17px; padding: 13px 14px; }
 .sub-block h1 { font-size: 24px; }
 .sub-how { background: var(--bg); border-radius: 10px; padding: 10px 12px; }
 .small-title { font-size: 15px; margin: 16px 0 0; }
+
+/* ---------- Phase 9: SMS — kuthibitisha namba na kurejesha password ---------- */
+.link-button { display: block; margin: 14px auto 0; background: none; border: 0; padding: 6px 4px; font: inherit; font-weight: 700; color: var(--naya-green); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.link-button:disabled { color: var(--muted); text-decoration: none; cursor: default; }
+.link-button.inline { display: inline; margin: 0; padding: 0; }
+.code-input { font-family: var(--font-display); font-size: 30px; font-weight: 800; letter-spacing: 0.35em; text-align: center; font-variant-numeric: tabular-nums; padding-left: 0.35em; }
+.forgot-title { font-size: 22px; margin-bottom: 4px; }
+#forgot-form .muted { margin: 0 0 6px; }
+.verify form { width: 100%; text-align: left; margin-top: 18px; }
+.verify .small-print { margin-top: 18px; font-size: 14px; }
