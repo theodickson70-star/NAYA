@@ -132,6 +132,10 @@ Bila funguo za Beem, SMS zimezimwa: hakuna anayeombwa kuthibitisha namba, na "Um
 
 - **Kufungua app:** logo inang'aa, inazunguka na chembe za dhahabu na kijani, kisha jina NAYA linajichora (`frontend/app/splash.js`
   + CSS). Mara ya kwanza kwenye kikao ni sekunde ~3; refresh baadaye ni fupi. Mode ya mwisho ikiwa Dereva, logo ni ya njano.
+- **Sauti ya logo:** `frontend/shared/sounds/naya-intro.mp3` (sek 3.4) inalingana na animation: mvumo logo ikizunguka, "pop" ya kitone
+  cha dhahabu, noti 4 herufi N-A-Y-A zikijichora, na mng'ao mwishoni. Browsers huzuia sauti kabla mtu hajagusa skrini, kwa hiyo
+  inasikika kwa uhakika app ikiwa imesakinishwa (Add to Home Screen / APK) au mtu akigusa skrini wakati logo inajitengeneza.
+  Mtumiaji anaweza kuizima: Akaunti → Sauti ya kufungua NAYA.
 - **Utangulizi:** slaidi 3 za kuteleza kwa kidole, mara ya kwanza tu (`frontend/app/intro.js`).
 - **Logo:** `naya-icon-light.svg` (nyeupe) juu ya kijani — app ya abiria; `naya-dereva-icon.svg` (njano) — mode ya Dereva;
   `naya-icon.svg` (kijani) — favicon na ofisi.

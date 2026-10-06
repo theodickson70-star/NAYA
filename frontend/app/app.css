@@ -761,3 +761,15 @@ input, select, textarea { font-size: 17px; padding: 13px 14px; border-radius: va
   .splash-line, .splash-progress span { transform: none; }
   .splash-orbit, .splash-rings { display: none; }
 }
+
+/* Swichi ya sauti (Akaunti) */
+.sound-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.sound-row h2 { margin-bottom: 2px; }
+.sound-row .muted { font-size: 15px; display: block; }
+.switch { position: relative; flex: none; margin: 0; width: 56px; height: 32px; cursor: pointer; }
+.switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.switch i { position: absolute; inset: 0; border-radius: 32px; background: #CBD9D1; transition: background 0.25s; }
+.switch i::after { content: ""; position: absolute; top: 4px; left: 4px; width: 24px; height: 24px; border-radius: 50%; background: var(--white); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2); transition: transform 0.3s var(--ease-spring); }
+.switch input:checked + span + i { background: var(--g700); }
+.switch input:checked + span + i::after { transform: translateX(24px); }
+.switch input:focus-visible + span + i { outline: 3px solid var(--gold); outline-offset: 2px; }

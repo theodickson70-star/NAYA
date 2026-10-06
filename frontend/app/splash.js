@@ -16,6 +16,59 @@ if (!quick) {
   setTimeout(() => !done && status('Tunakuletea uzoefu bora…'), 1900);
 }
 
+// ---- Sauti ya logo (imeanzishwa na boot.js) ----
+const audio = window.__nayaIntroAudio ?? null;
+/** Muda wa animation ya logo sasa hivi (sekunde) — sauti ilingane nayo hata ikichelewa kuanza. */
+function animationTime() {
+  // Mstari wa maendeleo unadumu muda wote wa animation (sek 2.8) — ndio saa yetu.
+  const anim = document.querySelector('.splash-progress span')?.getAnimations?.()[0];
+  return anim && typeof anim.currentTime === 'number' ? anim.currentTime / 1000 : null;
+}
+if (audio) {
+  // Sauti na picha zilingane: sahihisha mara chache mwanzoni kama zimeachana zaidi ya sek 0.1.
+  let fixes = 0;
+  const sync = () => {
+    const t = animationTime();
+    if (t === null || t <= 0) return;
+    if (fixes >= 2 || audio.currentTime > 1.6) return audio.removeEventListener('timeupdate', sync);
+    if (Math.abs(audio.currentTime - t) > 0.1 && t < 2.6) {
+      audio.currentTime = t;
+      fixes += 1;
+    }
+  };
+  audio.addEventListener('timeupdate', sync);
+  // Browser imezuia sauti kabla ya kugusa skrini → jaribu tena mtu akigusa wakati logo bado inajitengeneza.
+  const retry = () => {
+    if (done || !audio.paused) return;
+    const t = animationTime();
+    if (t !== null && t > 2.4) return; // imechelewa mno — usipige sauti katikati ya skrini nyingine
+    audio.play().catch(() => {});
+  };
+  for (const type of ['pointerdown', 'keydown']) window.addEventListener(type, retry, { once: true, capture: true });
+}
+
+export const soundEnabled = () => {
+  try {
+    return localStorage.getItem('naya_sound') !== 'off';
+  } catch {
+    return true;
+  }
+};
+export function setSoundEnabled(on) {
+  try {
+    if (on) localStorage.removeItem('naya_sound');
+    else localStorage.setItem('naya_sound', 'off');
+  } catch {
+    // storage imezuiwa
+  }
+}
+/** Sikiliza sauti ya NAYA (kutoka kwenye Akaunti). */
+export function previewSound() {
+  const a = new Audio('/shared/sounds/naya-intro.mp3');
+  a.volume = 0.85;
+  return a.play();
+}
+
 export const splashActive = () => !done;
 
 /** Inatimia muda wa chini wa animation (haichelewi zaidi ya hapo). */

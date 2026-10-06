@@ -15,7 +15,7 @@ import { disablePush, enablePush, pushState } from '/shared/push.js';
 import { connectRealtime } from '/shared/realtime.js';
 import { introSeen, setupIntro } from './intro.js';
 import * as rides from './rides.js';
-import { finishSplash, splashActive, splashReady } from './splash.js';
+import { finishSplash, previewSound, setSoundEnabled, soundEnabled, splashActive, splashReady } from './splash.js';
 
 const api = createApi('naya_app_token');
 const $ = (id) => document.getElementById(id);
@@ -92,6 +92,17 @@ function syncOtp(input) {
 for (const input of document.querySelectorAll('.otp-input')) {
   for (const type of ['input', 'focus', 'blur']) input.addEventListener(type, () => syncOtp(input));
 }
+
+// Sauti ya kufungua NAYA (Akaunti)
+document.addEventListener('change', (event) => {
+  if (event.target.id !== 'sound-toggle') return;
+  setSoundEnabled(event.target.checked);
+  toast(event.target.checked ? 'Sauti imewashwa' : 'Sauti imezimwa');
+});
+document.addEventListener('click', (event) => {
+  if (event.target.id !== 'sound-test') return;
+  previewSound().catch(() => toast('Simu imezuia sauti. Ongeza sauti ya simu kisha ujaribu tena.'));
+});
 
 // Onyesha / ficha password
 document.addEventListener('click', (event) => {
@@ -701,6 +712,14 @@ function renderAccount() {
       <p class="alert alert-danger" id="push-error" role="alert" hidden></p>
       <div id="push-action"></div>
       <ul class="notes" id="note-list"></ul>
+    </section>
+
+    <section class="card sound-card" aria-labelledby="sound-title">
+      <div class="sound-row">
+        <span><h2 id="sound-title">Sauti ya kufungua NAYA</h2><span class="muted">Sauti fupi logo inapojitengeneza app ikifunguka.</span></span>
+        <label class="switch"><input type="checkbox" id="sound-toggle"${soundEnabled() ? ' checked' : ''}><span class="sr-only">Washa sauti ya kufungua</span><i aria-hidden="true"></i></label>
+      </div>
+      <button class="link-btn" type="button" id="sound-test">Sikiliza sauti</button>
     </section>
 
     <button class="btn btn-ghost btn-out" type="button" data-action="logout">Toka</button>
