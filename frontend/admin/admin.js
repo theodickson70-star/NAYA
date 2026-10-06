@@ -2,6 +2,7 @@
 // Session inahifadhiwa; refresh haikutoi isipokuwa API imekataa token (401/403).
 import { createApi, escapeHtml as esc, fetchHealth } from '/shared/api.js';
 import * as places from './places.js';
+import * as ridesAdmin from './rides-admin.js';
 import {
   AUDIT_ACTIONS,
   DOCUMENT_ORDER,
@@ -16,7 +17,7 @@ import {
 const api = createApi('naya_admin_token');
 const $ = (id) => document.getElementById(id);
 const views = ['view-loading', 'view-login', 'view-offline', 'view-app'];
-const pages = ['page-overview', 'page-drivers', 'page-driver', 'page-locations', 'page-fares'];
+const pages = ['page-overview', 'page-drivers', 'page-driver', 'page-locations', 'page-fares', 'page-rides', 'page-ride'];
 let me = null;
 
 function show(view) {
@@ -91,8 +92,11 @@ function route() {
   else if (parts[0] === 'madereva') page = 'page-drivers';
   else if (parts[0] === 'maeneo') page = 'page-locations';
   else if (parts[0] === 'bei') page = 'page-fares';
+  else if (parts[0] === 'safari' && parts[1]) page = 'page-ride';
+  else if (parts[0] === 'safari') page = 'page-rides';
+  ridesAdmin.stop();
   for (const p of pages) $(p).hidden = p !== page;
-  const navFor = { 'page-overview': 'overview', 'page-drivers': 'drivers', 'page-driver': 'drivers', 'page-locations': 'locations', 'page-fares': 'fares' };
+  const navFor = { 'page-overview': 'overview', 'page-drivers': 'drivers', 'page-driver': 'drivers', 'page-locations': 'locations', 'page-fares': 'fares', 'page-rides': 'rides', 'page-ride': 'rides' };
   for (const a of document.querySelectorAll('[data-nav]')) {
     const active = a.dataset.nav === navFor[page];
     if (active) a.setAttribute('aria-current', 'page');
@@ -104,6 +108,8 @@ function route() {
   if (page === 'page-driver') loadDriver(parts[1]);
   if (page === 'page-locations') places.loadLocations();
   if (page === 'page-fares') places.loadFares();
+  if (page === 'page-rides') ridesAdmin.loadRides();
+  if (page === 'page-ride') ridesAdmin.loadRide(parts[1]);
 }
 window.addEventListener('hashchange', route);
 
@@ -136,6 +142,12 @@ async function loadOverview() {
     setDot('sys-db', data.system.database === 'ok' ? 'ok' : 'bad');
     $('sys-version').textContent = `NAYA ${data.system.version} · ${data.system.phase}`;
     renderSetup(data);
+    $('stat-active').textContent = n(data.rides.active);
+    $('stat-completed').textContent = n(data.rides.completedToday);
+    $('stat-value').textContent = `TSh ${n(data.rides.valueToday)}`;
+    $('stat-online').textContent = n(data.rides.driversOnline);
+    $('nav-active').textContent = data.rides.active;
+    $('nav-active').hidden = !data.rides.active;
   } catch (err) {
     if (handleAuthError(err)) return;
     showError('dashboard-error', err);
@@ -503,4 +515,5 @@ async function start() {
 }
 
 places.setup({ api, onAuthError: handleAuthError });
+ridesAdmin.setup({ api, onAuthError: handleAuthError });
 start();

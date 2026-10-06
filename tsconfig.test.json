@@ -1,5 +1,5 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": { "noEmit": true, "rootDir": "." },
-  "files": ["tests/auth.test.ts", "tests/drivers.test.ts", "tests/places.test.ts"]
+  "files": ["tests/auth.test.ts", "tests/drivers.test.ts", "tests/places.test.ts", "tests/rides.test.ts"]
 }

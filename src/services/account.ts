@@ -3,6 +3,7 @@
 import { db, transaction } from '../db/pool.js';
 import { notFound } from '../utils/http.js';
 import { driverStatusOf, ensureDriverProfile } from './drivers.js';
+import { assertCanSwitchMode, dispatchRide } from './rides.js';
 import { findUserById, toPublicUser, type AppMode, type UserRow } from './users.js';
 
 export async function getAccount(user: UserRow) {
@@ -19,10 +20,14 @@ export async function getAccount(user: UserRow) {
 
 /** Kuchagua au kubadili mode. Kuchagua Dereva kwa mara ya kwanza = "Kuwa dereva" (ombi linafunguliwa). */
 export async function setMode(userId: string, mode: AppMode) {
-  await transaction(async (client) => {
+  // Hakuna safari inayoendelea upande unaoachwa; ukiacha udereva, unakuwa offline.
+  const releasedRide = await transaction(async (client) => {
+    const released = await assertCanSwitchMode(client, userId, mode);
     if (mode === 'DRIVER') await ensureDriverProfile(client, userId);
     await client.query('UPDATE naya.users SET active_mode = $2, updated_at = now() WHERE id = $1', [userId, mode]);
+    return released;
   });
+  if (releasedRide) await dispatchRide(releasedRide);
   const user = await findUserById(db, userId);
   if (!user) throw notFound('Akaunti haikupatikana');
   return getAccount(user);

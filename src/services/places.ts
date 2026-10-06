@@ -33,7 +33,7 @@ export function listLocations(options: { q?: string; includeInactive?: boolean }
   );
 }
 
-const findLocation = (client: Db, id: string) =>
+export const findLocation = (client: Db, id: string) =>
   one<LocationView>(client, `SELECT ${LOCATION_COLUMNS} FROM naya.locations WHERE id = $1`, [id]);
 
 function duplicateName(error: unknown): never {
@@ -140,6 +140,24 @@ export function previewFares(input: FareRuleInput) {
 
 // ---------------------------------------------------------------- makadirio ya abiria
 
+async function describeGpsPoint(point: Point): Promise<string> {
+  const active = await listLocations();
+  let best: { name: string; km: number } | null = null;
+  for (const l of active) {
+    const km = straightLineKm(point, l);
+    if (!best || km < best.km) best = { name: l.name, km };
+  }
+  if (!best || best.km > 2) return 'Mahali pa abiria (GPS)';
+  return best.km < 0.15 ? best.name : `Karibu na ${best.name}`;
+}
+
+/** Je, pointi iko ndani ya km SERVICE_RADIUS_KM kutoka eneo lolote la huduma? */
+export async function insideServiceArea(point: Point): Promise<boolean> {
+  const active = await listLocations();
+  const nearest = Math.min(...active.map((l) => straightLineKm(point, l)));
+  return Number.isFinite(nearest) && nearest <= SERVICE_RADIUS_KM;
+}
+
 type PlaceRef = { locationId: string } | { lat: number; lng: number };
 
 async function resolvePlace(ref: PlaceRef, role: 'pickup' | 'destination') {
@@ -150,18 +168,18 @@ async function resolvePlace(ref: PlaceRef, role: 'pickup' | 'destination') {
     }
     return { source: 'location' as const, id: location.id, name: location.name, lat: location.lat, lng: location.lng };
   }
-  return { source: 'gps' as const, id: null, name: 'Mahali ulipo', lat: ref.lat, lng: ref.lng };
+  return { source: 'gps' as const, id: null, name: 'Mahali ulipo' as string, lat: ref.lat, lng: ref.lng };
 }
 
 export async function estimateTrip(input: { pickup: PlaceRef; destination: { locationId: string } }) {
   const [pickup, destination] = await Promise.all([resolvePlace(input.pickup, 'pickup'), resolvePlace(input.destination, 'destination')]);
 
   if (pickup.source === 'gps') {
-    const active = await listLocations();
-    const nearest = Math.min(...active.map((l) => straightLineKm(pickup, l)));
-    if (!Number.isFinite(nearest) || nearest > SERVICE_RADIUS_KM) {
+    if (!(await insideServiceArea(pickup))) {
       throw badRequest('Uko nje ya eneo la huduma la NAYA kwa sasa. Chagua unapoanzia kwenye orodha ya maeneo.');
     }
+    // Jina linalomsaidia dereva: "Karibu na <eneo lililo karibu zaidi>" (ramani inatumia GPS halisi).
+    pickup.name = await describeGpsPoint(pickup);
   }
   if (pickup.id === destination.id || straightLineKm(pickup, destination) < 0.05) {
     throw badRequest('Mahali pa kuanzia na unakoenda ni pamoja. Chagua unakoenda kwingine.');
@@ -170,8 +188,8 @@ export async function estimateTrip(input: { pickup: PlaceRef; destination: { loc
   const rules = (await listFareRules()).filter((r) => r.isActive);
   const options: FareQuote[] = rules.map((rule) => quoteFare(rule, pickup as Point, destination as Point));
   return {
-    pickup: { source: pickup.source, id: pickup.id, name: pickup.name },
-    destination: { id: destination.id, name: destination.name },
+    pickup: { source: pickup.source, id: pickup.id, name: pickup.name, lat: pickup.lat, lng: pickup.lng },
+    destination: { id: destination.id as string, name: destination.name, lat: destination.lat, lng: destination.lng },
     straightKm: Math.round(straightLineKm(pickup, destination) * 10) / 10,
     options,
   };

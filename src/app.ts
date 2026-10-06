@@ -17,6 +17,7 @@ import { authRoutes } from './routes/auth.js';
 import { driverRoutes } from './routes/drivers.js';
 import { healthRoutes } from './routes/health.js';
 import { placeRoutes } from './routes/places.js';
+import { rideRoutes } from './routes/rides.js';
 
 const FRONTEND_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
 // Ramani (Leaflet) inatolewa na server hii hii — hakuna script ya CDN ya nje.
@@ -52,6 +53,7 @@ export async function buildApp(options: { logger?: boolean } = {}): Promise<Fast
   await app.register(accountRoutes);
   await app.register(driverRoutes);
   await app.register(placeRoutes);
+  await app.register(rideRoutes);
 
   // Kurasa za NAYA: /app/ (app moja ya abiria na dereva) na /admin/ (ofisi).
   await app.register(fastifyStatic, { root: FRONTEND_DIR, prefix: '/', index: ['index.html'] });

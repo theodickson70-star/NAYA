@@ -8,9 +8,8 @@ Mfumo wa bodaboda na bajaji. Unajengwa phase moja baada ya nyingine; kila phase 
 | 2 | Msingi: usalama, migrations, login (simu + password), dashboard ya ofisi | ✅ |
 | 3 | Madereva: usajili, chombo, nyaraka, uthibitisho wa ofisi, logo ya NAYA | ✅ |
 | 3.5 | App moja ya NAYA: abiria na dereva kwa akaunti moja, kuchagua na kubadili mode | ✅ |
-| 4 | Maeneo (ramani ya ofisi), bei kwa kila chombo, makadirio ya nauli kwa abiria (GPS au orodha) | ✅ sasa |
-| 5 | Safari: kuomba, kumpata dereva, hali za safari (mode ya Abiria) | |
-| 6 | Mode ya Dereva: online, maombi, mapato | |
+| 4 | Maeneo (ramani ya ofisi), bei kwa kila chombo, makadirio ya nauli kwa abiria (GPS au orodha) | ✅ |
+| 5+6 | Safari kamili: kuagiza, kumpata dereva, online/offline, kukubali, nimefika → anza → maliza, nyota, mapato, ukurasa wa Safari ofisini | ✅ sasa |
 | 7 | Realtime (Supabase Realtime) na notifications | |
 | 8 | Malipo kwa simu (M-Pesa, Airtel, Tigo, HaloPesa) | |
 | 9 | Msaidizi wa AI (Claude) unaotumia data halisi | |
@@ -23,8 +22,8 @@ src/server.ts          Inaanzisha server (PORT kutoka env, 0.0.0.0) na kuendesha
 src/app.ts             Fastify: helmet, CORS, rate limit, JWT, routes, kurasa
 src/config/env.ts      Variables (inakataa kuanza kama za lazima hazipo)
 src/db/                Pool ya Supabase + migration runner
-src/routes/            /health, /api/auth/*, /api/account/*, /api/drivers/me/*, /api/locations, /api/fares/*, /api/admin/*
-src/services/          Mantiki (users, auth, account, drivers, files, audit, places, fare-engine)
+src/routes/            /health, /api/auth/*, /api/account/*, /api/drivers/me/*, /api/locations, /api/fares/*, /api/rides/*, /api/driver/*, /api/admin/*
+src/services/          Mantiki (users, auth, account, drivers, files, audit, places, fare-engine, rides)
 src/middleware/        Uhakiki wa token na roles, makosa
 database/migrations/   SQL (tables zote ziko kwenye schema "naya")
 frontend/app/          App MOJA ya NAYA (abiria + dereva) — / na /dereva/ zinaelekeza hapa
@@ -54,6 +53,23 @@ Majibu yote ya API: `{ "success": true, "data": ... }` au `{ "success": false, "
 - Umbali wa barabara ≈ umbali wa moja kwa moja × kizidisho cha barabara (kawaida 1.3).
 - Abiria anaanzia mahali alipo (GPS) au eneo la orodha; GPS lazima iwe ndani ya km 30 ya maeneo ya huduma.
 - Ramani: Leaflet (kutoka npm, inatolewa na server hii) + picha za OpenStreetMap.
+
+## Safari
+
+```
+SEARCHING → ACCEPTED → ARRIVED → IN_PROGRESS → COMPLETED
+          ↘ NO_DRIVER (hakuna dereva ndani ya dakika 3)
+          ↘ CANCELLED (abiria kabla ya safari kuanza, au ofisi)
+Dereva akighairi baada ya kukubali → safari inarudi SEARCHING (dereva mwingine anatafutwa).
+```
+
+- **Kumpata dereva:** server inaendesha dispatch kila sekunde 3 (`src/server.ts`). Ombi linaenda kwa dereva aliyethibitishwa, aliye online,
+  mwenye chombo sahihi, aliye karibu zaidi (ndani ya km 10). Ana sekunde 20 kukubali; akikataa au muda ukiisha, anayefuata anapewa.
+- **Usalama wa data:** unique indexes zinazuia dereva au abiria kuwa na safari mbili zinazoendelea; dereva ana ombi moja tu linalosubiri;
+  kukubali kunafanyika chini ya row lock (madereva wawili hawawezi kupata safari moja).
+- **Nauli** inahesabiwa na server wakati wa kuagiza (haitoki kwenye app). Malipo kwa sasa ni taslimu.
+- Kila badiliko la hali linaandikwa kwenye `naya.ride_status_history`.
+- App inaangalia hali mpya kila sekunde 4 (Phase 7 italeta Supabase Realtime na notifications).
 
 ## Nyaraka za madereva
 

@@ -11,12 +11,13 @@ import {
   LOCATION_CATEGORIES,
   VEHICLE_TYPES,
 } from '/shared/labels.js';
+import * as rides from './rides.js';
 
 const api = createApi('naya_app_token');
 const $ = (id) => document.getElementById(id);
 const views = ['view-loading', 'view-auth', 'view-role', 'view-offline', 'view-app'];
 const MAX_BYTES = 3 * 1024 * 1024;
-const VERSION = '0.5.0';
+const VERSION = '0.6.0';
 
 let account = null; // { user, activeMode, driverStatus, canDrive }
 let driver = null; // wasifu wa udereva (mode ya Dereva)
@@ -28,6 +29,7 @@ const thumbs = new Map();
 // Safari inayopangwa na abiria (Phase 4: makadirio ya nauli; kuagiza kunakuja Phase 5).
 const trip = { pickup: null, destination: null, estimate: null, estimateError: null, selected: null, gps: 'idle', loading: false };
 let places = null; // maeneo ya huduma (cache)
+let tripHistory = null; // safari za abiria zilizopita (cache)
 
 // Akaunti ya zamani ya app ya dereva: mtu asilazimike kuingia upya.
 try {
@@ -147,6 +149,8 @@ $('role-form').addEventListener('submit', async (event) => {
 
 async function switchMode(mode, { goHome } = {}) {
   account = await api.put('/api/account/mode', { mode });
+  rides.stopPolling();
+  if (mode === 'PASSENGER') rides.stopGps();
   driver = null;
   editingVehicle = false;
   show('view-app');
@@ -157,6 +161,7 @@ async function switchMode(mode, { goHome } = {}) {
 // ---------- Njia (tabs) ----------
 function route() {
   if (!account) return;
+  rides.stopPolling();
   tab = location.hash.startsWith('#/akaunti') ? 'account' : 'home';
   const picker = location.hash.match(/^#\/chagua\/(kwenda|kutoka)/)?.[1] ?? null;
   for (const a of document.querySelectorAll('[data-tab]')) {
@@ -200,8 +205,25 @@ function pickupLabel() {
   return 'Chagua unapoanzia';
 }
 
+const onPassengerHome = () => account?.activeMode === 'PASSENGER' && tab === 'home' && !location.hash.startsWith('#/chagua');
+
 async function renderPassengerHome() {
   const ds = account.driverStatus;
+  // Safari inayoendelea (au iliyoisha bila kufungwa) inachukua skrini nzima.
+  try {
+    const ride = await rides.fetchCurrentRide();
+    if (ride) {
+      if (onPassengerHome()) rides.renderPassengerRide(ride);
+      return;
+    }
+  } catch (err) {
+    if (handleError(err)) return;
+  }
+  try {
+    tripHistory ??= await api.get('/api/rides/history');
+  } catch {
+    tripHistory = null;
+  }
   let planner;
   try {
     const list = await loadPlaces();
@@ -220,7 +242,7 @@ async function renderPassengerHome() {
     </section>
     <section class="card">
       <h2>Safari zako</h2>
-      <p class="empty-state">Bado hujasafiri na NAYA.</p>
+      ${rides.historyHtml(tripHistory)}
     </section>
     ${
       ds
@@ -277,8 +299,9 @@ function estimateBlock() {
         )
         .join('')}
     </fieldset>
-    <button class="btn btn-primary btn-block" type="button" disabled>Agiza safari</button>
-    <p class="muted small" style="margin-top:8px">Kuagiza kunaanza hivi karibuni. Kwa sasa unaona nauli halisi ya safari yako.</p>`;
+    <p class="alert alert-danger" id="book-error" role="alert" hidden></p>
+    <button class="btn btn-primary btn-block" type="button" data-action="book">Agiza safari</button>
+    <p class="muted small" style="margin-top:8px">Malipo: taslimu kwa dereva. Nauli ni makadirio kwa umbali wa barabara.</p>`;
 }
 
 async function refreshEstimate() {
@@ -303,7 +326,7 @@ async function refreshEstimate() {
 }
 
 function renderIfHome() {
-  if (account?.activeMode === 'PASSENGER' && tab === 'home' && !location.hash.startsWith('#/chagua')) renderPassengerHome();
+  if (onPassengerHome()) renderPassengerHome();
 }
 
 /** GPS kupitia kivinjari; makosa yanageuzwa kuwa ujumbe rafiki (GPS_MESSAGES). */
@@ -425,7 +448,7 @@ function renderDriver() {
   if (tab !== 'home' || account.activeMode !== 'DRIVER') return;
   const status = driver.driver.status;
   if (status === 'PENDING') return renderDriverStatus('wait');
-  if (status === 'APPROVED') return renderDriverStatus('ok');
+  if (status === 'APPROVED') return rides.loadDriverDashboard();
   if (status === 'SUSPENDED') return renderDriverStatus('bad');
   renderOnboarding();
 }
@@ -706,6 +729,21 @@ $('app-content').addEventListener('click', async (event) => {
     return renderPassengerHome();
   }
   if (action === 'refresh') return loadDriver();
+  if (action === 'book') {
+    const button = event.target.closest('[data-action]');
+    button.disabled = true;
+    button.textContent = 'Inaagiza…';
+    try {
+      const pickup = trip.pickup.type === 'gps' ? { lat: trip.pickup.lat, lng: trip.pickup.lng } : { locationId: trip.pickup.id };
+      await rides.book({ pickup, destination: { locationId: trip.destination.id }, vehicleType: trip.selected });
+      tripHistory = null;
+    } catch (err) {
+      if (handleError(err, 'book-error')) return;
+      button.disabled = false;
+      button.textContent = 'Agiza safari';
+    }
+    return;
+  }
   if (action === 'to-driver') {
     return switchMode('DRIVER', { goHome: true })
       .then(() => toast('Uko kwenye mode ya Dereva'))
@@ -755,6 +793,8 @@ async function logout() {
 }
 
 function signOutLocally() {
+  rides.reset();
+  tripHistory = null;
   account = null;
   driver = null;
   places = null;
@@ -768,6 +808,20 @@ function signOutLocally() {
 }
 
 $('retry-button').addEventListener('click', start);
+
+rides.init({
+  api,
+  toast,
+  handleError,
+  firstName: () => firstName(),
+  isPassengerHome: onPassengerHome,
+  isDriverHome: () => account?.activeMode === 'DRIVER' && tab === 'home' && driver?.driver.status === 'APPROVED',
+  onPassengerRideClosed: () => {
+    tripHistory = null;
+    trip.estimate = null;
+    refreshEstimate();
+  },
+});
 
 // ---------- Mwanzo ----------
 async function start() {

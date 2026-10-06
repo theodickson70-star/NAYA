@@ -69,6 +69,7 @@
       </a>
       <nav class="topnav" aria-label="Sehemu za ofisi">
         <a href="#/" data-nav="overview">Muhtasari</a>
+        <a href="#/safari" data-nav="rides">Safari <span id="nav-active" class="nav-count" hidden></span></a>
         <a href="#/madereva" data-nav="drivers">Madereva <span id="nav-pending" class="nav-count" hidden></span></a>
         <a href="#/maeneo" data-nav="locations">Maeneo</a>
         <a href="#/bei" data-nav="fares">Bei</a>
@@ -89,6 +90,13 @@
         <div class="stat"><span class="stat-value" id="stat-drivers">–</span><span class="stat-label">Madereva waliothibitishwa</span></div>
         <a class="stat stat-link" href="#/madereva?hali=PENDING"><span class="stat-value" id="stat-pending">–</span><span class="stat-label">Wanasubiri uthibitisho</span></a>
         <div class="stat"><span class="stat-value" id="stat-new">–</span><span class="stat-label">Wapya leo</span></div>
+      </section>
+
+      <section class="stat-strip stat-strip-rides" aria-label="Safari">
+        <a class="stat stat-link" href="#/safari"><span class="stat-value" id="stat-active">–</span><span class="stat-label">Safari zinazoendelea</span></a>
+        <div class="stat"><span class="stat-value" id="stat-completed">–</span><span class="stat-label">Zilizokamilika leo</span></div>
+        <div class="stat"><span class="stat-value stat-money" id="stat-value">–</span><span class="stat-label">Thamani ya safari leo</span></div>
+        <div class="stat"><span class="stat-value" id="stat-online">–</span><span class="stat-label">Madereva online sasa</span></div>
       </section>
 
       <p id="dashboard-error" class="alert alert-danger" role="alert" hidden></p>
@@ -115,8 +123,8 @@
           <li class="done">Madereva: usajili, nyaraka na uthibitisho</li>
           <li class="done">App moja ya NAYA: abiria na dereva, kubadili mode</li>
           <li class="done">Bei na maeneo ya Urambo</li>
-          <li>Kuomba safari na kumpata dereva</li>
-          <li>Mode ya dereva: online, maombi, mapato</li>
+          <li class="done">Kuomba safari na kumpata dereva</li>
+          <li class="done">Mode ya dereva: online, maombi, mapato</li>
           <li>Taarifa za papo hapo na notifications</li>
           <li>Malipo kwa simu</li>
           <li>Msaidizi wa AI</li>
@@ -137,6 +145,26 @@
       <div id="driver-filters" class="filters" role="group" aria-label="Chuja kwa hali"></div>
       <p id="drivers-error" class="alert alert-danger" role="alert" hidden></p>
       <div id="driver-list" class="driver-list" aria-live="polite"></div>
+    </main>
+
+    <!-- Safari -->
+    <main id="page-rides" class="page" hidden>
+      <div class="page-head">
+        <h1>Safari</h1>
+        <div class="filters" role="group" aria-label="Chuja safari">
+          <button type="button" class="chip" data-scope="active" aria-pressed="true">Zinazoendelea</button>
+          <button type="button" class="chip" data-scope="all" aria-pressed="false">Zote</button>
+        </div>
+      </div>
+      <p class="muted small">Inasasishwa kila sekunde 10.</p>
+      <p id="rides-error" class="alert alert-danger" role="alert" hidden></p>
+      <div id="ride-list" class="driver-list" aria-live="polite"></div>
+    </main>
+
+    <main id="page-ride" class="page" hidden>
+      <a class="back-link" href="#/safari">Rudi kwa safari</a>
+      <p id="ride-error" class="alert alert-danger" role="alert" hidden></p>
+      <div id="ride-detail"></div>
     </main>
 
     <!-- Maeneo -->
