@@ -4,6 +4,8 @@ import { createApi, escapeHtml as esc, fetchHealth } from '/shared/api.js';
 import { connectRealtime } from '/shared/realtime.js';
 import * as places from './places.js';
 import * as ridesAdmin from './rides-admin.js';
+import * as safetyAdmin from './safety-admin.js';
+import * as subsAdmin from './subscriptions-admin.js';
 import {
   AUDIT_ACTIONS,
   DOCUMENT_ORDER,
@@ -18,7 +20,7 @@ import {
 const api = createApi('naya_admin_token');
 const $ = (id) => document.getElementById(id);
 const views = ['view-loading', 'view-login', 'view-offline', 'view-app'];
-const pages = ['page-overview', 'page-drivers', 'page-driver', 'page-locations', 'page-fares', 'page-rides', 'page-ride'];
+const pages = ['page-overview', 'page-drivers', 'page-driver', 'page-locations', 'page-fares', 'page-rides', 'page-ride', 'page-subscriptions', 'page-sos'];
 let me = null;
 
 function show(view) {
@@ -87,12 +89,16 @@ function onAdminEvent(_type, data) {
     else if (!$('page-rides').hidden) ridesAdmin.refreshList();
     else if (!$('page-ride').hidden && data?.rideId && location.hash.endsWith(data.rideId)) ridesAdmin.loadRide(data.rideId);
     else if (!$('page-drivers').hidden) loadDrivers(driversState.status, driversState.q);
+    // Usifute maelezo ambayo msimamizi anaandika sasa hivi.
+    else if (!$('page-sos').hidden && !document.activeElement?.closest('#sos-list form')) safetyAdmin.loadPage();
+    else if (!$('page-subscriptions').hidden) subsAdmin.loadList();
     if ($('page-overview').hidden) loadPendingCount();
   }, 700);
 }
 
 function enterApp(user) {
   me = user;
+  loadPendingCount(); // idadi kwenye menyu + bango la dharura tangu mwanzo
   realtime ??= connectRealtime(api, {
     onEvent: onAdminEvent,
     onStatus: (up) => {
@@ -118,9 +124,12 @@ function route() {
   else if (parts[0] === 'bei') page = 'page-fares';
   else if (parts[0] === 'safari' && parts[1]) page = 'page-ride';
   else if (parts[0] === 'safari') page = 'page-rides';
+  else if (parts[0] === 'ada') page = 'page-subscriptions';
+  else if (parts[0] === 'dharura') page = 'page-sos';
   ridesAdmin.stop();
+  driverOnPage = null;
   for (const p of pages) $(p).hidden = p !== page;
-  const navFor = { 'page-overview': 'overview', 'page-drivers': 'drivers', 'page-driver': 'drivers', 'page-locations': 'locations', 'page-fares': 'fares', 'page-rides': 'rides', 'page-ride': 'rides' };
+  const navFor = { 'page-overview': 'overview', 'page-drivers': 'drivers', 'page-driver': 'drivers', 'page-locations': 'locations', 'page-fares': 'fares', 'page-rides': 'rides', 'page-ride': 'rides', 'page-subscriptions': 'subscriptions', 'page-sos': 'sos' };
   for (const a of document.querySelectorAll('[data-nav]')) {
     const active = a.dataset.nav === navFor[page];
     if (active) a.setAttribute('aria-current', 'page');
@@ -134,6 +143,8 @@ function route() {
   if (page === 'page-fares') places.loadFares();
   if (page === 'page-rides') ridesAdmin.loadRides();
   if (page === 'page-ride') ridesAdmin.loadRide(parts[1]);
+  if (page === 'page-subscriptions') subsAdmin.loadPage();
+  if (page === 'page-sos') safetyAdmin.loadPage();
 }
 window.addEventListener('hashchange', route);
 
@@ -172,6 +183,10 @@ async function loadOverview() {
     $('stat-online').textContent = n(data.rides.driversOnline);
     $('nav-active').textContent = data.rides.active;
     $('nav-active').hidden = !data.rides.active;
+    $('stat-sub-month').textContent = `TSh ${n(data.subscriptions.monthTotal)}`;
+    $('stat-sub-expired').textContent = n(data.subscriptions.expiredDrivers);
+    $('stat-sos').textContent = n(data.sosOpen);
+    safetyAdmin.setOpenCount(data.sosOpen);
   } catch (err) {
     if (handleAuthError(err)) return;
     showError('dashboard-error', err);
@@ -280,6 +295,7 @@ $('driver-search').addEventListener('submit', (event) => {
 
 // ---------- Dereva mmoja ----------
 let blobUrls = [];
+let driverOnPage = null; // dereva aliye wazi kwenye ukurasa
 function releaseBlobs() {
   for (const url of blobUrls) URL.revokeObjectURL(url);
   blobUrls = [];
@@ -344,6 +360,8 @@ function renderDriver(data) {
       </div>
     </section>
 
+    ${['APPROVED', 'SUSPENDED'].includes(driver.status) ? '<section class="panel" id="driver-sub"><h2>Ada ya mwezi</h2><p class="muted">Inapakia…</p></section>' : ''}
+
     ${decisionPanel(driver, docs)}
 
     <section class="panel">
@@ -380,6 +398,8 @@ function renderDriver(data) {
   }
 
   bindDecision(data);
+  driverOnPage = ['APPROVED', 'SUSPENDED'].includes(driver.status) ? data.user.id : null;
+  if (driverOnPage) subsAdmin.loadDriverPanel(driverOnPage);
 }
 
 function decisionPanel(driver, docs) {
@@ -494,6 +514,7 @@ async function loadPendingCount() {
     setPendingBadge(data.drivers.PENDING);
     $('nav-active').textContent = data.rides.active;
     $('nav-active').hidden = !data.rides.active;
+    safetyAdmin.setOpenCount(data.sosOpen);
   } catch {
     // si muhimu
   }
@@ -544,4 +565,6 @@ async function start() {
 
 places.setup({ api, onAuthError: handleAuthError });
 ridesAdmin.setup({ api, onAuthError: handleAuthError });
+subsAdmin.setup({ api, onAuthError: handleAuthError });
+safetyAdmin.setup({ api, onAuthError: handleAuthError });
 start();

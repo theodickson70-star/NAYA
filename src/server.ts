@@ -5,6 +5,7 @@ import { db } from './db/pool.js';
 import { runMigrations } from './db/migrate.js';
 import { startListener, stopListener } from './realtime/hub.js';
 import { dispatchPending } from './services/rides.js';
+import { runSubscriptionChecks } from './services/subscriptions.js';
 
 const app = await buildApp();
 
@@ -36,8 +37,15 @@ const dispatcher = setInterval(async () => {
   }
 }, 3000);
 
+// Ada ya mwezi: ukumbusho, arifa ya kuisha, na kumrudisha offline dereva ambaye siku za kuvumiliwa zimeisha.
+const checkSubscriptions = () =>
+  runSubscriptionChecks().catch((error) => app.log.error({ err: error }, 'ukaguzi wa ada umeshindwa'));
+const subscriptionTimer = setInterval(checkSubscriptions, 5 * 60_000);
+void checkSubscriptions();
+
 const shutdown = async () => {
   clearInterval(dispatcher);
+  clearInterval(subscriptionTimer);
   await stopListener();
   await app.close();
   await db.end();

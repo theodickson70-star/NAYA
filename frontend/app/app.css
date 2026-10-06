@@ -319,3 +319,35 @@ input, select, textarea { font-size: 17px; padding: 13px 14px; }
 .notes li:first-child { border-top: 0; }
 .notes li.unread strong::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--naya-green); margin-right: 8px; vertical-align: 2px; }
 .notes .muted { font-size: 14px; }
+
+/* ---------- Phase 8: ramani ya safari, PIN, usalama, ada ya mwezi ---------- */
+.ride-map { height: 230px; margin-top: 14px; border-radius: 16px; border: 1.5px solid var(--line); overflow: hidden; background: var(--naya-mint); position: relative; z-index: 0; }
+.ride-map .map-fallback { padding: 90px 16px 0; text-align: center; }
+.moto-marker { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--warning); border: 3px solid var(--white); box-shadow: 0 2px 6px rgba(23, 35, 29, 0.35); }
+.moto-marker svg { width: 22px; height: 22px; fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+.pin-card { display: flex; flex-direction: column; align-items: center; text-align: center; border-color: var(--warning); background: #FFFBEA; }
+.pin-label { font-weight: 700; color: var(--warning-ink); }
+.pin-digits { font-family: var(--font-display); font-size: 44px; font-weight: 800; letter-spacing: 0.08em; font-variant-numeric: tabular-nums; line-height: 1.1; margin: 4px 0 6px; }
+
+.pin-form label { font-weight: 700; }
+.pin-input { font-family: var(--font-display); font-size: 34px; font-weight: 800; letter-spacing: 0.4em; text-align: center; font-variant-numeric: tabular-nums; padding: 10px 0 10px 0.4em; }
+
+.safety-row { display: flex; gap: 10px; margin-top: 14px; }
+.safety-row .btn { flex: 1; margin-top: 0; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.safety-row svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.sos-button { color: var(--danger); border-color: var(--danger); }
+.sos-sheet { border-color: var(--danger); background: var(--danger-bg); }
+.sos-sheet h2 { color: var(--danger); }
+.sos-sheet .btn { margin-top: 10px; }
+.alert-sos { background: var(--danger); color: var(--white); margin-top: 14px; }
+.alert-sos a { color: var(--white); font-weight: 700; }
+.share-card input { margin-top: 10px; font-size: 14px; }
+
+.sub-line { margin: 14px 0 0; font-size: 14px; color: var(--muted); }
+.sub-note { margin: 14px 0 0; text-align: left; font-size: 15px; }
+.sub-note a { color: inherit; font-weight: 700; }
+.sub-block { border-color: var(--warning); text-align: left; }
+.sub-block h1 { font-size: 24px; }
+.sub-how { background: var(--bg); border-radius: 10px; padding: 10px 12px; }
+.small-title { font-size: 15px; margin: 16px 0 0; }

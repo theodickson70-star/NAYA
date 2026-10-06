@@ -6,13 +6,17 @@
 //
 // Kila badiliko linafanyika ndani ya transaction kwa "UPDATE … WHERE status = <inayotarajiwa>" au row lock,
 // na database ina unique indexes zinazozuia dereva/abiria kuwa na safari mbili zinazoendelea.
+import { randomInt } from 'node:crypto';
 import { type Db, db, many, one, transaction } from '../db/pool.js';
+import { publish } from '../realtime/hub.js';
 import { badRequest, conflict, forbidden, isUniqueViolation, notFound } from '../utils/http.js';
 import { writeAudit } from './audit.js';
 import { readDocument } from './drivers.js';
 import { straightLineKm } from './fare-engine.js';
 import { notify, notifyAdmins } from './notify.js';
 import { estimateTrip, findLocation, insideServiceArea } from './places.js';
+import { openSosFor } from './safety.js';
+import { assertSubscriptionOk, describeSubscription, getSettings, SUBSCRIPTION_OK_SQL } from './subscriptions.js';
 
 export type RideStatus = 'SEARCHING' | 'ACCEPTED' | 'ARRIVED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'NO_DRIVER';
 type VehicleType = 'BODABODA' | 'BAJAJI';
@@ -21,6 +25,9 @@ export const OFFER_SECONDS = 20; // muda wa dereva kukubali ombi
 export const SEARCH_TIMEOUT_SECONDS = 180; // baada ya hapo bila dereva → NO_DRIVER
 export const MAX_PICKUP_KM = 10; // dereva awe ndani ya umbali huu kutoka kwa abiria
 export const DRIVER_STALE_SECONDS = 120; // dereva asiyeonekana kwa muda huu hapewi maombi
+export const PIN_MAX_ATTEMPTS = 5; // PIN ya safari ikikosewa mara hizi, dereva hawezi kuanza safari (wasiliana na ofisi)
+const CITY_SPEED_KMH = 22; // makadirio ya mwendo mjini (bodaboda/bajaji) kwa muda wa kufika
+const ROAD_FACTOR = 1.3;
 
 const ACTIVE: RideStatus[] = ['SEARCHING', 'ACCEPTED', 'ARRIVED', 'IN_PROGRESS'];
 const WITH_DRIVER: RideStatus[] = ['ACCEPTED', 'ARRIVED', 'IN_PROGRESS'];
@@ -52,9 +59,15 @@ interface RideRow {
   started_at: Date | null;
   completed_at: Date | null;
   cancelled_at: Date | null;
+  start_pin: string | null;
+  pin_attempts: number;
+  share_token_hash: Buffer | null;
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
+/** Dakika za kufika (km za mstari ulionyooka × barabara ÷ mwendo wa mjini), angalau dakika 1. */
+export const etaMinutes = (km: number) => Math.max(1, Math.ceil(((km * ROAD_FACTOR) / CITY_SPEED_KMH) * 60));
+const newPin = () => String(randomInt(0, 10_000)).padStart(4, '0');
 const tsh = (n: number) => `TSh ${Math.round(n).toLocaleString('en-US')}`;
 
 async function history(client: Db, rideId: string, from: RideStatus | null, to: RideStatus, actorId: string | null, note?: string) {
@@ -103,6 +116,7 @@ export async function dispatchRide(rideId: string): Promise<void> {
     const waiting = await one(client, `SELECT 1 FROM naya.ride_offers WHERE ride_id = $1 AND status = 'PENDING'`, [rideId]);
     if (waiting) return {};
 
+    const { graceDays } = await getSettings(client);
     const candidates = await many<{ user_id: string; km: number }>(
       client,
       `SELECT d.user_id, ${DISTANCE_SQL('d.last_lat', 'd.last_lng', '$2', '$3')} AS km
@@ -110,13 +124,14 @@ export async function dispatchRide(rideId: string): Promise<void> {
         WHERE d.status = 'APPROVED' AND d.is_online AND u.status = 'ACTIVE' AND d.vehicle_type = $4
           AND d.last_lat IS NOT NULL AND d.last_seen_at > now() - make_interval(secs => $5::float8)
           AND d.user_id <> $6
+          AND ${SUBSCRIPTION_OK_SQL('d', '$7')}
           AND NOT EXISTS (SELECT 1 FROM naya.rides r WHERE r.driver_id = d.user_id AND r.status IN ('ACCEPTED', 'ARRIVED', 'IN_PROGRESS'))
           AND NOT EXISTS (SELECT 1 FROM naya.rides r WHERE r.passenger_id = d.user_id AND r.status IN ('SEARCHING', 'ACCEPTED', 'ARRIVED', 'IN_PROGRESS'))
           AND NOT EXISTS (SELECT 1 FROM naya.ride_offers o WHERE o.driver_id = d.user_id AND o.status = 'PENDING')
           AND NOT EXISTS (SELECT 1 FROM naya.ride_offers o WHERE o.ride_id = $1 AND o.driver_id = d.user_id)
         ORDER BY km ASC
         LIMIT 5`,
-      [rideId, ride.pickup_lat, ride.pickup_lng, ride.vehicle_type, DRIVER_STALE_SECONDS, ride.passenger_id],
+      [rideId, ride.pickup_lat, ride.pickup_lng, ride.vehicle_type, DRIVER_STALE_SECONDS, ride.passenger_id, graceDays],
     );
     for (const candidate of candidates) {
       if (candidate.km > MAX_PICKUP_KM) break;
@@ -179,13 +194,14 @@ async function driverCard(client: Db, driverId: string) {
     vehicle_color: string | null;
     last_lat: number | null;
     last_lng: number | null;
+    last_seen_at: Date | null;
     has_photo: boolean;
     rating_avg: number | null;
     rating_count: number;
   }>(
     client,
     `SELECT u.full_name, u.phone, d.vehicle_type, d.plate_number, d.vehicle_make, d.vehicle_model, d.vehicle_color,
-            d.last_lat, d.last_lng,
+            d.last_lat, d.last_lng, d.last_seen_at,
             EXISTS (SELECT 1 FROM naya.driver_documents x WHERE x.driver_id = d.user_id AND x.doc_type = 'PROFILE_PHOTO') AS has_photo,
             (SELECT round(avg(r.rating_for_driver)::numeric, 1)::float8 FROM naya.rides r WHERE r.driver_id = d.user_id AND r.rating_for_driver IS NOT NULL) AS rating_avg,
             (SELECT count(*)::int FROM naya.rides r WHERE r.driver_id = d.user_id AND r.rating_for_driver IS NOT NULL) AS rating_count
@@ -202,7 +218,7 @@ async function driverCard(client: Db, driverId: string) {
     color: row.vehicle_color,
     hasPhoto: row.has_photo,
     rating: row.rating_count > 0 ? { average: row.rating_avg, count: row.rating_count } : null,
-    location: row.last_lat !== null && row.last_lng !== null ? { lat: row.last_lat, lng: row.last_lng } : null,
+    location: row.last_lat !== null && row.last_lng !== null ? { lat: row.last_lat, lng: row.last_lng, at: row.last_seen_at } : null,
   };
 }
 
@@ -233,13 +249,23 @@ async function passengerView(client: Db, r: RideRow) {
   const redispatched =
     r.status === 'SEARCHING' &&
     !!(await one(client, `SELECT 1 FROM naya.ride_status_history WHERE ride_id = $1 AND to_status = 'SEARCHING' AND from_status IS NOT NULL`, [r.id]));
+  const target = r.status === 'IN_PROGRESS' ? { lat: r.dest_lat, lng: r.dest_lng } : { lat: r.pickup_lat, lng: r.pickup_lng };
+  const km = driver?.location ? straightLineKm(driver.location, target) : null;
+  const live = WITH_DRIVER.includes(r.status);
   return {
     ...baseView(r),
     ratingForDriver: r.rating_for_driver,
     redispatched,
+    // PIN ya kuanza safari: abiria anampa dereva akishapanda (inaonekana kwa abiria tu).
+    pin: ['ACCEPTED', 'ARRIVED'].includes(r.status) ? r.start_pin : null,
+    shared: live && r.share_token_hash !== null,
+    sosOpen: live ? await openSosFor(client, r.passenger_id, r.id) : false,
     driver: driver && {
       ...driver,
-      distanceToPickupKm: driver.location ? round1(straightLineKm(driver.location, { lat: r.pickup_lat, lng: r.pickup_lng })) : null,
+      location: live ? driver.location : null,
+      distanceToPickupKm: driver.location && r.status === 'ACCEPTED' ? round1(km!) : null,
+      // ACCEPTED: muda wa dereva kufika kwa abiria · IN_PROGRESS: muda uliobaki kufika unakoenda
+      etaMinutes: km !== null && (r.status === 'ACCEPTED' || r.status === 'IN_PROGRESS') ? etaMinutes(km) : null,
     },
   };
 }
@@ -250,6 +276,9 @@ async function driverView(client: Db, r: RideRow) {
     ...baseView(r),
     ratingForPassenger: r.rating_for_passenger,
     passenger: passenger && { name: passenger.full_name, phone: passenger.phone },
+    pinRequired: r.status === 'ARRIVED' && r.start_pin !== null,
+    pinAttemptsLeft: Math.max(0, PIN_MAX_ATTEMPTS - r.pin_attempts),
+    sosOpen: r.driver_id && WITH_DRIVER.includes(r.status) ? await openSosFor(client, r.driver_id, r.id) : false,
   };
 }
 
@@ -276,8 +305,8 @@ export async function requestRide(
       const row = await one<{ id: string }>(
         client,
         `INSERT INTO naya.rides (passenger_id, vehicle_type, pickup_location_id, pickup_name, pickup_lat, pickup_lng,
-                                 dest_location_id, dest_name, dest_lat, dest_lng, distance_km, fare)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
+                                 dest_location_id, dest_name, dest_lat, dest_lng, distance_km, fare, start_pin)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
         [
           passengerId,
           input.vehicleType,
@@ -291,6 +320,7 @@ export async function requestRide(
           estimate.destination.lng,
           option.distanceKm,
           option.fare,
+          newPin(),
         ],
       );
       await history(client, row!.id, null, 'SEARCHING', passengerId);
@@ -435,6 +465,7 @@ export async function setOnline(
       [driverId],
     );
     if (passengerRide) throw conflict('Una safari inayoendelea kama abiria. Imalize kwanza.');
+    await assertSubscriptionOk(client, driverId);
     let point: { lat: number; lng: number };
     if (input.locationId) {
       const location = await findLocation(client, input.locationId);
@@ -463,12 +494,40 @@ export async function updateDriverLocation(driverId: string, point: { lat: numbe
     `UPDATE naya.drivers SET last_lat = $2, last_lng = $3, last_seen_at = now() WHERE user_id = $1 AND is_online RETURNING user_id`,
     [driverId, point.lat, point.lng],
   );
+  if (updated) {
+    // Abiria wa safari inayoendelea anaona pikipiki ikisogea kwenye ramani (yeye tu).
+    const ride = await one<{ id: string; passenger_id: string; status: RideStatus; pickup_lat: number; pickup_lng: number; dest_lat: number; dest_lng: number }>(
+      db,
+      `SELECT id, passenger_id, status, pickup_lat, pickup_lng, dest_lat, dest_lng FROM naya.rides
+        WHERE driver_id = $1 AND status IN ('ACCEPTED', 'ARRIVED', 'IN_PROGRESS')`,
+      [driverId],
+    );
+    if (ride) {
+      const target = ride.status === 'IN_PROGRESS' ? { lat: ride.dest_lat, lng: ride.dest_lng } : { lat: ride.pickup_lat, lng: ride.pickup_lng };
+      const km = straightLineKm(point, target);
+      await publish({
+        type: 'location',
+        userId: ride.passenger_id,
+        rideId: ride.id,
+        data: {
+          lat: point.lat,
+          lng: point.lng,
+          etaMinutes: ride.status === 'ARRIVED' ? null : etaMinutes(km),
+          distanceKm: ride.status === 'ACCEPTED' ? round1(km) : null,
+        },
+      });
+    }
+  }
   return { updated: !!updated };
 }
 
 /** Kila kitu dereva anahitaji kwenye skrini: online?, ombi linalosubiri, safari inayoendelea, mapato. */
 export async function driverState(driverId: string) {
-  const d = await one<{ status: string; is_online: boolean }>(db, 'SELECT status, is_online FROM naya.drivers WHERE user_id = $1', [driverId]);
+  const d = await one<{ status: string; is_online: boolean; paid_until: Date | null }>(
+    db,
+    'SELECT status, is_online, paid_until FROM naya.drivers WHERE user_id = $1',
+    [driverId],
+  );
   if (!d) throw notFound('Bado hujaomba kuwa dereva.');
   // App iko wazi → dereva anaonekana (mapigo ya moyo).
   if (d.is_online) await db.query('UPDATE naya.drivers SET last_seen_at = now() WHERE user_id = $1', [driverId]);
@@ -517,9 +576,11 @@ export async function driverState(driverId: string) {
       WHERE driver_id = $1 AND status = 'COMPLETED'`,
     [driverId],
   );
+  const settings = await getSettings();
   return {
     driverStatus: d.status,
     online: d.is_online,
+    subscription: { ...describeSubscription(d.paid_until, settings), paymentInstructions: settings.paymentInstructions },
     offer,
     ride: rideRow ? await driverView(db, rideRow) : null,
     earnings: {
@@ -598,6 +659,36 @@ const STEP = {
   start: { from: 'ARRIVED', to: 'IN_PROGRESS', column: 'started_at' },
   complete: { from: 'IN_PROGRESS', to: 'COMPLETED', column: 'completed_at' },
 } as const;
+
+/**
+ * Kuanza safari kunahitaji PIN ya abiria (inathibitisha dereva amembeba abiria sahihi, na abiria yuko kwenye chombo sahihi).
+ * Majaribio yanahesabiwa nje ya transaction ya kuanza, kwa hiyo kukosea kunahifadhiwa hata ombi likikataliwa.
+ */
+export async function startRide(driverId: string, rideId: string, pin: string | undefined) {
+  const ride = await findRide(db, rideId);
+  if (!ride || ride.driver_id !== driverId) throw notFound('Safari haikupatikana');
+  if (ride.status === 'ARRIVED' && ride.start_pin !== null) {
+    if (ride.pin_attempts >= PIN_MAX_ATTEMPTS) {
+      throw conflict('PIN imekosewa mara nyingi. Mpigie abiria, au wasiliana na ofisi ya NAYA.');
+    }
+    if (!pin) throw badRequest('Muulize abiria PIN yake ya tarakimu 4.');
+    if (pin !== ride.start_pin) {
+      const row = await one<{ pin_attempts: number }>(
+        db,
+        `UPDATE naya.rides SET pin_attempts = pin_attempts + 1, updated_at = now() WHERE id = $1 AND status = 'ARRIVED' RETURNING pin_attempts`,
+        [rideId],
+      );
+      const left = Math.max(0, PIN_MAX_ATTEMPTS - (row?.pin_attempts ?? PIN_MAX_ATTEMPTS));
+      if (left === 0) {
+        await history(db, rideId, 'ARRIVED', 'ARRIVED', driverId, `PIN imekosewa mara ${PIN_MAX_ATTEMPTS}`);
+        await notifyAdmins(rideId);
+        throw conflict('PIN imekosewa mara nyingi. Mpigie abiria, au wasiliana na ofisi ya NAYA.');
+      }
+      throw badRequest(`PIN si sahihi. Umebakiza majaribio ${left}.`);
+    }
+  }
+  return advanceRide(driverId, rideId, 'start');
+}
 
 /** Nimefika → Anza safari → Maliza safari (dereva wa safari hii tu, kwa mpangilio huo tu). */
 export async function advanceRide(driverId: string, rideId: string, step: keyof typeof STEP) {
@@ -746,14 +837,23 @@ export async function rideForAdmin(rideId: string) {
       [rideId],
     ),
   ]);
+  const sos = await many(
+    db,
+    `SELECT s.id, s.role, s.status, s.created_at AS "createdAt", s.resolved_at AS "resolvedAt", s.resolution_note AS "note", u.full_name AS "name"
+       FROM naya.sos_alerts s JOIN naya.users u ON u.id = s.user_id WHERE s.ride_id = $1 ORDER BY s.created_at`,
+    [rideId],
+  );
   return {
     ...baseView(ride),
     ratingForDriver: ride.rating_for_driver,
     ratingForPassenger: ride.rating_for_passenger,
+    pinAttempts: ride.pin_attempts,
+    shared: ride.share_token_hash !== null,
     passenger: passenger && { name: passenger.full_name, phone: passenger.phone },
     driver,
     timeline,
     offers,
+    sos,
   };
 }
 

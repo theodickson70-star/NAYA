@@ -8,7 +8,7 @@ import { AppError } from '../utils/http.js';
 export function registerErrorHandling(app: FastifyInstance): void {
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof AppError) {
-      if (error.statusCode === 401) request.log.warn({ url: request.url }, 'auth imeshindwa');
+      if (error.statusCode === 401) request.log.warn({ url: request.url.split('?')[0] }, 'auth imeshindwa');
       return reply.status(error.statusCode).send({ success: false, message: error.message });
     }
     if (error instanceof ZodError) {

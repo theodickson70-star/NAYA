@@ -19,7 +19,7 @@ const api = createApi('naya_app_token');
 const $ = (id) => document.getElementById(id);
 const views = ['view-loading', 'view-auth', 'view-role', 'view-offline', 'view-app'];
 const MAX_BYTES = 3 * 1024 * 1024;
-const VERSION = '0.7.0';
+const VERSION = '0.8.0';
 
 let account = null; // { user, activeMode, driverStatus, canDrive }
 let driver = null; // wasifu wa udereva (mode ya Dereva)
@@ -174,7 +174,7 @@ function startRealtime() {
         dot.title = up ? 'Taarifa za papo hapo zimeunganishwa' : 'Inaunganisha upya…';
       }
     },
-    onEvent: async (type) => {
+    onEvent: async (type, data) => {
       if (!account) return;
       if (type === 'account') {
         // mf. ofisi imekuthibitisha kuwa dereva
@@ -182,12 +182,13 @@ function startRealtime() {
           account = await api.get('/api/account');
           driver = null;
           if (tab === 'home') route();
+          else if (tab === 'account') renderAccount();
         } catch (err) {
           handleError(err);
         }
         return;
       }
-      rides.onRealtime(type);
+      rides.onRealtime(type, data);
     },
   });
 }
@@ -460,6 +461,15 @@ function renderAccount() {
       }</p>
     </section>
 
+    ${
+      driverStatus === 'APPROVED' || driverStatus === 'SUSPENDED'
+        ? `<section class="card" aria-labelledby="sub-title">
+            <h2 id="sub-title">Ada ya mwezi</h2>
+            <div id="sub-body"><p class="muted">Inaangalia…</p></div>
+          </section>`
+        : ''
+    }
+
     <section class="card" aria-labelledby="notify-title">
       <h2 id="notify-title">Arifa</h2>
       <p class="muted" id="push-status">Inaangalia…</p>
@@ -471,6 +481,47 @@ function renderAccount() {
     <button class="btn btn-ghost btn-out" type="button" data-action="logout">Toka</button>
     <p class="version">NAYA ${VERSION} · TWENDE PAMOJA</p>`;
   loadNotificationSection();
+  if ($('sub-body')) loadSubscriptionSection();
+}
+
+const SUB_STATE = {
+  ACTIVE: ['ok', 'Iko hai'],
+  GRACE: ['warn', 'Imeisha — siku za kulipa'],
+  EXPIRED: ['bad', 'Imeisha'],
+  NONE: ['muted', 'Haijaanza'],
+};
+const PAY_METHODS = { CASH: 'Taslimu', MPESA: 'M-Pesa', AIRTEL: 'Airtel Money', TIGO: 'Mixx by Yas (Tigo Pesa)', HALOPESA: 'HaloPesa', BANK: 'Benki' };
+
+async function loadSubscriptionSection() {
+  try {
+    const sub = await api.get('/api/driver/subscription');
+    if (!$('sub-body')) return;
+    const [tone, label] = SUB_STATE[sub.state];
+    const line =
+      sub.state === 'ACTIVE'
+        ? `Mpaka <strong>${esc(formatDate(sub.paidUntil))}</strong> · siku ${sub.daysLeft}`
+        : sub.state === 'GRACE'
+          ? `Lipa kabla ya <strong>${esc(formatDate(sub.graceEndsAt, true))}</strong> uendelee kupokea safari.`
+          : 'Lipa ili uendelee kupokea safari.';
+    $('sub-body').innerHTML = `
+      <div class="mode-row"><span><span class="muted">Ada</span><br><strong>${formatTsh(sub.monthlyFee)} kwa siku 30</strong></span><span class="badge badge-${tone}">${label}</span></div>
+      <p>${line}</p>
+      <p class="sub-how"><strong>Jinsi ya kulipa:</strong> ${esc(sub.paymentInstructions)}</p>
+      ${
+        sub.payments.length
+          ? `<h3 class="small-title">Malipo yako</h3><ul class="notes">${sub.payments
+              .map(
+                (p) => `<li><strong>${formatTsh(p.amount)}</strong> · miezi ${p.months} · ${esc(PAY_METHODS[p.method] ?? p.method)}${
+                  p.reference ? ` · ${esc(p.reference)}` : ''
+                }<br><span class="muted">${esc(formatDate(p.createdAt))} → mpaka ${esc(formatDate(p.periodEnd))}</span></li>`,
+              )
+              .join('')}</ul>`
+          : '<p class="muted">Bado hujalipa ada. Malipo yako yataonekana hapa.</p>'
+      }`;
+  } catch (err) {
+    if (handleError(err)) return;
+    if ($('sub-body')) $('sub-body').innerHTML = `<p class="alert alert-danger" role="alert">${esc(err.message)}</p>`;
+  }
 }
 
 const PUSH_TEXT = {

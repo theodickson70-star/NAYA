@@ -49,8 +49,8 @@ async function makeUser(key: string, phone: string, name: string, role = 'USER',
 async function makeDriver(key: string, phone: string, name: string, vehicle: 'BODABODA' | 'BAJAJI', status = 'APPROVED', plate = '') {
   await makeUser(key, phone, name, 'USER', 'DRIVER');
   await db.query(
-    `INSERT INTO naya.drivers (user_id, status, vehicle_type, plate_number, vehicle_make, vehicle_color, license_number)
-     VALUES ($1, $2, $3, $4, 'Boxer', 'Nyekundu', 'DL123456')`,
+    `INSERT INTO naya.drivers (user_id, status, vehicle_type, plate_number, vehicle_make, vehicle_color, license_number, paid_until)
+     VALUES ($1, $2, $3, $4, 'Boxer', 'Nyekundu', 'DL123456', now() + interval '30 days')`,
     [ids[key], status, vehicle, plate],
   );
 }
@@ -198,7 +198,10 @@ describe('NAYA Phase 5+6 — safari', () => {
     assert.equal((await call('POST', `/api/driver/rides/${rideId}/complete`, {}, 'd1')).status, 409);
     assert.equal((await call('POST', `/api/driver/rides/${rideId}/arrive`, {}, 'd2')).status, 404);
     assert.equal((await call('POST', `/api/driver/rides/${rideId}/arrive`, {}, 'd1')).json.data.ride.status, 'ARRIVED');
-    assert.equal((await call('POST', `/api/driver/rides/${rideId}/start`, {}, 'd1')).json.data.ride.status, 'IN_PROGRESS');
+    const pin = (await call('GET', '/api/rides/current', undefined, 'p1')).json.data.pin;
+    assert.match(pin, /^\d{4}$/);
+    assert.equal((await call('POST', `/api/driver/rides/${rideId}/start`, {}, 'd1')).status, 400); // PIN inahitajika
+    assert.equal((await call('POST', `/api/driver/rides/${rideId}/start`, { pin }, 'd1')).json.data.ride.status, 'IN_PROGRESS');
     assert.equal((await call('POST', `/api/rides/${rideId}/cancel`, {}, 'p1')).status, 409); // imeshaanza
     assert.equal((await call('POST', `/api/rides/${rideId}/rate`, { rating: 5 }, 'p1')).status, 409); // bado haijaisha
     const done = await call('POST', `/api/driver/rides/${rideId}/complete`, {}, 'd1');

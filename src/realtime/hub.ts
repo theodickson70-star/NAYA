@@ -1,6 +1,6 @@
 // Taarifa za papo hapo.
 // Kila simu iliyo wazi inashikilia muunganisho mmoja wa Server-Sent Events (/api/stream). Kitu kikibadilika
-// (safari, ombi, udereva) tunatuma tukio dogo kwa mtumiaji husika — "{type, rideId}" tu, bila data binafsi —
+// (safari, ombi, udereva) tunatuma tukio dogo kwa mtumiaji husika — "{type, rideId}" (pamoja na mahali pa dereva kwa abiria wa safari yake tu) —
 // na app inajichukulia hali mpya kupitia API ya kawaida (yenye ukaguzi wa ruhusa).
 //
 // Railway ikiendesha nakala zaidi ya moja ya server, tukio linapita kwenye Postgres NOTIFY/LISTEN
@@ -9,13 +9,15 @@ import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { connectionConfig, db } from '../db/pool.js';
 
-export type EventType = 'ride' | 'offer' | 'driver' | 'account' | 'admin';
+export type EventType = 'ride' | 'offer' | 'driver' | 'account' | 'admin' | 'location';
 
 export interface RealtimeMessage {
   type: EventType;
   userId?: string; // mtumiaji mmoja
   admins?: boolean; // ofisi yote
   rideId?: string | null;
+  /** Data ndogo isiyo ya siri kwa mpokeaji husika tu (mf. mahali pa dereva kwa abiria wa safari yake). */
+  data?: Record<string, string | number | null>;
 }
 
 interface StreamClient {
@@ -46,7 +48,7 @@ export function closeAllClients(): void {
 
 /** Fikisha tukio kwa watumiaji walio kwenye server HII. */
 function deliver(message: RealtimeMessage) {
-  const payload = { type: message.type, rideId: message.rideId ?? null };
+  const payload = { ...(message.data ?? {}), type: message.type, rideId: message.rideId ?? null };
   for (const client of clients) {
     if ((message.userId && client.userId === message.userId) || (message.admins && client.admin)) {
       client.send(message.type, payload);

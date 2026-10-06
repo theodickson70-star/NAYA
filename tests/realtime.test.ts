@@ -127,8 +127,9 @@ before(async () => {
   await makeUser('driver', `0731${s}`, 'USER', 'DRIVER');
   await makeUser('applicant', `0732${s}`, 'USER', 'DRIVER');
   await db.query(
-    `INSERT INTO naya.drivers (user_id, status, vehicle_type, plate_number, vehicle_make, vehicle_color, license_number)
-     VALUES ($1, 'APPROVED', 'BODABODA', $2, 'Boxer', 'Bluu', 'DL1'), ($3, 'PENDING', 'BODABODA', $4, 'TVS', 'Nyeusi', 'DL2')`,
+    `INSERT INTO naya.drivers (user_id, status, vehicle_type, plate_number, vehicle_make, vehicle_color, license_number, paid_until)
+     VALUES ($1, 'APPROVED', 'BODABODA', $2, 'Boxer', 'Bluu', 'DL1', now() + interval '30 days'),
+            ($3, 'PENDING', 'BODABODA', $4, 'TVS', 'Nyeusi', 'DL2', NULL)`,
     [ids.driver, `MC ${s.slice(-3)} RTA`, ids.applicant, `MC ${s.slice(-3)} RTB`],
   );
 });
@@ -248,7 +249,7 @@ describe('NAYA Phase 7 — realtime na arifa', () => {
     // abiria wa kwanza bado ana safari inayoendelea → 409; tumia safari mpya ya abiria huyo baada ya kuimaliza
     if (ride.status === 409) {
       const current = (await http('GET', '/api/rides/current', undefined, 'passenger')).json.data;
-      await http('POST', `/api/driver/rides/${current.id}/start`, {}, 'driver');
+      await http('POST', `/api/driver/rides/${current.id}/start`, { pin: current.pin ?? undefined }, 'driver');
       await http('POST', `/api/driver/rides/${current.id}/complete`, {}, 'driver');
       await http('POST', `/api/rides/${current.id}/close`, {}, 'passenger');
       await http('POST', '/api/driver/online', { online: false }, 'driver'); // ombi liende kwa dereva mwenye push

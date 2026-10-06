@@ -1,7 +1,7 @@
 // Taarifa za papo hapo kutoka server ya NAYA (Server-Sent Events).
 // Tiketi ya sekunde 60 inaombwa kwanza (token haipiti kwenye URL); muunganisho ukikatika,
 // tunaomba tiketi mpya na kuunganisha tena (sekunde 1 → 2 → 4 … hadi 30).
-const TYPES = ['ride', 'offer', 'driver', 'account', 'admin'];
+const TYPES = ['ride', 'offer', 'driver', 'account', 'admin', 'location'];
 
 export function connectRealtime(api, { onEvent, onStatus }) {
   let source = null;

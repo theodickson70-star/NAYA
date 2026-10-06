@@ -19,6 +19,8 @@ import { healthRoutes } from './routes/health.js';
 import { placeRoutes } from './routes/places.js';
 import { pushRoutes } from './routes/push.js';
 import { rideRoutes } from './routes/rides.js';
+import { safetyRoutes } from './routes/safety.js';
+import { subscriptionRoutes } from './routes/subscriptions.js';
 import { streamRoutes } from './routes/stream.js';
 
 const FRONTEND_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
@@ -88,12 +90,15 @@ export async function buildApp(options: { logger?: boolean } = {}): Promise<Fast
   await app.register(rideRoutes);
   await app.register(streamRoutes);
   await app.register(pushRoutes);
+  await app.register(subscriptionRoutes);
+  await app.register(safetyRoutes);
 
   // Kurasa za NAYA: /app/ (app moja ya abiria na dereva) na /admin/ (ofisi).
   await app.register(fastifyStatic, { root: FRONTEND_DIR, prefix: '/', index: ['index.html'] });
   await app.register(fastifyStatic, { root: LEAFLET_DIR, prefix: '/vendor/leaflet/', decorateReply: false });
   app.get('/admin', async (_request, reply) => reply.redirect('/admin/'));
   app.get('/app', async (_request, reply) => reply.redirect('/app/'));
+  app.get('/safari', async (_request, reply) => reply.redirect('/safari/'));
   // Mwanzo na anwani ya zamani ya app ya dereva → app moja ya NAYA.
   app.get('/', async (_request, reply) => reply.redirect('/app/'));
   app.get('/dereva', async (_request, reply) => reply.redirect('/app/'));

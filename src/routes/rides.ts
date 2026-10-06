@@ -23,6 +23,7 @@ import {
   requestRide,
   rideForAdmin,
   setOnline,
+  startRide,
   updateDriverLocation,
 } from '../services/rides.js';
 import { ok } from '../utils/http.js';
@@ -109,7 +110,12 @@ export async function rideRoutes(app: FastifyInstance): Promise<void> {
     const { id } = idParam.parse(request.params);
     return ok(await declineOffer(uid(request), id));
   });
-  for (const step of ['arrive', 'start', 'complete'] as const) {
+  app.post('/api/driver/rides/:id/start', { ...user, config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (request) => {
+    const { id } = idParam.parse(request.params);
+    const { pin } = z.object({ pin: z.string().trim().regex(/^\d{4}$/, 'PIN ni tarakimu 4').optional() }).parse(request.body ?? {});
+    return ok(await startRide(uid(request), id, pin));
+  });
+  for (const step of ['arrive', 'complete'] as const) {
     app.post(`/api/driver/rides/:id/${step}`, user, async (request) => {
       const { id } = idParam.parse(request.params);
       return ok(await advanceRide(uid(request), id, step));

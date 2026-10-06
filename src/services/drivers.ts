@@ -6,6 +6,7 @@ import { conflict, forbidden, isUniqueViolation, notFound } from '../utils/http.
 import type { DocumentType, VehicleInput } from '../validators/drivers.js';
 import { auditFor, writeAudit } from './audit.js';
 import { notify, notifyAdmins } from './notify.js';
+import { startTrialIfNeeded } from './subscriptions.js';
 import { deleteFile, readFile, storeFile } from './files.js';
 import { toPublicUser, type UserRow } from './users.js';
 
@@ -309,6 +310,7 @@ export async function approveDriver(adminId: string, driverId: string) {
       `UPDATE naya.driver_documents SET status = 'APPROVED', review_note = NULL, reviewed_at = now() WHERE driver_id = $1`,
       [driverId],
     );
+    await startTrialIfNeeded(client, driverId); // siku za bure za ada ya mwezi (mara ya kwanza tu)
     await writeAudit(client, { actorId: adminId, action: 'driver.approved', targetType: 'driver', targetId: driverId });
   });
   await notify({

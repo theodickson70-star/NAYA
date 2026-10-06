@@ -97,6 +97,15 @@ function render(r) {
       ${badge(r.status)}
     </div>
     ${r.cancelledBy ? `<p class="alert alert-warn">Imeghairiwa na ${BY[r.cancelledBy] ?? r.cancelledBy}${r.cancelReason ? `: ${esc(r.cancelReason)}` : ''}</p>` : ''}
+    ${(r.sos ?? []).some((x) => x.status === 'OPEN') ? '<p class="alert alert-danger"><strong>Dharura iko wazi kwenye safari hii.</strong> <a href="#/dharura">Ishughulikie</a></p>' : ''}
+    ${
+      r.pinAttempts >= 5
+        ? '<p class="alert alert-warn"><strong>PIN imekosewa mara 5</strong> — dereva hawezi kuanza safari. Wapigie wote wawili; ghairi safari ikibidi.</p>'
+        : r.pinAttempts > 0
+          ? `<p class="muted small">PIN imekosewa mara ${r.pinAttempts}.</p>`
+          : ''
+    }
+    ${r.shared ? '<p class="muted small">Abiria ameshiriki safari hii na ndugu/rafiki.</p>' : ''}
     <div class="people">
       <div class="panel-box"><h2>Abiria</h2>${
         r.passenger ? `<p><strong>${esc(r.passenger.name)}</strong><br><a href="tel:+${esc(r.passenger.phone)}">${esc(formatPhone(r.passenger.phone))}</a></p>` : '—'
@@ -117,6 +126,17 @@ function render(r) {
         )
         .join('')}</ol>
     </section>
+    ${
+      (r.sos ?? []).length
+        ? `<section class="panel"><h2>Dharura</h2><ul class="history">${r.sos
+            .map(
+              (x) => `<li><span><strong>${x.role === 'PASSENGER' ? 'Abiria' : 'Dereva'}: ${esc(x.name)}</strong> · ${x.status === 'OPEN' ? 'Wazi' : 'Imeshughulikiwa'}</span><span class="muted">${esc(
+                formatDate(x.createdAt, true),
+              )}</span>${x.note ? `<span class="note">${esc(x.note)}</span>` : ''}</li>`,
+            )
+            .join('')}</ul></section>`
+        : ''
+    }
     <section class="panel">
       <h2>Maombi kwa madereva</h2>
       ${

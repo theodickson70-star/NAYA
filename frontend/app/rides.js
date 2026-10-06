@@ -3,6 +3,7 @@
 // ikiwa imekatika, au kila sekunde 20 ikiwa imeunganishwa (pia ni "mapigo ya moyo" ya dereva aliye online).
 import { escapeHtml as esc } from '/shared/api.js';
 import { formatDate, formatPhone, formatTsh, VEHICLE_TYPES } from '/shared/labels.js';
+import { rideMap } from '/shared/map.js';
 
 let ctx = null; // { api, toast, handleError, isPassengerHome, isDriverHome, onPassengerRideClosed, firstName }
 const $ = (id) => document.getElementById(id);
@@ -18,10 +19,17 @@ let driverData = null;
 let lastKey = '';
 let gpsWatch = null;
 let lastPing = 0;
+let latestPos = null;
+let pingTimer = null;
 let cancelOpen = false;
 let standPicker = false;
 let onlineError = '';
+let sosSheet = false; // skrini ya "Una dharura?" iko wazi
+let sosSending = false;
+let shareUrl = ''; // link ya kushiriki (kama simu haina "Share")
+let mapView = null; // { rideId, map }
 const photos = new Map();
+const LIVE = ['ACCEPTED', 'ARRIVED', 'IN_PROGRESS'];
 
 export function init(context) {
   ctx = context;
@@ -30,6 +38,7 @@ export function init(context) {
   });
   $('app-content').addEventListener('click', onClick);
   $('app-content').addEventListener('change', onChange);
+  $('app-content').addEventListener('input', onInput);
 }
 
 export function stopPolling() {
@@ -45,7 +54,12 @@ export function setRealtime(up) {
 }
 
 /** Tukio la papo hapo kutoka server: chukua hali mpya ya skrini iliyo wazi. */
-export function onRealtime(type) {
+export function onRealtime(type, data = {}) {
+  if (type === 'location') {
+    // Dereva amesogea: sogeza pikipiki kwenye ramani na usasishe dakika — bila kupakia skrini upya.
+    if (passengerRide && data.rideId === passengerRide.id && ctx.isPassengerHome()) updateLive(data);
+    return;
+  }
   if (ctx.isPassengerHome() && (type === 'ride' || passengerRide)) return refreshPassenger();
   if (ctx.isDriverHome() && ['offer', 'ride', 'driver'].includes(type)) return refreshDriver();
 }
@@ -61,8 +75,45 @@ export function reset() {
   lastKey = '';
   cancelOpen = false;
   standPicker = false;
+  sosSheet = false;
+  shareUrl = '';
+  dropMap();
   for (const url of photos.values()) URL.revokeObjectURL(url);
   photos.clear();
+}
+
+function dropMap() {
+  mapView?.map?.destroy();
+  mapView = null;
+}
+
+async function mountMap(ride, points) {
+  const el = $('ride-map');
+  if (!el) return;
+  const view = { rideId: ride.id, map: null };
+  mapView = view;
+  try {
+    view.map = await rideMap(el, points, { focus: ride.status === 'IN_PROGRESS' ? 'destination' : 'pickup' });
+  } catch {
+    el.innerHTML = '<p class="muted map-fallback">Ramani haikupakia. Angalia internet.</p>';
+  }
+  if (mapView !== view) view.map?.destroy(); // skrini imebadilika wakati ramani inapakia
+}
+
+/** Maandishi ya muda wa kufika (abiria). */
+function etaText(ride, eta, km) {
+  if (ride.status === 'ACCEPTED') {
+    if (eta) return `Anafika baada ya dakika ~${eta}${km != null ? ` · yuko km ${km}` : ''}.`;
+    return `Anakuja ${ride.pickup.name}.`;
+  }
+  if (ride.status === 'IN_PROGRESS') return `Unaelekea ${ride.destination.name}${eta ? ` · dakika ~${eta}` : ''}.`;
+  return `Anakusubiri ${ride.pickup.name}.`;
+}
+
+function updateLive(data) {
+  if (data.lat != null && data.lng != null) mapView?.map?.setDriver({ lat: data.lat, lng: data.lng });
+  const el = $('ride-eta');
+  if (el && passengerRide) el.textContent = etaText(passengerRide, data.etaMinutes, data.distanceKm);
 }
 
 const tel = (phone) => `tel:+${esc(phone)}`;
@@ -72,6 +123,8 @@ const ICON = {
   map: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/></svg>',
   pin: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>',
   dot: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="9"/></svg>',
+  share: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.2 10.8l7.6-4.5M8.2 13.2l7.6 4.5"/></svg>',
+  alert: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4.5M12 17.5v.5"/></svg>',
 };
 
 function routeSummary(ride) {
@@ -103,15 +156,24 @@ export async function book(body) {
 }
 
 function passengerKey(r) {
-  return [r.status, r.redispatched, r.driver?.distanceToPickupKm, r.driver?.name].join('|');
+  // Umbali/dakika hazimo hapa: zinasasishwa papo hapo bila kuchora skrini upya (ramani isianze upya).
+  return [r.status, r.redispatched, r.driver?.name, r.pin, r.sosOpen, r.shared, cancelOpen, sosSheet, shareUrl].join('|');
 }
 
 export function renderPassengerRide(ride) {
+  if (passengerRide?.id !== ride.id || !LIVE.includes(ride.status)) {
+    shareUrl = '';
+    sosSheet = false;
+  }
   passengerRide = ride;
   const key = passengerKey(ride);
   // Usichore upya kama hakuna kilichobadilika (mf. abiria anaandika maoni au anachagua nyota).
-  if (key === lastKey && $('ride-screen')) return ensurePassengerPolling();
+  if (key === lastKey && $('ride-screen')) {
+    updateLive({ ...(ride.driver?.location ?? {}), etaMinutes: ride.driver?.etaMinutes, distanceKm: ride.driver?.distanceToPickupKm });
+    return ensurePassengerPolling();
+  }
   lastKey = key;
+  dropMap();
 
   const d = ride.driver;
   const head = {
@@ -120,23 +182,28 @@ export function renderPassengerRide(ride) {
       ride.redispatched ? 'Tunakutafutia dereva mwingine' : 'Tunatafuta dereva karibu nawe…',
       ride.redispatched ? 'Dereva wa awali ameghairi. Usijali — tunamtafuta mwingine sasa hivi.' : 'Safari yako imepokelewa. Subiri kidogo.',
     ],
-    ACCEPTED: ['coming', 'Dereva anakuja', d?.distanceToPickupKm != null ? `Yuko km ${d.distanceToPickupKm} kutoka ${ride.pickup.name}.` : `Anakuja ${ride.pickup.name}.`],
-    ARRIVED: ['arrived', 'Dereva amefika!', `Anakusubiri ${ride.pickup.name}.`],
-    IN_PROGRESS: ['moving', 'Safari inaendelea', `Unaelekea ${ride.destination.name}.`],
+    ACCEPTED: ['coming', 'Dereva anakuja', etaText(ride, d?.etaMinutes, d?.distanceToPickupKm)],
+    ARRIVED: ['arrived', 'Dereva amefika!', etaText(ride)],
+    IN_PROGRESS: ['moving', 'Safari inaendelea', etaText(ride, d?.etaMinutes)],
     COMPLETED: ['done', `Umefika ${ride.destination.name}!`, `Lipa dereva ${formatTsh(ride.fare)} taslimu.`],
     NO_DRIVER: ['none', 'Hakuna dereva aliyepatikana karibu kwa sasa', 'Jaribu tena baada ya dakika chache.'],
     CANCELLED: ['none', 'Safari imeghairiwa', ride.cancelledBy === 'ADMIN' ? `Ofisi ya NAYA: ${ride.cancelReason ?? ''}` : ride.cancelReason ?? ''],
   }[ride.status];
 
   const canCancel = ['SEARCHING', 'ACCEPTED', 'ARRIVED'].includes(ride.status);
+  const live = LIVE.includes(ride.status);
   $('app-content').innerHTML = `<div id="ride-screen">
     <section class="ride-head ride-${head[0]}" role="status">
       <span class="ride-pulse" aria-hidden="true"></span>
       <h1>${esc(head[1])}</h1>
-      <p>${esc(head[2])}</p>
+      <p id="ride-eta">${esc(head[2])}</p>
     </section>
+    ${ride.sosOpen ? sosSentHtml() : ''}
     ${ride.status === 'SEARCHING' ? pushPrompt('Washa arifa ujue dereva akipatikana, hata ukifunga app.') : ''}
+    ${live ? '<div class="ride-map" id="ride-map" role="img" aria-label="Ramani: mahali pa kuchukuliwa, unakoenda, na dereva"></div>' : ''}
+    ${ride.pin ? pinCardHtml(ride.pin) : ''}
     ${d ? driverCardHtml(ride) : ''}
+    ${live ? safetyHtml({ share: true, sosOpen: ride.sosOpen }) : ''}
     <section class="card">${routeSummary(ride)}</section>
     ${
       ride.status === 'COMPLETED'
@@ -165,7 +232,61 @@ export function renderPassengerRide(ride) {
     }
   </div>`;
   if (d?.hasPhoto) loadDriverPhoto(ride.id);
+  if (live) mountMap(ride, { pickup: ride.pickup, destination: ride.destination, driver: d?.location });
   ensurePassengerPolling();
+}
+
+function pinCardHtml(pin) {
+  return `<section class="card pin-card" aria-label="PIN ya safari">
+    <span class="pin-label">PIN ya safari</span>
+    <strong class="pin-digits">${esc(pin.split('').join(' '))}</strong>
+    <span class="muted">Mpe dereva PIN hii ukishapanda — kwanza hakikisha plate ni sahihi.</span>
+  </section>`;
+}
+
+/** Shiriki safari (abiria) + Dharura (abiria na dereva). */
+function safetyHtml({ share, sosOpen }) {
+  const sheet = sosSheet
+    ? `<section class="card sos-sheet" role="alertdialog" aria-labelledby="sos-title">
+        <h2 id="sos-title">Una dharura?</h2>
+        <p class="muted">Ofisi ya NAYA itapata ujumbe wako papo hapo pamoja na safari hii na mahali ulipo, na itakupigia.</p>
+        <p class="alert alert-danger" id="sos-error" role="alert" hidden></p>
+        <button class="btn btn-danger btn-block btn-big" type="button" data-ride="sos-send"${sosSending ? ' disabled' : ''}>${
+          sosSending ? 'Inatuma…' : 'Tuma dharura kwa ofisi ya NAYA'
+        }</button>
+        <a class="btn btn-ghost btn-block" href="tel:112">${ICON.phone} Piga Polisi · 112</a>
+        <button class="btn btn-ghost btn-block btn-plain" type="button" data-ride="sos-close">Rudi</button>
+      </section>`
+    : '';
+  const shareBox = shareUrl
+    ? `<section class="card share-card">
+        <p><strong>Tuma link hii kwa ndugu au rafiki</strong><br><span class="muted">Ataona safari yako na dereva kwenye ramani mpaka ufike.</span></p>
+        <input id="share-url" readonly value="${esc(shareUrl)}" aria-label="Link ya safari">
+        <div class="actions two">
+          <a class="btn btn-ghost" href="https://wa.me/?text=${encodeURIComponent(`Fuatilia safari yangu ya NAYA: ${shareUrl}`)}" target="_blank" rel="noopener">WhatsApp</a>
+          <button class="btn btn-ghost" type="button" data-ride="share-copy">Nakili link</button>
+        </div>
+      </section>`
+    : '';
+  return `${sheet}<div class="safety-row">
+      ${share ? `<button class="btn btn-ghost" type="button" data-ride="share">${ICON.share} Shiriki safari</button>` : ''}
+      ${sosOpen ? '' : `<button class="btn btn-ghost sos-button" type="button" data-ride="sos-open">${ICON.alert} Dharura</button>`}
+    </div>${shareBox}`;
+}
+
+function sosSentHtml() {
+  return `<p class="alert alert-sos" role="alert"><strong>Dharura imetumwa.</strong> Ofisi ya NAYA imepokea na itakupigia sasa hivi. Ukiwa hatarini piga <a href="tel:112">112</a>.</p>`;
+}
+
+function quickPosition() {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) return resolve(null);
+    navigator.geolocation.getCurrentPosition(
+      (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 3000, maximumAge: 30_000 },
+    );
+  });
 }
 
 function driverCardHtml(ride) {
@@ -219,6 +340,7 @@ async function refreshPassenger() {
     const ride = await fetchCurrentRide();
     if (!ride) {
       if (!passengerRide) return;
+      dropMap();
       stopPolling();
       passengerRide = null;
       lastKey = '';
@@ -241,6 +363,7 @@ function pushPrompt(text) {
 
 async function closePassengerRide() {
   await ctx.api.post(`/api/rides/${passengerRide.id}/close`);
+  dropMap();
   stopPolling();
   passengerRide = null;
   lastKey = '';
@@ -264,7 +387,21 @@ export async function loadDriverDashboard() {
 }
 
 function driverKey(s) {
-  return [s.online, s.offer?.id, s.ride?.id, s.ride?.status, s.earnings.today.total, standPicker, cancelOpen, onlineError, pushStatus].join('|');
+  return [
+    s.online,
+    s.offer?.id,
+    s.ride?.id,
+    s.ride?.status,
+    s.ride?.sosOpen,
+    s.earnings.today.total,
+    s.subscription?.state,
+    s.subscription?.daysLeft,
+    standPicker,
+    cancelOpen,
+    sosSheet,
+    onlineError,
+    pushStatus,
+  ].join('|');
 }
 
 function renderDriverDashboard() {
@@ -274,6 +411,7 @@ function renderDriverDashboard() {
   if (key === lastKey && $('driver-screen')) return;
   lastKey = key;
   clearInterval(tickTimer);
+  if (!s.ride || !LIVE.includes(s.ride.status)) sosSheet = false;
 
   let main;
   if (s.ride) main = driverRideHtml(s.ride);
@@ -300,22 +438,52 @@ function onlineHtml(s) {
       <button class="btn btn-ghost btn-block btn-plain" type="button" data-ride="stand-cancel">Rudi</button>
     </section>`;
   }
+  const sub = s.subscription;
+  if (!s.online && sub?.state === 'EXPIRED') return subscriptionBlockHtml(sub);
   if (!s.online) {
     return `<section class="go-online">
       <h1>Habari, ${ctx.firstName()}</h1>
       <p class="muted">Ukiwa online utapokea maombi ya safari yaliyo karibu nawe.</p>
       ${onlineError ? `<p class="alert alert-danger" role="alert">${esc(onlineError)}</p>` : ''}
       <button class="online-button" type="button" data-ride="go-online">NENDA ONLINE</button>
+      ${subscriptionNoteHtml(sub)}
       ${pushPrompt('Washa arifa ili simu ilie ombi la safari likiingia, hata app ikiwa imefungwa.')}
     </section>`;
   }
   return `<section class="go-online is-online" role="status">
     <span class="ride-pulse" aria-hidden="true"></span>
+    ${subscriptionNoteHtml(sub)}
     <h1>Uko online</h1>
     <p class="muted">${pushStatus === 'on' ? 'Unasubiri maombi ya safari. Simu italia ombi likiingia.' : 'Unasubiri maombi ya safari. Acha app wazi.'}</p>
     ${onlineError ? `<p class="alert alert-danger" role="alert">${esc(onlineError)}</p>` : ''}
     ${pushPrompt('Washa arifa ili usikose ombi hata ukifunga app.')}
     <button class="btn btn-ghost btn-block" type="button" data-ride="go-offline">Nenda offline</button>
+  </section>`;
+}
+
+// ---- Ada ya mwezi
+function subscriptionNoteHtml(sub) {
+  if (!sub || sub.state === 'NONE') return '';
+  if (sub.state === 'GRACE' || sub.state === 'EXPIRED') {
+    return `<p class="alert alert-warn sub-note" role="note"><strong>Ada yako ya mwezi imeisha.</strong> Lipa ${formatTsh(sub.monthlyFee)} kabla ya ${esc(
+      formatDate(sub.graceEndsAt, true),
+    )} uendelee kupokea safari. <a href="#/akaunti">Jinsi ya kulipa</a></p>`;
+  }
+  if (sub.daysLeft <= 3) {
+    return `<p class="alert alert-warn sub-note" role="note">Ada yako inaisha ${sub.daysLeft <= 1 ? 'kesho' : `baada ya siku ${sub.daysLeft}`} (${esc(
+      formatDate(sub.paidUntil),
+    )}). Lipa ${formatTsh(sub.monthlyFee)} mapema. <a href="#/akaunti">Jinsi ya kulipa</a></p>`;
+  }
+  return `<p class="sub-line">Ada ya mwezi iko hai mpaka ${esc(formatDate(sub.paidUntil))}</p>`;
+}
+
+function subscriptionBlockHtml(sub) {
+  return `<section class="card sub-block" role="alert">
+    <h1>Ada ya mwezi imeisha</h1>
+    <p>Lipa <strong>${formatTsh(sub.monthlyFee)}</strong> kwa mwezi ili uendelee kupokea safari za NAYA.</p>
+    <p class="sub-how">${esc(sub.paymentInstructions)}</p>
+    <p class="muted">Ofisi ikishapokea malipo yako, utaweza kwenda online mara moja.</p>
+    <button class="btn btn-primary btn-block" type="button" data-ride="reload">Nimeshalipa — angalia tena</button>
   </section>`;
 }
 
@@ -391,7 +559,18 @@ function driverRideHtml(ride) {
       <button class="btn btn-primary btn-block" type="button" data-ride="driver-close">Sawa</button>`;
   }
   const step = steps[ride.status];
-  return `<section class="ride-head ride-coming"><h1>${esc(step.title)}</h1><p>${esc(step.sub)}</p></section>
+  const needsPin = ride.status === 'ARRIVED' && ride.pinRequired;
+  const action = needsPin
+    ? `<form class="card pin-form" id="pin-form" novalidate>
+        <label for="start-pin">PIN ya abiria</label>
+        <input id="start-pin" class="pin-input" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="one-time-code" placeholder="• • • •">
+        <p class="muted">Muulize abiria PIN iliyo kwenye app yake, kisha anza safari.</p>
+        <p class="alert alert-danger" id="step-error" role="alert" hidden></p>
+        <button class="btn btn-primary btn-block btn-big" type="submit" id="start-button" data-id="${ride.id}" disabled>Anza safari</button>
+      </form>`
+    : `<p class="alert alert-danger" id="step-error" role="alert" hidden></p>
+      <button class="btn btn-primary btn-block btn-big" type="button" data-ride="${step.action}" data-id="${ride.id}">${step.label}</button>`;
+  return `${ride.sosOpen ? sosSentHtml() : ''}<section class="ride-head ride-coming"><h1>${esc(step.title)}</h1><p>${esc(step.sub)}</p></section>
     <section class="card">
       <div class="driver-top">
         <span class="driver-photo">${esc((p?.name ?? '?').split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase())}</span>
@@ -403,8 +582,8 @@ function driverRideHtml(ride) {
       </div>
     </section>
     <section class="card">${routeSummary(ride)}</section>
-    <p class="alert alert-danger" id="step-error" role="alert" hidden></p>
-    <button class="btn btn-primary btn-block btn-big" type="button" data-ride="${step.action}" data-id="${ride.id}">${step.label}</button>
+    ${action}
+    ${safetyHtml({ share: false, sosOpen: ride.sosOpen })}
     ${
       ride.status !== 'IN_PROGRESS'
         ? cancelOpen
@@ -445,21 +624,32 @@ async function refreshDriver() {
   }
 }
 
-// ---- GPS ya dereva: mahali panatumwa kila sekunde 20 akiwa online
+// ---- GPS ya dereva: kila sekunde 20 akiwa online; kila sekunde 5 akiwa na safari (abiria anamwona kwenye ramani)
 function startGps() {
   if (gpsWatch !== null || !navigator.geolocation) return;
   gpsWatch = navigator.geolocation.watchPosition(
     (pos) => {
-      if (Date.now() - lastPing < 20_000) return;
-      lastPing = Date.now();
-      ctx.api.post('/api/driver/location', { lat: pos.coords.latitude, lng: pos.coords.longitude }).catch(() => {});
+      latestPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      const onTrip = driverData?.ride && LIVE.includes(driverData.ride.status);
+      const wait = (onTrip ? 5_000 : 20_000) - (Date.now() - lastPing);
+      // Mahali pa mwisho panatumwa mwisho wa kipindi (hata simu ikiacha kutuma mabadiliko baadaye).
+      clearTimeout(pingTimer);
+      if (wait <= 0) sendPing();
+      else pingTimer = setTimeout(sendPing, wait);
     },
     () => {},
-    { enableHighAccuracy: true, maximumAge: 15_000 },
+    { enableHighAccuracy: true, maximumAge: 5_000 },
   );
 }
 
+function sendPing() {
+  if (!latestPos || gpsWatch === null) return;
+  lastPing = Date.now();
+  ctx.api.post('/api/driver/location', latestPos).catch(() => {});
+}
+
 export function stopGps() {
+  clearTimeout(pingTimer);
   if (gpsWatch !== null) navigator.geolocation?.clearWatch(gpsWatch);
   gpsWatch = null;
 }
@@ -480,8 +670,13 @@ async function goOnline(body) {
     ctx.toast('Uko online');
   } catch (err) {
     if (ctx.handleError(err)) return;
-    onlineError = err.message;
+    if (err.status === 402) {
+      // ada imeisha — onyesha skrini ya kulipa
+      driverData = await ctx.api.get('/api/driver/state').catch(() => driverData);
+      standPicker = false;
+    } else onlineError = err.message;
   }
+  lastKey = '';
   renderDriverDashboard();
 }
 
@@ -521,6 +716,7 @@ async function onClick(event) {
     try {
       await ctx.api.post(`/api/rides/${passengerRide.id}/cancel`, {});
       cancelOpen = false;
+      dropMap();
       stopPolling();
       passengerRide = null;
       lastKey = '';
@@ -541,6 +737,79 @@ async function onClick(event) {
       el.disabled = false;
     }
     return;
+  }
+
+  // Usalama (abiria na dereva)
+  if (action === 'share') {
+    el.disabled = true;
+    try {
+      const { path } = await ctx.api.post(`/api/rides/${passengerRide.id}/share`);
+      const url = `${location.origin}${path}`;
+      const d = passengerRide.driver;
+      const text = `Fuatilia safari yangu ya NAYA${d ? ` (${d.name}, ${d.plateNumber})` : ''}:`;
+      let shared = false;
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: 'Safari yangu ya NAYA', text, url });
+          shared = true;
+        } catch {
+          // mtumiaji ameghairi au haiwezekani — onyesha link
+        }
+      }
+      if (shared) ctx.toast('Link ya safari imetumwa');
+      else shareUrl = url;
+    } catch (err) {
+      if (ctx.handleError(err)) return;
+      ctx.toast(err.message);
+    }
+    el.disabled = false;
+    lastKey = '';
+    return renderPassengerRide(passengerRide);
+  }
+  if (action === 'share-copy') {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      ctx.toast('Link imenakiliwa');
+    } catch {
+      $('share-url')?.select();
+      ctx.toast('Bonyeza link kwa muda, kisha "Copy"');
+    }
+    return;
+  }
+  if (action === 'sos-open' || action === 'sos-close') {
+    sosSheet = action === 'sos-open';
+    lastKey = '';
+    return rerender();
+  }
+  if (action === 'sos-send') {
+    const rideId = passengerRide && ctx.isPassengerHome() ? passengerRide.id : driverData?.ride?.id;
+    if (!rideId || sosSending) return;
+    sosSending = true;
+    lastKey = '';
+    rerender();
+    try {
+      const where = await quickPosition();
+      await ctx.api.post('/api/sos', { rideId, ...(where ?? {}) });
+      sosSheet = false;
+      navigator.vibrate?.(300);
+      ctx.toast('Dharura imetumwa kwa ofisi ya NAYA');
+      if (passengerRide && ctx.isPassengerHome()) passengerRide = { ...passengerRide, sosOpen: true };
+      else if (driverData?.ride) driverData = { ...driverData, ride: { ...driverData.ride, sosOpen: true } };
+    } catch (err) {
+      if (ctx.handleError(err)) return;
+      sosSending = false;
+      lastKey = '';
+      rerender();
+      const box = $('sos-error');
+      if (box) {
+        box.textContent = err.message;
+        box.hidden = false;
+      }
+      return;
+    }
+    sosSending = false;
+    lastKey = '';
+    return rerender();
   }
 
   // Dereva
@@ -632,20 +901,46 @@ async function onClick(event) {
   }
 }
 
+function rerender() {
+  return passengerRide && ctx.isPassengerHome() ? renderPassengerRide(passengerRide) : renderDriverDashboard();
+}
+
+function onInput(event) {
+  if (event.target.id !== 'start-pin') return;
+  event.target.value = event.target.value.replace(/\D/g, '').slice(0, 4);
+  const button = $('start-button');
+  if (button) button.disabled = event.target.value.length !== 4;
+}
+
 function onChange(event) {
   if (event.target.name === 'rating' && $('rate-submit')) $('rate-submit').disabled = false;
 }
 
 document.addEventListener('submit', async (event) => {
   const form = event.target;
-  if (!['rate-driver-form', 'rate-passenger-form', 'driver-cancel-form'].includes(form.id)) return;
+  if (!['rate-driver-form', 'rate-passenger-form', 'driver-cancel-form', 'pin-form'].includes(form.id)) return;
   event.preventDefault();
   const button = form.querySelector('button[type="submit"]');
   button.disabled = true;
+  if (form.id === 'pin-form') {
+    try {
+      driverData = await ctx.api.post(`/api/driver/rides/${button.dataset.id}/start`, { pin: $('start-pin').value });
+      cancelOpen = false;
+      lastKey = '';
+      ctx.toast('Safari imeanza');
+      renderDriverDashboard();
+    } catch (err) {
+      if (ctx.handleError(err, 'step-error')) return;
+      $('start-pin').value = '';
+      $('start-pin').focus();
+    }
+    return;
+  }
   try {
     if (form.id === 'rate-driver-form') {
       const rating = Number(form.querySelector('input[name="rating"]:checked')?.value);
       await ctx.api.post(`/api/rides/${passengerRide.id}/rate`, { rating, comment: $('rate-comment').value });
+      dropMap();
       stopPolling();
       passengerRide = null;
       lastKey = '';

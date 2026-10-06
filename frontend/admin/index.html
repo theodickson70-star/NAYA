@@ -73,12 +73,15 @@
         <a href="#/madereva" data-nav="drivers">Madereva <span id="nav-pending" class="nav-count" hidden></span></a>
         <a href="#/maeneo" data-nav="locations">Maeneo</a>
         <a href="#/bei" data-nav="fares">Bei</a>
+        <a href="#/ada" data-nav="subscriptions">Ada</a>
+        <a href="#/dharura" data-nav="sos">Dharura <span id="nav-sos" class="nav-count nav-count-sos" hidden></span></a>
       </nav>
       <div class="topbar-user">
         <span id="me-name" class="me-name"></span>
         <button id="logout-button" class="btn btn-ghost btn-small" type="button">Toka</button>
       </div>
     </header>
+    <a id="sos-banner" class="sos-banner" href="#/dharura" role="alert" hidden></a>
 
     <!-- Muhtasari -->
     <main id="page-overview" class="page" hidden>
@@ -97,6 +100,12 @@
         <div class="stat"><span class="stat-value" id="stat-completed">–</span><span class="stat-label">Zilizokamilika leo</span></div>
         <div class="stat"><span class="stat-value stat-money" id="stat-value">–</span><span class="stat-label">Thamani ya safari leo</span></div>
         <div class="stat"><span class="stat-value" id="stat-online">–</span><span class="stat-label">Madereva online sasa</span></div>
+      </section>
+
+      <section class="stat-strip stat-strip-money" aria-label="Ada na usalama">
+        <a class="stat stat-link" href="#/ada"><span class="stat-value stat-money" id="stat-sub-month">–</span><span class="stat-label">Ada zilizolipwa mwezi huu</span></a>
+        <a class="stat stat-link" href="#/ada"><span class="stat-value" id="stat-sub-expired">–</span><span class="stat-label">Madereva wenye ada iliyoisha</span></a>
+        <a class="stat stat-link" href="#/dharura"><span class="stat-value" id="stat-sos">–</span><span class="stat-label">Dharura zilizo wazi</span></a>
       </section>
 
       <p id="dashboard-error" class="alert alert-danger" role="alert" hidden></p>
@@ -125,7 +134,8 @@
           <li class="done">Bei na maeneo ya Urambo</li>
           <li class="done">Kuomba safari na kumpata dereva</li>
           <li class="done">Mode ya dereva: online, maombi, mapato</li>
-          <li>Taarifa za papo hapo na notifications</li>
+          <li class="done">Taarifa za papo hapo na arifa za simu</li>
+          <li class="done">Ada ya mwezi, ramani ya live na usalama wa safari</li>
           <li>Malipo kwa simu</li>
           <li>Msaidizi wa AI</li>
           <li>Ripoti na takwimu</li>
@@ -210,6 +220,54 @@
       <p class="muted">Nauli = bei ya kuanzia + (bei kwa km × umbali wa barabara), isipungue nauli ya chini, ikizungushwa juu. Umbali wa barabara ≈ umbali wa moja kwa moja × kizidisho cha barabara.</p>
       <p class="alert alert-danger" id="fares-error" role="alert" hidden></p>
       <div id="fare-cards" class="fare-cards"></div>
+    </main>
+
+    <!-- Ada ya mwezi -->
+    <main id="page-subscriptions" class="page" hidden>
+      <div class="page-head">
+        <h1>Ada ya mwezi</h1>
+        <div class="filters" id="sub-filters" role="group" aria-label="Chuja madereva">
+          <button type="button" class="chip" data-filter="expired" aria-pressed="true">Zimeisha</button>
+          <button type="button" class="chip" data-filter="due" aria-pressed="false">Zinaisha wiki hii</button>
+          <button type="button" class="chip" data-filter="all" aria-pressed="false">Wote</button>
+        </div>
+      </div>
+      <section class="stat-strip stat-strip-sub" aria-label="Ada">
+        <div class="stat"><span class="stat-value stat-money" id="sub-month">–</span><span class="stat-label" id="sub-month-count">Mwezi huu</span></div>
+        <div class="stat"><span class="stat-value" id="sub-expired">–</span><span class="stat-label">Ada zimeisha</span></div>
+        <div class="stat"><span class="stat-value" id="sub-due">–</span><span class="stat-label">Zinaisha ndani ya siku 7</span></div>
+      </section>
+      <p class="muted small">Kurekodi malipo: fungua dereva, kisha "Ada ya mwezi" → Rekodi malipo.</p>
+      <p id="sub-error" class="alert alert-danger" role="alert" hidden></p>
+      <div id="sub-list" class="driver-list" aria-live="polite"></div>
+
+      <form class="decision sub-settings" id="sub-settings-form" novalidate>
+        <h2>Mipangilio ya ada</h2>
+        <div class="pay-grid">
+          <div><label for="set-fee">Ada kwa siku 30 (TSh)</label><input id="set-fee" type="number" min="0" step="500" inputmode="numeric"></div>
+          <div><label for="set-trial">Siku za bure kwa dereva mpya</label><input id="set-trial" type="number" min="0" max="90" inputmode="numeric"></div>
+          <div><label for="set-grace">Siku za kuvumiliwa baada ya kuisha</label><input id="set-grace" type="number" min="0" max="14" inputmode="numeric"></div>
+        </div>
+        <label for="set-instructions">Maelekezo ya kulipa (madereva wanayaona kwenye app)</label>
+        <textarea id="set-instructions" maxlength="500" placeholder="Mf. Lipa kwa M-Pesa namba 07XX XXX XXX (jina: NAYA), kisha tuma SMS ya muamala kwa ofisi."></textarea>
+        <p class="alert alert-danger" id="sub-settings-error" role="alert" hidden></p>
+        <p class="alert alert-ok" id="sub-settings-saved" role="status" hidden>Imehifadhiwa</p>
+        <div class="actions"><button class="btn btn-primary" type="submit">Hifadhi mipangilio</button></div>
+      </form>
+    </main>
+
+    <!-- Dharura -->
+    <main id="page-sos" class="page" hidden>
+      <div class="page-head">
+        <h1>Dharura</h1>
+        <div class="filters" id="sos-filters" role="group" aria-label="Chuja dharura">
+          <button type="button" class="chip" data-scope="open" aria-pressed="true">Zilizo wazi</button>
+          <button type="button" class="chip" data-scope="all" aria-pressed="false">Zote</button>
+        </div>
+      </div>
+      <p class="muted small">Abiria au dereva akibonyeza "Dharura" kwenye app, inaonekana hapa papo hapo na kengele inalia. Mpigie kwanza; ukiona hatari, wasiliana na Polisi (112).</p>
+      <p id="sos-error" class="alert alert-danger" role="alert" hidden></p>
+      <div id="sos-list" aria-live="polite"></div>
     </main>
 
     <!-- Dereva mmoja -->

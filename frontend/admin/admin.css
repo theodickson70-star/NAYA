@@ -225,3 +225,33 @@
 
 .live-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: rgba(255, 255, 255, 0.4); margin-left: 4px; }
 .live-dot.on { background: #7CE3A8; box-shadow: 0 0 0 3px rgba(124, 227, 168, 0.3); }
+
+/* ---------- Phase 8: ada ya mwezi na dharura ---------- */
+.stat-strip-money, .stat-strip-sub { margin-top: 12px; grid-template-columns: repeat(3, 1fr); }
+.nav-count-sos { background: var(--danger); color: var(--white); }
+.sos-banner {
+  display: block; padding: 12px 24px; background: var(--danger); color: var(--white); text-decoration: none; font-size: 16px;
+  animation: sos-pulse 1.6s ease-in-out infinite;
+}
+.sos-banner-cta { text-decoration: underline; font-weight: 700; margin-left: 6px; }
+@keyframes sos-pulse { 50% { background: #9E2F1E; } }
+@media (prefers-reduced-motion: reduce) { .sos-banner { animation: none; } }
+.sos-card { background: var(--white); border: 1.5px solid var(--line); border-radius: var(--radius-md); padding: 18px 20px; margin-top: 14px; }
+.sos-card.is-open { border-color: var(--danger); box-shadow: inset 4px 0 0 var(--danger); }
+.sos-card h2 { margin: 0; }
+.sos-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 8px; }
+.sos-actions .btn { margin-top: 0; }
+.sos-resolve input { width: 100%; }
+.pay-form { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 12px; }
+.pay-form h3, #driver-sub h3 { font-size: 16px; margin: 14px 0 4px; }
+.pay-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.pay-grid input, .pay-grid select { width: 100%; }
+.history li.voided > span:first-child { text-decoration: line-through; color: var(--muted); }
+.void-button { margin-left: auto; }
+.sub-settings { margin-top: 32px; }
+.sub-settings textarea { width: 100%; min-height: 80px; }
+@media (max-width: 760px) {
+  .stat-strip-money, .stat-strip-sub { grid-template-columns: 1fr 1fr; }
+  .pay-grid { grid-template-columns: 1fr; }
+  .sos-banner { padding: 12px 16px; }
+}
