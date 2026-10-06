@@ -121,7 +121,7 @@ async function loadOverview() {
     const data = await api.get('/api/admin/dashboard');
     $('dashboard-error').hidden = true;
     const n = (v) => Number(v).toLocaleString('sw-TZ');
-    $('stat-customers').textContent = n(data.users.customers);
+    $('stat-members').textContent = n(data.users.members);
     $('stat-drivers').textContent = n(data.drivers.APPROVED);
     $('stat-pending').textContent = n(data.drivers.PENDING);
     $('stat-new').textContent = n(data.users.newToday);
@@ -191,7 +191,7 @@ function emptyText(status) {
     REJECTED: 'Hakuna dereva aliyekataliwa.',
     SUSPENDED: 'Hakuna dereva aliyesimamishwa.',
     INCOMPLETE: 'Hakuna dereva ambaye hajamaliza usajili.',
-    ALL: 'Bado hakuna dereva aliyejisajili. Madereva wanajisajili kupitia /dereva/.',
+    ALL: 'Bado hakuna dereva. Watumiaji wanaomba udereva ndani ya app ya NAYA (Akaunti → Kuwa dereva).',
   }[status];
 }
 
@@ -293,7 +293,7 @@ function renderDriver(data) {
           : `<ul class="history">${history
               .map(
                 (h) => `<li><span><strong>${esc(AUDIT_ACTIONS[h.action] ?? h.action)}</strong>${
-                  h.actorName && h.action !== 'driver.submitted' ? ` — na ${esc(h.actorName)}` : ''
+                  h.actorName && !['driver.submitted', 'driver.applied'].includes(h.action) ? ` — na ${esc(h.actorName)}` : ''
                 }</span><span class="muted">${esc(formatDate(h.createdAt, true))}</span>${
                   h.details?.reason ? `<span class="note">${esc(h.details.reason)}</span>` : ''
                 }</li>`,

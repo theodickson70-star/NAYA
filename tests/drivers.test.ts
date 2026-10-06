@@ -1,4 +1,4 @@
-// Tests za Phase 3: usajili wa dereva, chombo, nyaraka, uthibitisho wa ofisi.
+// Tests za app moja ya NAYA (abiria ↔ dereva) + Phase 3: chombo, nyaraka, uthibitisho wa ofisi.
 // Zinaendeshwa dhidi ya database ya MAJARIBIO tu:  DATABASE_URL=... JWT_SECRET=... npm test
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
@@ -66,7 +66,7 @@ before(async () => {
     [`255${adminPhone.slice(1)}`, hash],
   );
   const customer = await db.query(
-    `INSERT INTO naya.users (phone, full_name, role, password_hash) VALUES ($1, 'Mteja Tu', 'CUSTOMER', $2)
+    `INSERT INTO naya.users (phone, full_name, role, password_hash) VALUES ($1, 'Abiria Tu', 'USER', $2)
      ON CONFLICT (phone) DO UPDATE SET full_name = EXCLUDED.full_name RETURNING id`,
     [`255${customerPhone.slice(1)}`, hash],
   );
@@ -93,34 +93,71 @@ describe('NAYA Phase 3 — madereva', () => {
   let customerToken = '';
   let driverId = '';
 
-  it('dereva anajisajili: role DRIVER, hali INCOMPLETE, hawezi kutuma bado', async () => {
-    const reg = await call('POST', '/api/drivers/register', { fullName: 'Juma Dereva', phone: driverPhone, password: PASSWORD });
+  it('akaunti mpya: role USER, bado hajachagua mode; huduma za dereva bado hazipo (404)', async () => {
+    const reg = await call('POST', '/api/auth/register', { fullName: 'Juma Dereva', phone: driverPhone, password: PASSWORD });
     assert.equal(reg.status, 201);
-    assert.equal(reg.json.data.user.role, 'DRIVER');
+    assert.equal(reg.json.data.user.role, 'USER');
+    assert.equal(reg.json.data.user.activeMode, null);
     driverToken = reg.json.data.token;
     driverId = reg.json.data.user.id;
     ids.push(driverId);
 
-    const me = await call('GET', '/api/drivers/me', undefined, driverToken);
-    assert.equal(me.status, 200);
-    assert.equal(me.json.data.driver.status, 'INCOMPLETE');
-    assert.equal(me.json.data.requirements.canSubmit, false);
-    assert.equal(me.json.data.requirements.missingDocuments.length, 4);
+    const acc = await call('GET', '/api/account', undefined, driverToken);
+    assert.equal(acc.status, 200);
+    assert.equal(acc.json.data.activeMode, null);
+    assert.equal(acc.json.data.driverStatus, null);
+    const early = await call('GET', '/api/drivers/me', undefined, driverToken);
+    assert.equal(early.status, 404);
+    assert.match(early.json.message, /mode ya Dereva/);
 
-    const reg2 = await call('POST', '/api/drivers/register', { fullName: 'Asha Dereva', phone: driver2Phone, password: PASSWORD });
+    const reg2 = await call('POST', '/api/auth/register', { fullName: 'Asha Dereva', phone: driver2Phone, password: PASSWORD });
     driver2Token = reg2.json.data.token;
     ids.push(reg2.json.data.user.id);
+    await call('PUT', '/api/account/mode', { mode: 'DRIVER' }, driver2Token);
 
     const admin = await call('POST', '/api/auth/login', { phone: adminPhone, password: PASSWORD, portal: 'admin' });
     adminToken = admin.json.data.token;
-    const customer = await call('POST', '/api/auth/login', { phone: customerPhone, password: PASSWORD });
+    const customer = await call('POST', '/api/auth/login', { phone: customerPhone, password: PASSWORD, portal: 'app' });
     customerToken = customer.json.data.token;
   });
 
-  it('portal ya dereva: dereva anaingia, mteja anakataliwa', async () => {
+  it('mode isiyo sahihi inakataliwa (400)', async () => {
+    assert.equal((await call('PUT', '/api/account/mode', { mode: 'ADMIN' }, driverToken)).status, 400);
+  });
+
+  it('kuchagua Dereva kunafungua ombi la udereva kwenye akaunti ile ile', async () => {
+    const res = await call('PUT', '/api/account/mode', { mode: 'DRIVER' }, driverToken);
+    assert.equal(res.status, 200);
+    assert.equal(res.json.data.activeMode, 'DRIVER');
+    assert.equal(res.json.data.driverStatus, 'INCOMPLETE');
+    assert.equal(res.json.data.canDrive, false);
+    assert.equal(res.json.data.user.id, driverId);
+    const me = await call('GET', '/api/drivers/me', undefined, driverToken);
+    assert.equal(me.json.data.driver.status, 'INCOMPLETE');
+    assert.equal(me.json.data.requirements.missingDocuments.length, 4);
+  });
+
+  it('kubadili Abiria ↔ Dereva: hakuna akaunti mpya, ombi la udereva linabaki', async () => {
+    const toPassenger = await call('PUT', '/api/account/mode', { mode: 'PASSENGER' }, driverToken);
+    assert.equal(toPassenger.json.data.activeMode, 'PASSENGER');
+    assert.equal(toPassenger.json.data.driverStatus, 'INCOMPLETE');
+    const back = await call('PUT', '/api/account/mode', { mode: 'DRIVER' }, driverToken);
+    assert.equal(back.json.data.activeMode, 'DRIVER');
+    const users = await db.query('SELECT count(*)::int AS n FROM naya.users WHERE phone = $1', [`255${driverPhone.slice(1)}`]);
+    assert.equal(users.rows[0].n, 1);
+    const drivers = await db.query('SELECT count(*)::int AS n FROM naya.drivers WHERE user_id = $1', [driverId]);
+    assert.equal(drivers.rows[0].n, 1);
+    // Akiingia tena, anarudi kwenye mode ya mwisho
+    const login = await call('POST', '/api/auth/login', { phone: driverPhone, password: PASSWORD, portal: 'app' });
+    assert.equal(login.json.data.user.activeMode, 'DRIVER');
+  });
+
+  it('ofisi na app zimetengana: admin haingii kwenye app, mtumiaji haingii ofisini', async () => {
+    assert.equal((await call('POST', '/api/auth/login', { phone: adminPhone, password: PASSWORD, portal: 'app' })).status, 403);
+    assert.equal((await call('POST', '/api/auth/login', { phone: driverPhone, password: PASSWORD, portal: 'admin' })).status, 403);
+    assert.equal((await call('GET', '/api/account', undefined, adminToken)).status, 403);
+    // jina la zamani la portal ya dereva bado linafanya kazi
     assert.equal((await call('POST', '/api/auth/login', { phone: driverPhone, password: PASSWORD, portal: 'driver' })).status, 200);
-    assert.equal((await call('POST', '/api/auth/login', { phone: customerPhone, password: PASSWORD, portal: 'driver' })).status, 403);
-    assert.equal((await call('GET', '/api/drivers/me', undefined, customerToken)).status, 403);
   });
 
   it('chombo: plate mbaya inakataliwa; plate inapangwa upya kuwa "MC 123 ABC"', async () => {
@@ -176,7 +213,7 @@ describe('NAYA Phase 3 — madereva', () => {
     assert.equal(files.rows[0].n, 4);
   });
 
-  it('anaona faili lake; dereva mwingine hawezi kuliona', async () => {
+  it('anaona faili lake; dereva mwingine hawezi kuliona; abiria tu hana nyaraka', async () => {
     const own = await app.inject({
       method: 'GET',
       url: '/api/drivers/me/documents/VEHICLE_PHOTO/file',
@@ -186,6 +223,8 @@ describe('NAYA Phase 3 — madereva', () => {
     assert.equal(own.headers['content-type'], 'image/png');
     const other = await call('GET', '/api/drivers/me/documents/VEHICLE_PHOTO/file', undefined, driver2Token);
     assert.equal(other.status, 404);
+    assert.equal((await call('GET', '/api/drivers/me/documents/VEHICLE_PHOTO/file', undefined, customerToken)).status, 404);
+    assert.equal((await upload('PROFILE_PHOTO', JPEG(), customerToken)).status, 404);
   });
 
   it('anatuma → PENDING; wakati wa ukaguzi hawezi kubadilisha', async () => {
@@ -198,6 +237,7 @@ describe('NAYA Phase 3 — madereva', () => {
   it('ofisi tu: mteja na dereva hawawezi kuona orodha ya madereva', async () => {
     assert.equal((await call('GET', '/api/admin/drivers', undefined, customerToken)).status, 403);
     assert.equal((await call('GET', '/api/admin/drivers', undefined, driverToken)).status, 403);
+    assert.equal((await call('POST', `/api/admin/drivers/${driverId}/approve`, {}, driverToken)).status, 403);
     const list = await call('GET', '/api/admin/drivers?status=PENDING', undefined, adminToken);
     assert.equal(list.status, 200);
     assert.ok(list.json.data.drivers.some((d: any) => d.id === driverId));
@@ -246,6 +286,8 @@ describe('NAYA Phase 3 — madereva', () => {
     assert.equal(ok.status, 200);
     assert.equal(ok.json.data.driver.status, 'APPROVED');
     assert.ok(ok.json.data.documents.every((d: any) => d.status === 'APPROVED'));
+    const acc = await call('GET', '/api/account', undefined, driverToken);
+    assert.equal(acc.json.data.canDrive, true);
     const actions = ok.json.data.history.map((h: any) => h.action);
     assert.deepEqual(actions.slice(0, 4), ['driver.approved', 'driver.submitted', 'driver.rejected', 'driver.submitted']);
     // akithibitishwa hawezi kubadilisha nyaraka mwenyewe

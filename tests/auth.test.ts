@@ -60,7 +60,8 @@ describe('NAYA Phase 2', () => {
     });
     assert.equal(status, 201);
     assert.equal(json.success, true);
-    assert.equal(json.data.user.role, 'CUSTOMER');
+    assert.equal(json.data.user.role, 'USER');
+    assert.equal(json.data.user.activeMode, null);
     assert.equal(json.data.user.phone, `255${customerPhone.slice(1)}`);
     assert.ok(json.data.token);
     assert.equal(JSON.stringify(json).includes('password'), false);
@@ -110,7 +111,7 @@ describe('NAYA Phase 2', () => {
     adminToken = login.json.data.token;
     const { status, json } = await call('GET', '/api/admin/dashboard', undefined, adminToken);
     assert.equal(status, 200);
-    assert.ok(json.data.users.customers >= 1);
+    assert.ok(json.data.users.members >= 1);
     assert.ok(json.data.users.admins >= 1);
     assert.equal(json.data.system.database, 'ok');
   });

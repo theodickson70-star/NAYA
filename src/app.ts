@@ -9,6 +9,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { env } from './config/env.js';
 import { registerJwt } from './middleware/auth.js';
 import { registerErrorHandling } from './middleware/errors.js';
+import { accountRoutes } from './routes/account.js';
 import { adminDriverRoutes } from './routes/admin-drivers.js';
 import { adminRoutes } from './routes/admin.js';
 import { authRoutes } from './routes/auth.js';
@@ -43,12 +44,17 @@ export async function buildApp(options: { logger?: boolean } = {}): Promise<Fast
   await app.register(authRoutes);
   await app.register(adminRoutes);
   await app.register(adminDriverRoutes);
+  await app.register(accountRoutes);
   await app.register(driverRoutes);
 
-  // Kurasa za NAYA: / (mwanzo), /admin/ (ofisi), /dereva/ (app ya dereva). App ya mteja itaongezwa hapa.
+  // Kurasa za NAYA: /app/ (app moja ya abiria na dereva) na /admin/ (ofisi).
   await app.register(fastifyStatic, { root: FRONTEND_DIR, prefix: '/', index: ['index.html'] });
   app.get('/admin', async (_request, reply) => reply.redirect('/admin/'));
-  app.get('/dereva', async (_request, reply) => reply.redirect('/dereva/'));
+  app.get('/app', async (_request, reply) => reply.redirect('/app/'));
+  // Mwanzo na anwani ya zamani ya app ya dereva → app moja ya NAYA.
+  app.get('/', async (_request, reply) => reply.redirect('/app/'));
+  app.get('/dereva', async (_request, reply) => reply.redirect('/app/'));
+  app.get('/dereva/', async (_request, reply) => reply.redirect('/app/'));
 
   return app;
 }

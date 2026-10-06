@@ -26,6 +26,7 @@ export const DOCUMENT_STATUS = {
 export const VEHICLE_TYPES = { BODABODA: 'Bodaboda', BAJAJI: 'Bajaji' };
 
 export const AUDIT_ACTIONS = {
+  'driver.applied': 'Aliomba kuwa dereva',
   'driver.submitted': 'Alituma taarifa kwa uthibitisho',
   'driver.approved': 'Alithibitishwa',
   'driver.rejected': 'Alikataliwa',

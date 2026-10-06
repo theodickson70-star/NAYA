@@ -1,18 +1,16 @@
-// /api/drivers — dereva mwenyewe: usajili, chombo, nyaraka, kutuma kwa uthibitisho.
+// /api/drivers/me — mtumiaji aliye kwenye mode ya Dereva: chombo, nyaraka, kutuma kwa uthibitisho.
+// Akaunti ni ile ile ya abiria (hakuna usajili wa pili); ombi la udereva linafunguliwa kupitia /api/account/mode.
 import type { FastifyInstance } from 'fastify';
-import { issueToken, requireRole } from '../middleware/auth.js';
+import { requireRole } from '../middleware/auth.js';
 import {
   getDriverProfile,
   readDocument,
-  registerDriver,
   saveDocument,
   submitForReview,
   updateVehicle,
 } from '../services/drivers.js';
 import { ALLOWED_MIME_TYPES, MAX_DOCUMENT_BYTES } from '../services/files.js';
-import { toPublicUser } from '../services/users.js';
 import { badRequest, ok } from '../utils/http.js';
-import { registerSchema } from '../validators/auth.js';
 import { documentTypeParam, vehicleSchema } from '../validators/drivers.js';
 
 export async function driverRoutes(app: FastifyInstance): Promise<void> {
@@ -21,14 +19,8 @@ export async function driverRoutes(app: FastifyInstance): Promise<void> {
     done(null, body),
   );
 
-  const driverOnly = { preHandler: requireRole('DRIVER') };
-
-  app.post('/api/drivers/register', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (request, reply) => {
-    const input = registerSchema.parse(request.body);
-    const user = await registerDriver(input);
-    request.log.info({ userId: user.id }, 'dereva mpya amejisajili');
-    return reply.status(201).send(ok({ token: issueToken(app, user), user: toPublicUser(user) }));
-  });
+  // Mtumiaji wa app; kama hajaomba kuwa dereva, huduma inajibu 404 yenye maelezo.
+  const driverOnly = { preHandler: requireRole('USER') };
 
   app.get('/api/drivers/me', driverOnly, async (request) => ok(await getDriverProfile(request.currentUser.id)));
 

@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="sw">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="NAYA — bodaboda na bajaji. Twende Pamoja.">
+  <meta name="theme-color" content="#0A6E47">
+  <link rel="manifest" href="/app/manifest.webmanifest">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/shared/brand/naya-apple-180.png">
+  <title>NAYA — Twende Pamoja</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/shared/naya.css">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <div id="view-loading" class="loading" aria-live="polite">
+    <img src="/shared/brand/naya-icon.svg" alt="" width="72" height="72">
+  </div>
+
+  <!-- Kuingia / kujisajili: akaunti moja ya NAYA -->
+  <main id="view-auth" class="auth" hidden>
+    <header class="auth-hero">
+      <img class="auth-wordmark" src="/shared/brand/naya-wordmark-white.svg" alt="NAYA" width="438" height="124">
+      <p class="auth-slogan">TWENDE PAMOJA</p>
+      <p class="auth-pitch">Bodaboda na bajaji za Urambo. Akaunti moja — safiri au endesha.</p>
+    </header>
+
+    <div class="auth-body">
+      <div class="segmented" role="tablist" aria-label="Chagua">
+        <button type="button" role="tab" id="tab-register" aria-selected="true" aria-controls="register-form">Jisajili</button>
+        <button type="button" role="tab" id="tab-login" aria-selected="false" aria-controls="login-form">Nina akaunti</button>
+      </div>
+
+      <form id="register-form" role="tabpanel" aria-labelledby="tab-register" novalidate>
+        <label for="reg-name">Jina kamili</label>
+        <input id="reg-name" autocomplete="name" placeholder="Mf. Juma Hamisi" required>
+        <label for="reg-phone">Namba ya simu</label>
+        <input id="reg-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="0712 345 678" required>
+        <label for="reg-password">Tengeneza password</label>
+        <input id="reg-password" type="password" autocomplete="new-password" placeholder="Angalau herufi 8" required>
+        <p class="alert alert-danger" id="register-error" role="alert" hidden></p>
+        <button class="btn btn-primary btn-block" type="submit">Jisajili</button>
+      </form>
+
+      <form id="login-form" role="tabpanel" aria-labelledby="tab-login" novalidate hidden>
+        <label for="login-phone">Namba ya simu</label>
+        <input id="login-phone" type="tel" inputmode="tel" autocomplete="username" placeholder="0712 345 678" required>
+        <label for="login-password">Password</label>
+        <input id="login-password" type="password" autocomplete="current-password" required>
+        <p class="alert alert-danger" id="login-error" role="alert" hidden></p>
+        <button class="btn btn-primary btn-block" type="submit">Ingia</button>
+      </form>
+    </div>
+  </main>
+
+  <!-- Mara ya kwanza: "Utatumiaje NAYA?" -->
+  <main id="view-role" class="role" hidden>
+    <img src="/shared/brand/naya-icon.svg" alt="" width="64" height="64">
+    <h1>Utatumiaje NAYA?</h1>
+    <p class="muted">Chagua aina ya akaunti. Unaweza kubadilisha baadaye kwenye Akaunti.</p>
+    <form id="role-form" class="role-options">
+      <label class="role-card">
+        <input type="radio" name="mode" value="PASSENGER">
+        <span class="role-body">
+          <span class="role-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg></span>
+          <span><strong>Abiria</strong><span>Agiza safari, ufike unapoenda.</span></span>
+        </span>
+      </label>
+      <label class="role-card">
+        <input type="radio" name="mode" value="DRIVER">
+        <span class="role-body">
+          <span class="role-icon role-icon-driver" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="5" cy="16.5" r="3"/><circle cx="19" cy="16.5" r="3"/><path d="M5 16.5l4-6.5h5l2.5 4H19"/><path d="M13 6.5h3l2 4"/></svg></span>
+          <span><strong>Dereva</strong><span>Endesha, pokea maombi ya safari, fuatilia mapato.</span></span>
+        </span>
+      </label>
+      <p class="alert alert-danger" id="role-error" role="alert" hidden></p>
+      <button class="btn btn-primary btn-block" id="role-continue" type="submit" disabled>Endelea</button>
+    </form>
+  </main>
+
+  <main id="view-offline" class="center" hidden>
+    <h1>Hatukuweza kufika kwenye mfumo</h1>
+    <p class="muted" id="offline-reason">Internet haipo. Tafadhali hakikisha umeunganishwa.</p>
+    <button id="retry-button" class="btn btn-primary btn-block" type="button">Jaribu tena</button>
+  </main>
+
+  <!-- Ndani ya app -->
+  <div id="view-app" hidden>
+    <header class="bar">
+      <span class="bar-brand">
+        <img id="bar-icon" src="/shared/brand/naya-icon.svg" alt="" width="32" height="32">
+        <img class="bar-wordmark" src="/shared/brand/naya-wordmark-white.svg" alt="NAYA" width="76" height="22">
+      </span>
+      <span id="mode-chip" class="mode-chip"></span>
+    </header>
+    <main id="app-content" class="content" aria-live="polite"></main>
+    <nav class="tabbar" aria-label="Menyu kuu">
+      <a href="#/" data-tab="home">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 10.5L12 4l8.5 6.5V20a1 1 0 0 1-1 1H15v-6H9v6H4.5a1 1 0 0 1-1-1z"/></svg>
+        <span>Nyumbani</span>
+      </a>
+      <a href="#/akaunti" data-tab="account">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
+        <span>Akaunti</span>
+      </a>
+    </nav>
+  </div>
+
+  <input id="file-input" type="file" accept="image/*,application/pdf" hidden>
+  <script src="app.js" type="module"></script>
+</body>
+</html>

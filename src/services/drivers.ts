@@ -5,9 +5,8 @@ import { type Db, db, many, one, transaction } from '../db/pool.js';
 import { conflict, forbidden, isUniqueViolation, notFound } from '../utils/http.js';
 import type { DocumentType, VehicleInput } from '../validators/drivers.js';
 import { auditFor, writeAudit } from './audit.js';
-import { hashPassword } from './auth.js';
 import { deleteFile, readFile, storeFile } from './files.js';
-import { insertUser, toPublicUser, type UserRow } from './users.js';
+import { toPublicUser, type UserRow } from './users.js';
 
 export type DriverStatus = 'INCOMPLETE' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
 
@@ -98,7 +97,7 @@ const findDocuments = (client: Db, userId: string) =>
 
 async function profile(client: Db, userId: string) {
   const driver = await findDriver(client, userId);
-  if (!driver) throw notFound('Taarifa za dereva hazikupatikana');
+  if (!driver) throw notFound('Bado hujaomba kuwa dereva. Chagua mode ya Dereva kwanza.');
   const documents = await findDocuments(client, userId);
   return {
     driver: toPublicDriver(driver),
@@ -109,25 +108,28 @@ async function profile(client: Db, userId: string) {
 
 // ---------------------------------------------------------------- dereva mwenyewe
 
-export async function registerDriver(input: { fullName: string; phone: string; password: string }): Promise<UserRow> {
-  const passwordHash = await hashPassword(input.password);
-  try {
-    return await transaction(async (client) => {
-      const user = await insertUser(client, { phone: input.phone, fullName: input.fullName, role: 'DRIVER', passwordHash });
-      await client.query('INSERT INTO naya.drivers (user_id) VALUES ($1)', [user!.id]);
-      return user!;
-    });
-  } catch (error) {
-    if (isUniqueViolation(error)) throw conflict('Namba hii ya simu tayari imesajiliwa. Ingia badala yake.');
-    throw error;
+/** "Kuwa dereva": inafungua ombi la udereva (INCOMPLETE) kwa akaunti ile ile. Haitengenezi akaunti mpya.
+ *  Inarudisha true kama ombi limefunguliwa sasa hivi. */
+export async function ensureDriverProfile(client: Db, userId: string): Promise<boolean> {
+  const created = await client.query('INSERT INTO naya.drivers (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING', [userId]);
+  if (created.rowCount === 1) {
+    await writeAudit(client, { actorId: userId, action: 'driver.applied', targetType: 'driver', targetId: userId });
+    return true;
   }
+  return false;
+}
+
+/** Hali ya udereva ya mtumiaji (null = hajawahi kuomba kuwa dereva). */
+export async function driverStatusOf(client: Db, userId: string): Promise<DriverStatus | null> {
+  const row = await one<{ status: DriverStatus }>(client, 'SELECT status FROM naya.drivers WHERE user_id = $1', [userId]);
+  return row?.status ?? null;
 }
 
 export const getDriverProfile = (userId: string) => profile(db, userId);
 
 async function lockEditable(client: Db, userId: string): Promise<DriverRow> {
   const driver = await findDriver(client, userId, true);
-  if (!driver) throw notFound('Taarifa za dereva hazikupatikana');
+  if (!driver) throw notFound('Bado hujaomba kuwa dereva. Chagua mode ya Dereva kwanza.');
   if (!EDITABLE.includes(driver.status)) {
     throw forbidden(
       driver.status === 'PENDING'
@@ -264,7 +266,11 @@ export async function countDriversByStatus(client: Db): Promise<Record<DriverSta
 }
 
 export async function getDriverForAdmin(driverId: string) {
-  const user = await one<UserRow>(db, `SELECT * FROM naya.users WHERE id = $1 AND role = 'DRIVER'`, [driverId]);
+  const user = await one<UserRow>(
+    db,
+    'SELECT u.* FROM naya.users u JOIN naya.drivers d ON d.user_id = u.id WHERE u.id = $1',
+    [driverId],
+  );
   if (!user) throw notFound('Dereva hajapatikana');
   const [details, history] = await Promise.all([profile(db, driverId), auditFor(db, 'driver', driverId)]);
   return { user: toPublicUser(user), ...details, history };

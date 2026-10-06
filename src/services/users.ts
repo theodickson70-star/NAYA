@@ -1,7 +1,9 @@
 // SQL ya watumiaji (naya.users). Hakuna mantiki ya biashara hapa.
 import { type Db, many, one } from '../db/pool.js';
 
-export type UserRole = 'CUSTOMER' | 'DRIVER' | 'ADMIN' | 'SUPER_ADMIN';
+/** USER = mtumiaji wa app (abiria na/au dereva). ADMIN/SUPER_ADMIN = ofisi. */
+export type UserRole = 'USER' | 'ADMIN' | 'SUPER_ADMIN';
+export type AppMode = 'PASSENGER' | 'DRIVER';
 export type UserStatus = 'ACTIVE' | 'SUSPENDED';
 
 export interface UserRow {
@@ -12,6 +14,7 @@ export interface UserRow {
   status: UserStatus;
   password_hash: string;
   token_version: number;
+  active_mode: AppMode | null;
   last_login_at: Date | null;
   created_at: Date;
 }
@@ -23,11 +26,21 @@ export interface PublicUser {
   fullName: string;
   role: UserRole;
   status: UserStatus;
+  /** Mode aliyochagua mara ya mwisho; null = bado hajachagua (aonyeshwe "Utatumiaje NAYA?"). */
+  activeMode: AppMode | null;
   createdAt: Date;
 }
 
 export function toPublicUser(u: UserRow): PublicUser {
-  return { id: u.id, phone: u.phone, fullName: u.full_name, role: u.role, status: u.status, createdAt: u.created_at };
+  return {
+    id: u.id,
+    phone: u.phone,
+    fullName: u.full_name,
+    role: u.role,
+    status: u.status,
+    activeMode: u.active_mode,
+    createdAt: u.created_at,
+  };
 }
 
 export const findUserByPhone = (db: Db, phone: string) =>

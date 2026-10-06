@@ -1,19 +1,21 @@
-// /api/auth — usajili wa mteja, kuingia, kutoka, na "mimi ni nani".
+// /api/auth — usajili (akaunti moja ya NAYA), kuingia, kutoka, na "mimi ni nani".
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { ADMIN_ROLES, authenticate, issueToken } from '../middleware/auth.js';
-import { login, logout, registerCustomer } from '../services/auth.js';
+import { login, logout, registerUser } from '../services/auth.js';
 import { toPublicUser, type UserRole } from '../services/users.js';
 import { ok } from '../utils/http.js';
 import { loginSchema, registerSchema } from '../validators/auth.js';
 
-/** Ukurasa unaoingia unaamua roles zinazoruhusiwa (mf. dashboard ya admin = admin tu). */
+/** Mahali mtu anaingia panaamua roles zinazoruhusiwa: ofisi = admin tu; app ya NAYA = watumiaji tu.
+ *  ("driver"/"customer" ni majina ya zamani ya app — yanaelekezwa kwenye app moja.) */
 const PORTAL_ROLES: Record<string, UserRole[]> = {
   admin: ADMIN_ROLES,
-  driver: ['DRIVER'],
-  customer: ['CUSTOMER'],
+  app: ['USER'],
+  driver: ['USER'],
+  customer: ['USER'],
 };
-const portalSchema = z.object({ portal: z.enum(['admin', 'driver', 'customer']).optional() });
+const portalSchema = z.object({ portal: z.enum(['admin', 'app', 'driver', 'customer']).optional() });
 
 // Kuzuia kujaribu password nyingi: maombi 10 kwa dakika kwa kila IP.
 const authLimit = { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } };
@@ -21,8 +23,8 @@ const authLimit = { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }
 export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post('/api/auth/register', authLimit, async (request, reply) => {
     const input = registerSchema.parse(request.body);
-    const user = await registerCustomer(input);
-    request.log.info({ userId: user.id }, 'mteja mpya amejisajili');
+    const user = await registerUser(input);
+    request.log.info({ userId: user.id }, 'mtumiaji mpya amejisajili');
     return reply.status(201).send(ok({ token: issueToken(app, user), user: toPublicUser(user) }));
   });
 

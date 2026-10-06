@@ -17,13 +17,13 @@ const DUMMY_HASH = bcrypt.hashSync('naya-dummy-password', BCRYPT_ROUNDS);
 
 export const hashPassword = (plain: string) => bcrypt.hash(plain, BCRYPT_ROUNDS);
 
-/** Mteja anajisajili mwenyewe. (Madereva wanasajiliwa kupitia mchakato wao — phase ijayo.) */
-export async function registerCustomer(input: { fullName: string; phone: string; password: string }): Promise<UserRow> {
+/** Mtu yeyote anajisajili kama mtumiaji wa NAYA; baadaye anachagua kuwa abiria au dereva (mode). */
+export async function registerUser(input: { fullName: string; phone: string; password: string }): Promise<UserRow> {
   try {
     const user = await insertUser(db, {
       phone: input.phone,
       fullName: input.fullName,
-      role: 'CUSTOMER',
+      role: 'USER',
       passwordHash: await hashPassword(input.password),
     });
     return user!;

@@ -23,8 +23,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     const count = (role: string) => byRole.find((r) => r.role === role)?.total ?? 0;
     return ok({
       users: {
-        customers: count('CUSTOMER'),
-        drivers: count('DRIVER'),
+        members: count('USER'),
         admins: count('ADMIN') + count('SUPER_ADMIN'),
         newToday: newToday?.total ?? 0,
       },
