@@ -105,3 +105,17 @@ export async function resetPassword(input: { phone: string; code: string; passwo
   });
   return { reset: true };
 }
+
+/** Mtumiaji aliyeingia anabadilisha password (mf. baada ya kupewa password ya muda na ofisi). Vifaa vingine vinatolewa. */
+export async function changePassword(userId: string, currentPassword: string, newPassword: string) {
+  const user = await one<{ password_hash: string }>(db, 'SELECT password_hash FROM naya.users WHERE id = $1', [userId]);
+  if (!user || !(await bcrypt.compare(currentPassword, user.password_hash))) throw new AppError(400, 'Password ya sasa si sahihi.');
+  if (currentPassword === newPassword) throw new AppError(400, 'Chagua password tofauti na ya sasa.');
+  const updated = await one<UserRow>(
+    db,
+    `UPDATE naya.users SET password_hash = $2, token_version = token_version + 1, updated_at = now() WHERE id = $1 RETURNING *`,
+    [userId, await hashPassword(newPassword)],
+  );
+  await removeAllFcmTokens(userId);
+  return updated!;
+}

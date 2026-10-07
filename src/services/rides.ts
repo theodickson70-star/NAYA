@@ -894,8 +894,8 @@ export async function rideForAdmin(rideId: string) {
     ratingForPassenger: ride.rating_for_passenger,
     pinAttempts: ride.pin_attempts,
     shared: ride.share_token_hash !== null,
-    passenger: passenger && { name: passenger.full_name, phone: passenger.phone },
-    driver,
+    passenger: passenger && { id: ride.passenger_id, name: passenger.full_name, phone: passenger.phone },
+    driver: driver && { ...driver, id: ride.driver_id },
     timeline,
     offers,
     sos,
@@ -947,4 +947,122 @@ export async function rideStats() {
     noDriverToday: row?.no_driver_today ?? 0,
     driversOnline: row?.drivers_online ?? 0,
   };
+}
+
+// =================================================================== OFISI: ramani ya moja kwa moja na kuingilia safari
+
+/** Madereva walio online (na mahali pao) + safari zote zinazoendelea — kwa ramani ya ofisi. */
+export async function liveOverview() {
+  const [drivers, rides] = await Promise.all([
+    many(
+      db,
+      `SELECT d.user_id AS id, u.full_name AS "name", u.phone, d.vehicle_type AS "vehicleType", d.plate_number AS "plateNumber",
+              d.last_lat::float8 AS lat, d.last_lng::float8 AS lng, d.last_seen_at AS "lastSeenAt",
+              d.last_seen_at < now() - make_interval(secs => $1::float8) AS stale,
+              (SELECT r.status FROM naya.rides r WHERE r.driver_id = d.user_id AND r.status IN ('ACCEPTED', 'ARRIVED', 'IN_PROGRESS') LIMIT 1) AS "rideStatus",
+              EXISTS (SELECT 1 FROM naya.ride_offers o WHERE o.driver_id = d.user_id AND o.status = 'PENDING') AS "hasOffer"
+         FROM naya.drivers d JOIN naya.users u ON u.id = d.user_id
+        WHERE d.is_online AND d.last_lat IS NOT NULL
+        ORDER BY u.full_name`,
+      [DRIVER_STALE_SECONDS],
+    ),
+    many(
+      db,
+      `SELECT r.id, r.status, r.vehicle_type AS "vehicleType", r.pickup_name AS "pickupName", r.dest_name AS "destinationName",
+              r.pickup_lat::float8 AS "pickupLat", r.pickup_lng::float8 AS "pickupLng", r.dest_lat::float8 AS "destLat", r.dest_lng::float8 AS "destLng",
+              r.fare, r.requested_at AS "requestedAt", extract(epoch FROM now() - coalesce(r.search_started_at, r.requested_at))::int AS "ageSeconds",
+              p.full_name AS "passengerName", du.full_name AS "driverName"
+         FROM naya.rides r JOIN naya.users p ON p.id = r.passenger_id LEFT JOIN naya.users du ON du.id = r.driver_id
+        WHERE r.status IN ('SEARCHING', 'ACCEPTED', 'ARRIVED', 'IN_PROGRESS')
+        ORDER BY r.requested_at`,
+    ),
+  ]);
+  return { drivers, rides, staleSeconds: DRIVER_STALE_SECONDS };
+}
+
+/** Madereva wanaoweza kupewa safari inayotafuta dereva, wa karibu kwanza (ofisi inachagua mmoja). */
+export async function candidatesForRide(rideId: string) {
+  const ride = await findRide(db, rideId);
+  if (!ride) throw notFound('Safari haikupatikana');
+  if (ride.status !== 'SEARCHING') return [];
+  const { graceDays } = await getSettings();
+  return many(
+    db,
+    `SELECT d.user_id AS id, u.full_name AS name, d.plate_number AS "plateNumber", ${DISTANCE_SQL('d.last_lat', 'd.last_lng', '$2', '$3')}::float8 AS km,
+            d.last_seen_at < now() - make_interval(secs => $5::float8) AS stale,
+            EXISTS (SELECT 1 FROM naya.ride_offers o WHERE o.driver_id = d.user_id AND o.status = 'PENDING') AS busy
+       FROM naya.drivers d JOIN naya.users u ON u.id = d.user_id
+      WHERE d.status = 'APPROVED' AND d.is_online AND u.status = 'ACTIVE' AND d.vehicle_type = $4 AND d.last_lat IS NOT NULL
+        AND d.user_id <> $1 AND ${SUBSCRIPTION_OK_SQL('d', '$6')}
+        AND NOT EXISTS (SELECT 1 FROM naya.rides r WHERE r.driver_id = d.user_id AND r.status IN ('ACCEPTED', 'ARRIVED', 'IN_PROGRESS'))
+      ORDER BY km LIMIT 10`,
+    [ride.passenger_id, ride.pickup_lat, ride.pickup_lng, ride.vehicle_type, DRIVER_STALE_SECONDS, graceDays],
+  ).then((rows) => (rows as { km: number }[]).map((r) => ({ ...r, km: round1(r.km) })));
+}
+
+/** Ofisi inampa dereva maalum ombi la safari iliyokwama (simu yake inalia kama kawaida). */
+export async function offerRideToDriver(adminId: string, rideId: string, driverId: string) {
+  const ride = await transaction(async (client) => {
+    const r = await one<RideRow>(client, `SELECT * FROM naya.rides WHERE id = $1 FOR UPDATE`, [rideId]);
+    if (!r) throw notFound('Safari haikupatikana');
+    if (r.status !== 'SEARCHING') throw conflict('Safari hii haitafuti dereva tena.');
+    const { graceDays } = await getSettings(client);
+    const driver = await one<{ km: number }>(
+      client,
+      `SELECT ${DISTANCE_SQL('d.last_lat', 'd.last_lng', '$2', '$3')}::float8 AS km
+         FROM naya.drivers d JOIN naya.users u ON u.id = d.user_id
+        WHERE d.user_id = $1 AND d.status = 'APPROVED' AND d.is_online AND u.status = 'ACTIVE' AND d.vehicle_type = $4
+          AND d.last_lat IS NOT NULL AND ${SUBSCRIPTION_OK_SQL('d', '$5')}
+          AND NOT EXISTS (SELECT 1 FROM naya.rides x WHERE x.driver_id = d.user_id AND x.status IN ('ACCEPTED', 'ARRIVED', 'IN_PROGRESS'))
+          AND NOT EXISTS (SELECT 1 FROM naya.ride_offers o WHERE o.driver_id = d.user_id AND o.status = 'PENDING')`,
+      [driverId, r.pickup_lat, r.pickup_lng, r.vehicle_type, graceDays],
+    );
+    if (!driver) throw conflict('Dereva huyu hapatikani sasa (hayuko online, ana safari/ombi jingine, chombo tofauti, au ada imeisha).');
+    // Ombi lililokuwa likimsubiri dereva mwingine linaondolewa; ombi la dereva huyu ndilo pekee.
+    const others = await many<{ driver_id: string }>(
+      client,
+      `UPDATE naya.ride_offers SET status = 'EXPIRED', responded_at = now() WHERE ride_id = $1 AND status = 'PENDING' RETURNING driver_id`,
+      [rideId],
+    );
+    // Dereva aliyewahi kukataa safari hii anaweza kupewa tena na ofisi.
+    await client.query(`DELETE FROM naya.ride_offers WHERE ride_id = $1 AND driver_id = $2 AND status <> 'PENDING'`, [rideId, driverId]);
+    await client.query(
+      `INSERT INTO naya.ride_offers (ride_id, driver_id, distance_km, expires_at) VALUES ($1, $2, $3, now() + make_interval(secs => $4::float8))`,
+      [rideId, driverId, round1(driver.km), OFFER_SECONDS],
+    );
+    // Muda wa kutafuta unaanza upya ili safari isigeuke "hakuna dereva" wakati dereva anafikiria.
+    await client.query('UPDATE naya.rides SET search_started_at = now(), updated_at = now() WHERE id = $1', [rideId]);
+    await writeAudit(client, { actorId: adminId, action: 'ride.offered_by_admin', targetType: 'ride', targetId: rideId, details: { driverId } });
+    return { r, others: others.map((o) => o.driver_id) };
+  });
+  for (const d of ride.others) await notify({ userId: d, event: 'offer', rideId });
+  await notify({
+    userId: driverId,
+    event: 'offer',
+    rideId,
+    kind: 'offer',
+    title: 'Ombi jipya la safari',
+    body: `${tsh(ride.r.fare)} · ${ride.r.pickup_name} → ${ride.r.dest_name}`,
+    urgent: true,
+    ttlSeconds: OFFER_SECONDS,
+  });
+  await notifyAdmins(rideId);
+  return rideForAdmin(rideId);
+}
+
+/** Safari iliyokwama (dereva amesahau kubonyeza "Maliza") — ofisi inaimaliza. */
+export async function completeByAdmin(adminId: string, rideId: string, note: string) {
+  const ride = await transaction(async (client) => {
+    const r = await findRide(client, rideId, true);
+    if (!r) throw notFound('Safari haikupatikana');
+    if (r.status !== 'IN_PROGRESS') throw conflict('Ofisi inaweza kumaliza safari inayoendelea (imeanza) tu.');
+    await client.query(`UPDATE naya.rides SET status = 'COMPLETED', completed_at = now(), updated_at = now() WHERE id = $1`, [rideId]);
+    await history(client, rideId, 'IN_PROGRESS', 'COMPLETED', adminId, note || 'Imemalizwa na ofisi');
+    await writeAudit(client, { actorId: adminId, action: 'ride.completed_by_admin', targetType: 'ride', targetId: rideId, details: { note } });
+    return r;
+  });
+  await notify({ userId: ride.passenger_id, event: 'ride', rideId, kind: 'ride_complete', title: `Umefika ${ride.dest_name}`, body: 'Safari imekamilishwa na ofisi ya NAYA.' });
+  if (ride.driver_id) await notify({ userId: ride.driver_id, event: 'ride', rideId });
+  await notifyAdmins(rideId);
+  return rideForAdmin(rideId);
 }

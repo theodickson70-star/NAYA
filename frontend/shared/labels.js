@@ -37,6 +37,35 @@ export const AUDIT_ACTIONS = {
   'driver.rejected': 'Alikataliwa',
   'driver.suspended': 'Alisimamishwa',
   'driver.reinstated': 'Alirudishwa kazini',
+  'driver.forced_offline': 'Alitolewa online na ofisi',
+  'user.suspended': 'Akaunti ilisimamishwa',
+  'user.reactivated': 'Akaunti ilirudishwa',
+  'user.phone_verified': 'Namba ilithibitishwa na ofisi',
+  'user.temp_password': 'Alipewa password ya muda',
+  'user.messaged': 'Alitumiwa ujumbe na ofisi',
+  'support.replied': 'Ofisi ilijibu ombi la msaada',
+  'support.resolved': 'Ombi la msaada lilitatuliwa',
+  'support.reopened': 'Ombi la msaada lilifunguliwa upya',
+  'subscription.paid': 'Malipo ya ada yalirekodiwa',
+  'subscription.voided': 'Malipo ya ada yalibatilishwa',
+};
+
+export const SUPPORT_CATEGORIES = {
+  RIDE: 'Tatizo la safari',
+  FARE: 'Nauli',
+  DRIVER: 'Kuhusu dereva',
+  PASSENGER: 'Kuhusu abiria',
+  LOST_ITEM: 'Nimesahau kitu',
+  SAFETY: 'Usalama',
+  APP: 'App haifanyi kazi vizuri',
+  ACCOUNT: 'Akaunti yangu',
+  OTHER: 'Mengineyo',
+};
+
+export const SUPPORT_STATUS = {
+  OPEN: { label: 'Inasubiri ofisi', tone: 'warn' },
+  ANSWERED: { label: 'Imejibiwa', tone: 'ok' },
+  RESOLVED: { label: 'Imetatuliwa', tone: 'muted' },
 };
 
 export function formatDate(value, withTime = false) {

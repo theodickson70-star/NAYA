@@ -2,7 +2,13 @@
 // Session inahifadhiwa; refresh haikutoi isipokuwa API imekataa token (401/403).
 import { createApi, escapeHtml as esc, fetchHealth } from '/shared/api.js';
 import { connectRealtime } from '/shared/realtime.js';
+import * as broadcastAdmin from './broadcast-admin.js';
+import { barChart, shortDay } from './charts.js';
+import * as liveAdmin from './live-admin.js';
 import * as places from './places.js';
+import * as reportsAdmin from './reports-admin.js';
+import * as supportAdmin from './support-admin.js';
+import * as usersAdmin from './users-admin.js';
 import * as ridesAdmin from './rides-admin.js';
 import * as safetyAdmin from './safety-admin.js';
 import * as subsAdmin from './subscriptions-admin.js';
@@ -20,7 +26,10 @@ import {
 const api = createApi('naya_admin_token');
 const $ = (id) => document.getElementById(id);
 const views = ['view-loading', 'view-login', 'view-offline', 'view-app'];
-const pages = ['page-overview', 'page-drivers', 'page-driver', 'page-locations', 'page-fares', 'page-rides', 'page-ride', 'page-subscriptions', 'page-sos'];
+const pages = [
+  'page-overview', 'page-drivers', 'page-driver', 'page-locations', 'page-fares', 'page-rides', 'page-ride', 'page-subscriptions', 'page-sos',
+  'page-live', 'page-users', 'page-user', 'page-support', 'page-ticket', 'page-reports', 'page-broadcast',
+];
 let me = null;
 
 function show(view) {
@@ -92,6 +101,12 @@ function onAdminEvent(_type, data) {
     // Usifute maelezo ambayo msimamizi anaandika sasa hivi.
     else if (!$('page-sos').hidden && !document.activeElement?.closest('#sos-list form')) safetyAdmin.loadPage();
     else if (!$('page-subscriptions').hidden) subsAdmin.loadList();
+    else if (!$('page-live').hidden) liveAdmin.refresh().catch(() => {});
+    else if (!$('page-support').hidden) supportAdmin.loadList(new URLSearchParams(location.hash.split('?')[1] ?? ''));
+    else if (!$('page-ticket').hidden && !supportAdmin.isTyping()) {
+      const id = supportAdmin.openTicketId();
+      if (id) supportAdmin.loadTicket(id);
+    }
     if ($('page-overview').hidden) loadPendingCount();
   }, 700);
 }
@@ -107,6 +122,7 @@ function enterApp(user) {
     },
   });
   $('me-name').textContent = user.fullName;
+  $('me-initials').textContent = user.fullName.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('');
   show('view-app');
   route();
 }
@@ -126,10 +142,23 @@ function route() {
   else if (parts[0] === 'safari') page = 'page-rides';
   else if (parts[0] === 'ada') page = 'page-subscriptions';
   else if (parts[0] === 'dharura') page = 'page-sos';
+  else if (parts[0] === 'ramani') page = 'page-live';
+  else if (parts[0] === 'wateja' && parts[1]) page = 'page-user';
+  else if (parts[0] === 'wateja') page = 'page-users';
+  else if (parts[0] === 'msaada' && parts[1]) page = 'page-ticket';
+  else if (parts[0] === 'msaada') page = 'page-support';
+  else if (parts[0] === 'ripoti') page = 'page-reports';
+  else if (parts[0] === 'matangazo') page = 'page-broadcast';
+  closeMenu();
   ridesAdmin.stop();
+  liveAdmin.stop();
   driverOnPage = null;
   for (const p of pages) $(p).hidden = p !== page;
-  const navFor = { 'page-overview': 'overview', 'page-drivers': 'drivers', 'page-driver': 'drivers', 'page-locations': 'locations', 'page-fares': 'fares', 'page-rides': 'rides', 'page-ride': 'rides', 'page-subscriptions': 'subscriptions', 'page-sos': 'sos' };
+  const navFor = {
+    'page-overview': 'overview', 'page-drivers': 'drivers', 'page-driver': 'drivers', 'page-locations': 'locations', 'page-fares': 'fares',
+    'page-rides': 'rides', 'page-ride': 'rides', 'page-subscriptions': 'subscriptions', 'page-sos': 'sos', 'page-live': 'live',
+    'page-users': 'users', 'page-user': 'users', 'page-support': 'support', 'page-ticket': 'support', 'page-reports': 'reports', 'page-broadcast': 'broadcast',
+  };
   for (const a of document.querySelectorAll('[data-nav]')) {
     const active = a.dataset.nav === navFor[page];
     if (active) a.setAttribute('aria-current', 'page');
@@ -145,7 +174,88 @@ function route() {
   if (page === 'page-ride') ridesAdmin.loadRide(parts[1]);
   if (page === 'page-subscriptions') subsAdmin.loadPage();
   if (page === 'page-sos') safetyAdmin.loadPage();
+  if (page === 'page-live') liveAdmin.load();
+  if (page === 'page-users') usersAdmin.loadList(params.get('chuja') ?? 'ALL', params.get('q') ?? '');
+  if (page === 'page-user') usersAdmin.loadUser(parts[1]);
+  if (page === 'page-support') supportAdmin.loadList(params);
+  if (page === 'page-ticket') supportAdmin.loadTicket(parts[1]);
+  if (page === 'page-reports') reportsAdmin.load();
+  if (page === 'page-broadcast') broadcastAdmin.load();
 }
+
+// ---------- Menyu ya simu ----------
+function closeMenu() {
+  $('view-app').classList.remove('menu-open');
+  $('side-scrim').hidden = true;
+  $('menu-button').setAttribute('aria-expanded', 'false');
+}
+$('menu-button').addEventListener('click', () => {
+  const open = !$('view-app').classList.contains('menu-open');
+  $('view-app').classList.toggle('menu-open', open);
+  $('side-scrim').hidden = !open;
+  $('menu-button').setAttribute('aria-expanded', String(open));
+});
+$('side-scrim').addEventListener('click', closeMenu);
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    closeMenu();
+    hideResults();
+  }
+});
+
+// ---------- Utafutaji mmoja (juu) ----------
+let searchTimer = null;
+let searchSeq = 0;
+function hideResults() {
+  $('global-results').hidden = true;
+  $('global-q').setAttribute('aria-expanded', 'false');
+}
+async function runSearch() {
+  const q = $('global-q').value.trim();
+  if (q.length < 2) return hideResults();
+  const seq = ++searchSeq;
+  try {
+    const res = await api.get(`/api/admin/search?q=${encodeURIComponent(q)}`);
+    if (seq !== searchSeq) return;
+    const items = [
+      ...res.users.map(
+        (u) => `<a href="#/wateja/${esc(u.id)}" role="option"><span><strong>${esc(u.fullName)}</strong><br><span class="muted small">${esc(formatPhone(u.phone))}${
+          u.plateNumber ? ` · ${esc(u.plateNumber)}` : ''
+        }</span></span><span class="gr-kind">${u.driverStatus ? 'Dereva' : 'Mteja'}${u.status === 'SUSPENDED' ? ' · amesimamishwa' : ''}</span></a>`,
+      ),
+      ...res.rides.map(
+        (r) => `<a href="#/safari/${esc(r.id)}" role="option"><span><strong>${esc(r.pickupName)} → ${esc(r.destinationName)}</strong><br><span class="muted small">${esc(
+          formatDate(r.requestedAt, true),
+        )}</span></span><span class="gr-kind">Safari</span></a>`,
+      ),
+    ];
+    $('global-results').innerHTML = items.length ? items.join('') : '<div class="gr-empty">Hakuna kilichopatikana. Jaribu jina, namba ya simu au plate.</div>';
+    $('global-results').hidden = false;
+    $('global-q').setAttribute('aria-expanded', 'true');
+  } catch (err) {
+    handleAuthError(err);
+  }
+}
+$('global-q').addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(runSearch, 250);
+});
+$('global-q').addEventListener('focus', () => {
+  if ($('global-q').value.trim().length >= 2) runSearch();
+});
+$('global-search').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const first = $('global-results').querySelector('a');
+  if (first) location.hash = first.getAttribute('href');
+  else runSearch();
+});
+$('global-results').addEventListener('click', () => {
+  hideResults();
+  $('global-q').value = '';
+});
+document.addEventListener('click', (event) => {
+  if (!event.target.closest('#global-search')) hideResults();
+});
 window.addEventListener('hashchange', route);
 
 // ---------- Muhtasari ----------
@@ -186,7 +296,11 @@ async function loadOverview() {
     $('stat-sub-month').textContent = `TSh ${n(data.subscriptions.monthTotal)}`;
     $('stat-sub-expired').textContent = n(data.subscriptions.expiredDrivers);
     $('stat-sos').textContent = n(data.sosOpen);
+    $('stat-support').textContent = n(data.supportOpen);
     safetyAdmin.setOpenCount(data.sosOpen);
+    setNavCounts(data);
+    renderQueue(data);
+    loadTrend();
     setDot('sys-sms', data.sms.enabled ? 'ok' : 'wait');
     $('sys-sms-text').textContent = data.sms.enabled ? 'SMS (Beem) zimewashwa' : 'SMS (Beem) hazijawashwa — weka BEEM_API_KEY na BEEM_SECRET_KEY';
     if (data.sms.enabled) loadSms();
@@ -232,6 +346,53 @@ async function loadSms() {
       .join('');
   } catch (err) {
     handleAuthError(err);
+  }
+}
+
+function setNavCounts(data) {
+  $('nav-support').textContent = data.supportOpen;
+  $('nav-support').hidden = !data.supportOpen;
+  $('nav-online').textContent = data.rides.driversOnline;
+  $('nav-online').hidden = !data.rides.driversOnline;
+}
+
+/** "Kazi zinazokusubiri": mambo yanayohitaji mtu wa ofisi sasa hivi, ya hatari kwanza. */
+async function renderQueue(data) {
+  let searching = 0;
+  try {
+    const live = await api.get('/api/admin/live');
+    searching = live.rides.filter((r) => r.status === 'SEARCHING').length;
+  } catch {
+    // si muhimu
+  }
+  const items = [
+    [data.sosOpen, 'bad', 'Dharura zilizo wazi', 'Mpigie mtu aliyeomba msaada sasa hivi', '#/dharura', 'Shughulikia'],
+    [searching, 'bad', 'Wateja wanasubiri dereva', 'Mpe dereva maalum kutoka ramani au ukurasa wa safari', '#/ramani', 'Fungua ramani'],
+    [data.supportOpen, 'warn', 'Maombi ya msaada yanasubiri jibu', 'Malalamiko na maswali kutoka kwenye app', '#/msaada?hali=OPEN', 'Jibu'],
+    [data.drivers.PENDING, 'warn', 'Madereva wanasubiri uthibitisho', 'Kagua nyaraka, kisha thibitisha au kataa', '#/madereva?hali=PENDING', 'Kagua'],
+    [data.subscriptions.expiredDrivers, 'warn', 'Madereva wenye ada iliyoisha', 'Hawapokei safari mpaka walipe', '#/ada', 'Angalia'],
+    [data.rides.noDriverToday, 'warn', 'Safari zilizokosa dereva leo', 'Waombe madereva zaidi waende online saa za shughuli', '#/ripoti', 'Ripoti'],
+  ].filter(([count]) => count > 0);
+  $('queue-list').innerHTML = items.length
+    ? items
+        .map(
+          ([count, tone, title, sub, href, cta]) => `<li><a class="queue-item q-${tone}" href="${href}"><span class="q-num">${count}</span>
+            <span class="q-text"><strong>${title}</strong><span>${sub}</span></span><span class="q-go">${cta}</span></a></li>`,
+        )
+        .join('')
+    : '<li class="queue-clear">Hakuna kazi inayosubiri sasa hivi. Kila kitu kiko sawa.</li>';
+}
+
+async function loadTrend() {
+  try {
+    const r = await api.get('/api/admin/reports?days=14');
+    barChart(
+      $('trend-chart'),
+      r.days.map((d) => ({ label: shortDay(d.day), value: d.completed, tip: `${shortDay(d.day)} · TSh ${d.value.toLocaleString('en-US')}` })),
+      { labelEvery: 2 },
+    );
+  } catch {
+    // si muhimu
   }
 }
 
@@ -555,6 +716,7 @@ async function loadPendingCount() {
     $('nav-active').textContent = data.rides.active;
     $('nav-active').hidden = !data.rides.active;
     safetyAdmin.setOpenCount(data.sosOpen);
+    setNavCounts(data);
   } catch {
     // si muhimu
   }
@@ -607,4 +769,9 @@ places.setup({ api, onAuthError: handleAuthError });
 ridesAdmin.setup({ api, onAuthError: handleAuthError });
 subsAdmin.setup({ api, onAuthError: handleAuthError });
 safetyAdmin.setup({ api, onAuthError: handleAuthError });
+usersAdmin.setup({ api, onAuthError: handleAuthError });
+supportAdmin.setup({ api, onAuthError: handleAuthError });
+liveAdmin.setup({ api, onAuthError: handleAuthError });
+reportsAdmin.setup({ api, onAuthError: handleAuthError });
+broadcastAdmin.setup({ api, onAuthError: handleAuthError });
 start();

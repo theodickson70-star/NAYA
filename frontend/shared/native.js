@@ -39,6 +39,11 @@ function serverEnabled(api) {
 
 let registeredToken = null;
 
+/** Baada ya kubadilisha password server inafuta usajili wa simu — sajili tena kwenye usawazishaji unaofuata. */
+export function resetNativeRegistration() {
+  registeredToken = null;
+}
+
 /** Sajili simu hii kwenye server (kimya). Inaitwa kila app inapofunguka mtumiaji akiwa ameingia. */
 export async function syncNative(api) {
   if (!isNativeApp()) return null;

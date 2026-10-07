@@ -16,6 +16,7 @@ import { adminRoutes } from './routes/admin.js';
 import { authRoutes } from './routes/auth.js';
 import { driverRoutes } from './routes/drivers.js';
 import { healthRoutes } from './routes/health.js';
+import { ofisiRoutes } from './routes/ofisi.js';
 import { placeRoutes } from './routes/places.js';
 import { pushRoutes } from './routes/push.js';
 import { rideRoutes } from './routes/rides.js';
@@ -91,6 +92,7 @@ export async function buildApp(options: { logger?: boolean } = {}): Promise<Fast
   await app.register(streamRoutes);
   await app.register(pushRoutes);
   await app.register(subscriptionRoutes);
+  await app.register(ofisiRoutes);
   await app.register(safetyRoutes);
 
   // Kurasa za NAYA: /app/ (app moja ya abiria na dereva) na /admin/ (ofisi).

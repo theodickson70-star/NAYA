@@ -6,6 +6,7 @@ import { driverStatusOf, ensureDriverProfile } from './drivers.js';
 import { assertCanSwitchMode, dispatchRide } from './rides.js';
 import { env } from '../config/env.js';
 import { smsEnabled } from './sms.js';
+import { unreadSupportCount } from './support.js';
 import { findUserById, toPublicUser, type AppMode, type UserRow } from './users.js';
 
 export async function getAccount(user: UserRow) {
@@ -23,6 +24,8 @@ export async function getAccount(user: UserRow) {
     smsEnabled: smsEnabled(),
     /** Link ya kupakua app ya Android (APK) — kwa madereva wanaotaka kengele ya maombi. */
     androidApkUrl: env.androidApkUrl ?? null,
+    /** Majibu ya ofisi (Msaada) ambayo mtumiaji bado hajasoma. */
+    supportUnread: await unreadSupportCount(user.id),
   };
 }
 

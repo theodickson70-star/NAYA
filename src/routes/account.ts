@@ -1,7 +1,9 @@
 // /api/account — akaunti ya mtumiaji wa app ya NAYA na mode yake (Abiria ↔ Dereva).
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireRole } from '../middleware/auth.js';
+import { issueToken, requireRole } from '../middleware/auth.js';
+import { changePassword } from '../services/auth.js';
+import { passwordSchema } from '../validators/auth.js';
 import { getAccount, setMode } from '../services/account.js';
 import { ok } from '../utils/http.js';
 
@@ -19,5 +21,14 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
     const account = await setMode(request.currentUser.id, mode);
     request.log.info({ userId: request.currentUser.id, mode }, 'mode imebadilishwa');
     return ok(account);
+  });
+
+  /** Kubadilisha password: vifaa vingine vyote vinatolewa; kifaa hiki kinapata token mpya. */
+  app.post('/api/account/password', { ...userOnly, config: { rateLimit: { max: 10, timeWindow: '15 minutes' } } }, async (request) => {
+    const input = z
+      .object({ currentPassword: z.string({ error: 'Weka password ya sasa' }).min(1, 'Weka password ya sasa').max(128), newPassword: passwordSchema })
+      .parse(request.body);
+    const user = await changePassword(request.currentUser.id, input.currentPassword, input.newPassword);
+    return ok({ token: issueToken(app, user) });
   });
 }

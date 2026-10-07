@@ -16,10 +16,10 @@ Mfumo wa bodaboda na bajaji. Unajengwa phase moja baada ya nyingine; kila phase 
 | 9.5 | Muonekano mpya: animation ya logo wakati wa kufungua, utangulizi wa slaidi 3, skrini mpya za kuingia na kila skrini ya app | ✅ |
 | 10 | App ya Android (APK): kengele ya ombi ya sekunde 30 hata app ikiwa imefungwa (Firebase), inajengwa na GitHub Actions | ✅ |
 | 10.1 | Bei maalum kati ya maeneo (ofisi inaandika bei za njia; km kwa nyingine) | ✅ |
-| 10.2 | Dereva anaweza kwenda online popote (anapokea maombi ya wateja walio ndani ya km 10 tu) | ✅ sasa |
-| 11 | Malipo kwa simu (M-Pesa, Airtel, Mixx/Tigo, HaloPesa) | |
-| 12 | Msaidizi wa AI (Claude) unaotumia data halisi | |
-| 13 | Ripoti, CSV, takwimu, ukaguzi wa usalama | |
+| 10.2 | Dereva anaweza kwenda online popote (anapokea maombi ya wateja walio ndani ya km 10 tu) | ✅ |
+| 11 | Ofisi kuu: wateja, msaada (malalamiko), ramani live, kuingilia safari, matangazo, ripoti + CSV, utafutaji mmoja | ✅ sasa |
+| 12 | Malipo kwa simu (M-Pesa, Airtel, Mixx/Tigo, HaloPesa) | |
+| 13 | Msaidizi wa AI (Claude) unaotumia data halisi | |
 
 ## Muundo
 
@@ -206,6 +206,27 @@ mabadiliko ya NAYA yanayopushiwa Railway yanaonekana kwenye app papo hapo — **
   kwa NAYA Google inaweza kuomba maelezo au kuizima — kengele ya sekunde 30 bado inalia, ila haitajitokeza juu ya skrini iliyofungwa.
 - Bila keystore, APK ni ya "debug" (inafaa kwa kusambaza moja kwa moja). GitHub inahifadhi ufunguo wake ili update isakinike juu
   ya ya zamani; ikitokea simu ikakataa ("App not installed"), futa NAYA ya zamani kisha usakinishe mpya.
+
+## Ofisi kuu (Phase 11)
+
+Ofisi (`/admin/`) ina menyu ya pembeni (kwenye simu: kitufe cha menyu juu kushoto) na **utafutaji mmoja** juu: andika jina,
+namba ya simu, plate au mwanzo wa namba ya safari.
+
+- **Muhtasari → Kazi zinazokusubiri:** dharura, wateja wanaosubiri dereva, maombi ya msaada, madereva wa kuthibitisha, ada
+  zilizoisha, safari zilizokosa dereva — kila moja na kiungo cha kulishughulikia. Chati ya safari za siku 14.
+- **Ramani live:** madereva walio online (kijani = huru, njano = ana safari/ombi, kijivu = hajaonekana dakika 2+) na wateja
+  wanaosubiri dereva (mraba mwekundu). Inajisasisha kila sekunde 10 na kwa matukio ya papo hapo.
+- **Safari → kuingilia:** safari inayotafuta dereva → "Mpe dereva maalum" (simu yake inalia kama ombi la kawaida, hata akiwa
+  zaidi ya km 10); safari iliyoanza na kukwama → "Maliza safari"; kughairi kama awali. Kila hatua inaandikwa kwenye historia.
+- **Wateja:** kila mtumiaji (abiria na dereva) — takwimu, safari, msaada, dharura, historia ya hatua za ofisi, maelezo ya ndani;
+  vitendo: mtumie ujumbe (app + SMS), thibitisha namba yake, mpe **password ya muda** (kwa SMS, au inaonyeshwa mara moja tu
+  ikiwa SMS hazijawashwa), mtoe online, simamisha / rudisha akaunti (anatolewa papo hapo).
+- **Msaada:** mteja au dereva: Akaunti → Msaada → "Ripoti tatizo" (aina, safari husika, maelezo). Ofisi inajibu (majibu ya haraka
+  yapo), jibu linamfikia kwenye app, arifa ya simu na kengele ya app ya Android; anaweza kujibu tena. "Jibu na utatue" inafunga ombi.
+- **Matangazo:** ujumbe kwa wote / wateja / madereva / madereva walio online (SMS hiari, hadi 500 kwa tangazo).
+- **Ripoti:** siku 7/30/90 — safari, thamani, zisizopata dereva, watumiaji wapya, ada; saa zenye shughuli; maeneo; madereva
+  bora; **Pakua CSV** (Excel inaifungua).
+- Kwenye app: Akaunti → **Badilisha password** (vifaa vingine vinatolewa).
 
 ## Nyaraka za madereva
 

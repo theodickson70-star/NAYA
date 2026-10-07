@@ -62,72 +62,105 @@
   </main>
 
   <!-- Ndani ya ofisi -->
-  <div id="view-app" hidden>
-    <header class="topbar">
-      <a class="topbar-brand" href="#/">
-        <img src="/shared/brand/naya-icon.svg" alt="" width="34" height="34">
-        <img class="topbar-wordmark" src="/shared/brand/naya-wordmark-white.svg" alt="NAYA" width="88" height="25">
-        <span class="topbar-area">Ofisi</span><span id="admin-live" class="live-dot" title="Inaunganisha…"></span>
+  <div id="view-app" class="shell" hidden>
+    <aside class="sidebar" id="sidebar" aria-label="Menyu ya ofisi">
+      <a class="side-brand" href="#/">
+        <img src="/shared/brand/naya-icon.svg" alt="" width="36" height="36">
+        <img class="side-wordmark" src="/shared/brand/naya-wordmark-white.svg" alt="NAYA" width="92" height="26">
+        <span class="side-area">Ofisi</span>
       </a>
-      <nav class="topnav" aria-label="Sehemu za ofisi">
-        <a href="#/" data-nav="overview">Muhtasari</a>
-        <a href="#/safari" data-nav="rides">Safari <span id="nav-active" class="nav-count" hidden></span></a>
-        <a href="#/madereva" data-nav="drivers">Madereva <span id="nav-pending" class="nav-count" hidden></span></a>
-        <a href="#/maeneo" data-nav="locations">Maeneo</a>
-        <a href="#/bei" data-nav="fares">Bei</a>
-        <a href="#/ada" data-nav="subscriptions">Ada</a>
-        <a href="#/dharura" data-nav="sos">Dharura <span id="nav-sos" class="nav-count nav-count-sos" hidden></span></a>
+      <nav class="side-nav">
+        <p class="side-group">Kazi za leo</p>
+          <a href="#/" data-nav="overview"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg><span>Muhtasari</span></a>
+          <a href="#/ramani" data-nav="live"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4l-6 2v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg><span>Ramani live</span><span id="nav-online" class="nav-count nav-count-soft" hidden></span></a>
+          <a href="#/safari" data-nav="rides"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="16" r="3"/><circle cx="18.5" cy="16" r="3"/><path d="M5.5 16l4-6h5l2.5 4h1.5"/><path d="M13 6.5h3l2 4"/></svg><span>Safari</span><span id="nav-active" class="nav-count" hidden></span></a>
+          <a href="#/msaada" data-nav="support"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8.5 8.5 0 0 1-12.6 7.4L3 21l1.6-5.4A8.5 8.5 0 1 1 21 12z"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.6 2.2c-.7.4-1.1.9-1.1 1.6v.4"/><path d="M12 16.6h.01"/></svg><span>Msaada</span><span id="nav-support" class="nav-count" hidden></span></a>
+          <a href="#/dharura" data-nav="sos"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9.5 16.5h-19L12 3z"/><path d="M12 10v4M12 17h.01"/></svg><span>Dharura</span><span id="nav-sos" class="nav-count nav-count-sos" hidden></span></a>
+        <p class="side-group">Watu</p>
+          <a href="#/wateja" data-nav="users"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M17 14.5a4.5 4.5 0 0 1 4.5 4.5"/></svg><span>Wateja</span></a>
+          <a href="#/madereva" data-nav="drivers"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/><path d="M8.5 6h7"/></svg><span>Madereva</span><span id="nav-pending" class="nav-count" hidden></span></a>
+        <p class="side-group">Biashara</p>
+          <a href="#/ada" data-nav="subscriptions"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 9.5v5M18 9.5v5"/></svg><span>Ada ya mwezi</span></a>
+          <a href="#/bei" data-nav="fares"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg><span>Bei</span></a>
+          <a href="#/maeneo" data-nav="locations"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg><span>Maeneo</span></a>
+          <a href="#/ripoti" data-nav="reports"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Ripoti</span></a>
+          <a href="#/matangazo" data-nav="broadcast"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4h4l7 5V5L7 10H3z"/><path d="M18 8.5a5 5 0 0 1 0 7"/></svg><span>Matangazo</span></a>
       </nav>
-      <div class="topbar-user">
-        <span id="me-name" class="me-name"></span>
-        <button id="logout-button" class="btn btn-ghost btn-small" type="button">Toka</button>
+      <div class="side-user">
+        <span class="side-avatar" id="me-initials" aria-hidden="true"></span>
+        <span class="side-me"><strong id="me-name"></strong><span>Msimamizi</span></span>
+        <button id="logout-button" class="side-logout" type="button" aria-label="Toka"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h4v16h-4"/><path d="M10 8l-4 4 4 4M6 12h11"/></svg></button>
       </div>
-    </header>
-    <a id="sos-banner" class="sos-banner" href="#/dharura" role="alert" hidden></a>
+    </aside>
+    <div class="side-scrim" id="side-scrim" hidden></div>
+
+    <div class="shell-main">
+      <header class="appbar">
+        <button class="appbar-menu" id="menu-button" type="button" aria-label="Fungua menyu" aria-controls="sidebar" aria-expanded="false"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+        <form class="global-search" id="global-search" role="search" autocomplete="off">
+          <label class="sr-only" for="global-q">Tafuta</label>
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <input id="global-q" type="search" placeholder="Tafuta jina, simu, plate au namba ya safari" aria-controls="global-results" aria-expanded="false">
+          <div class="global-results" id="global-results" role="listbox" hidden></div>
+        </form>
+        <span id="admin-live" class="live-pill" title="Inaunganisha…"><i></i><span>Live</span></span>
+      </header>
+      <a id="sos-banner" class="sos-banner" href="#/dharura" role="alert" hidden></a>
 
     <!-- Muhtasari -->
     <main id="page-overview" class="page" hidden>
-      <h1 id="greeting" class="greeting">Habari</h1>
-      <p class="muted" id="today"></p>
-
-      <section class="stat-strip" aria-label="Takwimu">
-        <div class="stat"><span class="stat-value" id="stat-members">–</span><span class="stat-label">Watumiaji wa app</span></div>
-        <div class="stat"><span class="stat-value" id="stat-drivers">–</span><span class="stat-label">Madereva waliothibitishwa</span></div>
-        <a class="stat stat-link" href="#/madereva?hali=PENDING"><span class="stat-value" id="stat-pending">–</span><span class="stat-label">Wanasubiri uthibitisho</span></a>
-        <div class="stat"><span class="stat-value" id="stat-new">–</span><span class="stat-label">Wapya leo</span></div>
-      </section>
-
-      <section class="stat-strip stat-strip-rides" aria-label="Safari">
-        <a class="stat stat-link" href="#/safari"><span class="stat-value" id="stat-active">–</span><span class="stat-label">Safari zinazoendelea</span></a>
-        <div class="stat"><span class="stat-value" id="stat-completed">–</span><span class="stat-label">Zilizokamilika leo</span></div>
-        <div class="stat"><span class="stat-value stat-money" id="stat-value">–</span><span class="stat-label">Thamani ya safari leo</span></div>
-        <div class="stat"><span class="stat-value" id="stat-online">–</span><span class="stat-label">Madereva online sasa</span></div>
-      </section>
-
-      <section class="stat-strip stat-strip-money" aria-label="Ada na usalama">
-        <a class="stat stat-link" href="#/ada"><span class="stat-value stat-money" id="stat-sub-month">–</span><span class="stat-label">Ada zilizolipwa mwezi huu</span></a>
-        <a class="stat stat-link" href="#/ada"><span class="stat-value" id="stat-sub-expired">–</span><span class="stat-label">Madereva wenye ada iliyoisha</span></a>
-        <a class="stat stat-link" href="#/dharura"><span class="stat-value" id="stat-sos">–</span><span class="stat-label">Dharura zilizo wazi</span></a>
-      </section>
-
+      <div class="overview-head">
+        <div>
+          <h1 id="greeting" class="greeting">Habari</h1>
+          <p class="muted" id="today"></p>
+        </div>
+        <div class="quick-actions">
+          <a class="btn btn-ghost btn-small" href="#/matangazo">Tuma tangazo</a>
+          <a class="btn btn-primary btn-small" href="#/ramani">Fungua ramani live</a>
+        </div>
+      </div>
       <p id="dashboard-error" class="alert alert-danger" role="alert" hidden></p>
 
-      <section class="panel" aria-labelledby="setup-title">
-        <h2 id="setup-title">Maandalizi ya safari</h2>
-        <p class="muted small">Haya yakikamilika, abiria wanaona bei halisi kwenye app ("Unaenda wapi?").</p>
-        <ul class="setup-list" id="setup-list"></ul>
+      <section class="queue" aria-labelledby="queue-title">
+        <h2 id="queue-title">Kazi zinazokusubiri</h2>
+        <ul class="queue-list" id="queue-list"><li class="muted">Inapakia…</li></ul>
       </section>
 
-      <section class="panel" aria-labelledby="system-title">
-        <h2 id="system-title">Hali ya mfumo</h2>
-        <ul class="system-list">
-          <li><span id="sys-api" class="dot dot-wait"></span>Server ya NAYA</li>
-          <li><span id="sys-db" class="dot dot-wait"></span>Database (Supabase)</li>
-          <li><span id="sys-sms" class="dot dot-wait"></span><span id="sys-sms-text">SMS (Beem)</span></li>
-          <li><span id="sys-app" class="dot dot-wait"></span><span id="sys-app-text">App ya Android (kengele ya maombi)</span></li>
-        </ul>
-        <p class="muted small" id="sys-version"></p>
+      <section class="kpis" aria-label="Leo">
+        <a class="kpi kpi-hero" href="#/safari"><span class="kpi-label">Safari zinazoendelea</span><span class="kpi-value" id="stat-active">–</span></a>
+        <div class="kpi"><span class="kpi-label">Zilizokamilika leo</span><span class="kpi-value" id="stat-completed">–</span></div>
+        <div class="kpi"><span class="kpi-label">Thamani ya safari leo</span><span class="kpi-value kpi-money" id="stat-value">–</span></div>
+        <a class="kpi" href="#/ramani"><span class="kpi-label">Madereva online sasa</span><span class="kpi-value" id="stat-online">–</span></a>
+        <a class="kpi" href="#/wateja"><span class="kpi-label">Watumiaji wa app</span><span class="kpi-value" id="stat-members">–</span><span class="kpi-sub"><span id="stat-new">–</span> wapya leo</span></a>
+        <a class="kpi" href="#/madereva?hali=APPROVED"><span class="kpi-label">Madereva waliothibitishwa</span><span class="kpi-value" id="stat-drivers">–</span><span class="kpi-sub"><span id="stat-pending">–</span> wanasubiri</span></a>
+        <a class="kpi" href="#/ada"><span class="kpi-label">Ada mwezi huu</span><span class="kpi-value kpi-money" id="stat-sub-month">–</span><span class="kpi-sub"><span id="stat-sub-expired">–</span> zimeisha</span></a>
+        <a class="kpi" href="#/msaada"><span class="kpi-label">Msaada na dharura</span><span class="kpi-value" id="stat-support">–</span><span class="kpi-sub"><span id="stat-sos">–</span> dharura wazi</span></a>
       </section>
+
+      <section class="panel chart-panel" aria-labelledby="trend-title">
+        <div class="panel-head">
+          <h2 id="trend-title">Safari zilizokamilika — siku 14</h2>
+          <a href="#/ripoti">Ripoti kamili</a>
+        </div>
+        <div id="trend-chart" class="bar-chart" role="img" aria-label="Safari zilizokamilika kila siku"></div>
+      </section>
+
+      <div class="overview-split">
+        <section class="panel" aria-labelledby="setup-title">
+          <h2 id="setup-title">Maandalizi ya safari</h2>
+          <ul class="setup-list" id="setup-list"></ul>
+        </section>
+        <section class="panel" aria-labelledby="system-title">
+          <h2 id="system-title">Hali ya mfumo</h2>
+          <ul class="system-list">
+            <li><span id="sys-api" class="dot dot-wait"></span>Server ya NAYA</li>
+            <li><span id="sys-db" class="dot dot-wait"></span>Database (Supabase)</li>
+            <li><span id="sys-sms" class="dot dot-wait"></span><span id="sys-sms-text">SMS (Beem)</span></li>
+            <li><span id="sys-app" class="dot dot-wait"></span><span id="sys-app-text">App ya Android (kengele ya maombi)</span></li>
+          </ul>
+          <p class="muted small" id="sys-version"></p>
+        </section>
+      </div>
 
       <section class="panel" aria-labelledby="sms-title" id="sms-panel" hidden>
         <h2 id="sms-title">SMS</h2>
@@ -138,24 +171,6 @@
         </section>
         <p class="alert alert-warn" id="sms-failed" hidden></p>
         <ul class="history" id="sms-recent"></ul>
-      </section>
-
-      <section class="panel" aria-labelledby="roadmap-title">
-        <h2 id="roadmap-title">Ujenzi wa NAYA</h2>
-        <ol class="roadmap">
-          <li class="done">Msingi, login na dashboard ya ofisi</li>
-          <li class="done">Madereva: usajili, nyaraka na uthibitisho</li>
-          <li class="done">App moja ya NAYA: abiria na dereva, kubadili mode</li>
-          <li class="done">Bei na maeneo ya Urambo</li>
-          <li class="done">Kuomba safari na kumpata dereva</li>
-          <li class="done">Mode ya dereva: online, maombi, mapato</li>
-          <li class="done">Taarifa za papo hapo na arifa za simu</li>
-          <li class="done">Ada ya mwezi, ramani ya live na usalama wa safari</li>
-          <li class="done">SMS: kuthibitisha namba na kurejesha password</li>
-          <li>Malipo kwa simu</li>
-          <li>Msaidizi wa AI</li>
-          <li>Ripoti na takwimu</li>
-        </ol>
       </section>
     </main>
 
@@ -325,6 +340,138 @@
       <p id="driver-error" class="alert alert-danger" role="alert" hidden></p>
       <div id="driver-detail"></div>
     </main>
+
+    <!-- Ramani live -->
+    <main id="page-live" class="page page-wide" hidden>
+      <div class="page-head">
+        <div><h1>Ramani live</h1><p class="muted small">Madereva walio online na safari zinazoendelea. Inajisasisha yenyewe.</p></div>
+        <div class="legend" aria-label="Maana ya rangi">
+          <span><i class="lg lg-free"></i>Yuko huru</span>
+          <span><i class="lg lg-busy"></i>Ana safari/ombi</span>
+          <span><i class="lg lg-stale"></i>Hajaonekana dakika 2+</span>
+          <span><i class="lg lg-search"></i>Mteja anasubiri dereva</span>
+        </div>
+      </div>
+      <p id="live-error" class="alert alert-danger" role="alert" hidden></p>
+      <div class="live-layout">
+        <div id="live-map" class="map live-map" role="application" aria-label="Ramani ya madereva na safari"></div>
+        <aside class="live-side">
+          <h2>Wanaosubiri dereva <span class="count-pill" id="live-search-count">0</span></h2>
+          <div id="live-searching" class="live-list"></div>
+          <h2>Madereva online <span class="count-pill" id="live-driver-count">0</span></h2>
+          <div id="live-drivers" class="live-list"></div>
+        </aside>
+      </div>
+    </main>
+
+    <!-- Wateja -->
+    <main id="page-users" class="page" hidden>
+      <div class="page-head">
+        <h1>Wateja na madereva</h1>
+        <form id="user-search" class="search" role="search">
+          <label class="sr-only" for="user-q">Tafuta mtumiaji</label>
+          <input id="user-q" type="search" placeholder="Jina, simu au plate">
+        </form>
+      </div>
+      <div id="user-filters" class="filters" role="group" aria-label="Chuja watumiaji"></div>
+      <p id="users-error" class="alert alert-danger" role="alert" hidden></p>
+      <div id="user-list" class="driver-list" aria-live="polite"></div>
+    </main>
+
+    <main id="page-user" class="page" hidden>
+      <a class="back-link" href="#/wateja">Rudi kwa wateja</a>
+      <p id="user-error" class="alert alert-danger" role="alert" hidden></p>
+      <div id="user-detail"></div>
+    </main>
+
+    <!-- Msaada -->
+    <main id="page-support" class="page" hidden>
+      <div class="page-head">
+        <div><h1>Msaada</h1><p class="muted small">Matatizo yaliyoripotiwa na wateja na madereva kwenye app ("Msaada"). Jibu lako linamfikia kwenye simu.</p></div>
+        <form id="support-search" class="search" role="search">
+          <label class="sr-only" for="support-q">Tafuta</label>
+          <input id="support-q" type="search" placeholder="Jina, simu au neno">
+        </form>
+      </div>
+      <div id="support-filters" class="filters" role="group" aria-label="Chuja maombi"></div>
+      <p id="support-error" class="alert alert-danger" role="alert" hidden></p>
+      <div id="support-list" class="driver-list" aria-live="polite"></div>
+    </main>
+
+    <main id="page-ticket" class="page" hidden>
+      <a class="back-link" href="#/msaada">Rudi kwa msaada</a>
+      <p id="ticket-error" class="alert alert-danger" role="alert" hidden></p>
+      <div id="ticket-detail"></div>
+    </main>
+
+    <!-- Ripoti -->
+    <main id="page-reports" class="page page-wide" hidden>
+      <div class="page-head">
+        <h1>Ripoti</h1>
+        <div class="filters" id="report-range" role="group" aria-label="Kipindi">
+          <button type="button" class="chip" data-days="7" aria-pressed="false">Siku 7</button>
+          <button type="button" class="chip" data-days="30" aria-pressed="true">Siku 30</button>
+          <button type="button" class="chip" data-days="90" aria-pressed="false">Siku 90</button>
+        </div>
+      </div>
+      <p id="reports-error" class="alert alert-danger" role="alert" hidden></p>
+      <section class="kpis kpis-report" id="report-totals" aria-label="Jumla ya kipindi"></section>
+      <section class="panel chart-panel">
+        <div class="panel-head"><h2>Safari zilizokamilika kila siku</h2></div>
+        <div id="report-trips" class="bar-chart" role="img" aria-label="Safari zilizokamilika kila siku"></div>
+      </section>
+      <section class="panel chart-panel">
+        <div class="panel-head"><h2>Thamani ya safari kila siku (TSh)</h2></div>
+        <div id="report-value" class="bar-chart" role="img" aria-label="Thamani ya safari kila siku"></div>
+      </section>
+      <div class="overview-split">
+        <section class="panel chart-panel">
+          <div class="panel-head"><h2>Saa zenye maombi mengi</h2></div>
+          <div id="report-hours" class="bar-chart bar-chart-short" role="img" aria-label="Maombi kwa kila saa ya siku"></div>
+        </section>
+        <section class="panel">
+          <h2>Maeneo yanayotumika zaidi</h2>
+          <ol class="rank-list" id="report-places"></ol>
+        </section>
+      </div>
+      <section class="panel">
+        <h2>Madereva bora wa kipindi</h2>
+        <div id="report-drivers" class="driver-list"></div>
+      </section>
+      <section class="panel export-panel">
+        <div><h2>Pakua safari (Excel / CSV)</h2><p class="muted small">Safari zote za kipindi ulichochagua, pamoja na abiria, dereva, nauli na hali.</p></div>
+        <button class="btn btn-primary" type="button" id="report-csv">Pakua CSV</button>
+      </section>
+    </main>
+
+    <!-- Matangazo -->
+    <main id="page-broadcast" class="page" hidden>
+      <h1>Matangazo</h1>
+      <p class="muted">Tuma ujumbe mmoja kwa kundi zima. Unafika kama arifa kwenye app (na kengele ya simu kwa wenye app ya Android).</p>
+      <form id="broadcast-form" class="decision broadcast-form" novalidate>
+        <fieldset class="audience" id="broadcast-audience">
+          <legend>Wapokeaji</legend>
+        </fieldset>
+        <label for="bc-title">Kichwa</label>
+        <input id="bc-title" maxlength="80" placeholder="Mf. Mvua kubwa leo jioni">
+        <label for="bc-body">Ujumbe</label>
+        <textarea id="bc-body" maxlength="300" placeholder="Mf. Madereva, endesheni kwa uangalifu. Wateja, vaeni kofia ngumu."></textarea>
+        <p class="muted small"><span id="bc-count">0</span>/300</p>
+        <label class="check"><input type="checkbox" id="bc-sms"> Tuma pia kwa SMS <span class="muted small" id="bc-sms-note"></span></label>
+        <div class="bc-preview" aria-live="polite">
+          <span class="bc-preview-label">Itaonekana hivi kwenye simu</span>
+          <div class="bc-phone"><img src="/shared/brand/naya-icon.svg" alt="" width="28" height="28"><div><strong id="bc-prev-title">Kichwa</strong><span id="bc-prev-body">Ujumbe wako</span></div></div>
+        </div>
+        <p class="alert alert-danger" id="bc-error" role="alert" hidden></p>
+        <p class="alert alert-ok" id="bc-ok" role="status" hidden></p>
+        <div class="actions"><button class="btn btn-primary" type="submit" id="bc-send">Tuma tangazo</button></div>
+      </form>
+      <section class="panel">
+        <h2>Yaliyotumwa</h2>
+        <ul class="history" id="broadcast-history"></ul>
+      </section>
+    </main>
+    </div>
   </div>
 
   <dialog id="doc-viewer" class="doc-viewer" aria-labelledby="doc-viewer-title">

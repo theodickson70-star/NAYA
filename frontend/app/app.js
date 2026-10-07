@@ -11,19 +11,20 @@ import {
   LOCATION_CATEGORIES,
   VEHICLE_TYPES,
 } from '/shared/labels.js';
-import { isNativeApp, nativeInfo, openFullScreenSettings, openNotificationSettings, syncNative, testRing } from '/shared/native.js';
+import { isNativeApp, nativeInfo, openFullScreenSettings, openNotificationSettings, resetNativeRegistration, syncNative, testRing } from '/shared/native.js';
 import { disablePush, enablePush, pushState } from '/shared/push.js';
 import { connectRealtime } from '/shared/realtime.js';
 import { introSeen, setupIntro } from './intro.js';
 import { nearbyMap } from '/shared/map.js';
 import * as rides from './rides.js';
+import * as support from './support.js';
 import { finishSplash, previewSound, setSoundEnabled, soundEnabled, splashActive, splashReady } from './splash.js';
 
 const api = createApi('naya_app_token');
 const $ = (id) => document.getElementById(id);
 const views = ['view-loading', 'view-intro', 'view-auth', 'view-verify', 'view-role', 'view-offline', 'view-app'];
 const MAX_BYTES = 3 * 1024 * 1024;
-const VERSION = '0.10.3';
+const VERSION = '0.11.0';
 
 let account = null; // { user, activeMode, driverStatus, canDrive }
 let driver = null; // wasifu wa udereva (mode ya Dereva)
@@ -392,13 +393,26 @@ function startRealtime() {
     },
     onEvent: async (type, data) => {
       if (!account) return;
+      if (type === 'support') {
+        // Ofisi imejibu / ujumbe au tangazo kutoka ofisi: sasisha alama na ukurasa ulio wazi tu.
+        try {
+          account = await api.get('/api/account');
+          setSupportDot();
+          if (support.openTicketId()) support.renderTicket(support.openTicketId());
+          else if (tab === 'account' && location.hash === '#/akaunti') renderAccount();
+        } catch (err) {
+          handleError(err);
+        }
+        return;
+      }
       if (type === 'account') {
         // mf. ofisi imekuthibitisha kuwa dereva
         try {
           account = await api.get('/api/account');
           driver = null;
+          setSupportDot();
           if (tab === 'home') route();
-          else if (tab === 'account') renderAccount();
+          else if (tab === 'account' && location.hash === '#/akaunti') renderAccount();
         } catch (err) {
           handleError(err);
         }
@@ -436,6 +450,8 @@ function route() {
   $('mode-chip').textContent = driverMode ? 'Dereva' : 'Abiria';
   document.querySelector('meta[name="theme-color"]').content = driverMode ? '#043A22' : '#06502F';
   window.scrollTo(0, 0);
+  const supportPath = location.hash.match(/^#\/akaunti\/msaada(?:\/([0-9a-f-]{36}))?/);
+  if (supportPath) return supportPath[1] ? support.renderTicket(supportPath[1]) : support.renderNew();
   if (tab === 'account') return renderAccount();
   if (driverMode) return loadDriver();
   if (picker) return renderPicker(picker === 'kwenda' ? 'destination' : 'pickup');
@@ -760,6 +776,33 @@ function statusBadge(status) {
 }
 
 // ---------- Akaunti ----------
+function setSupportDot() {
+  const dot = $('tab-dot');
+  if (dot) dot.hidden = !account?.supportUnread;
+}
+
+$('app-content').addEventListener('submit', async (event) => {
+  if (event.target.id !== 'password-form') return;
+  event.preventDefault();
+  const button = event.target.querySelector('button[type="submit"]');
+  $('pw-error').hidden = true;
+  button.disabled = true;
+  try {
+    const { token } = await api.post('/api/account/password', { currentPassword: $('pw-current').value, newPassword: $('pw-new').value });
+    api.setToken(token);
+    resetNativeRegistration();
+    syncNative(api).catch(() => {});
+    realtime?.close();
+    realtime = null;
+    startRealtime();
+    toast('Password imebadilishwa');
+    renderAccount();
+  } catch (err) {
+    handleError(err, 'pw-error');
+    button.disabled = false;
+  }
+});
+
 function renderAccount() {
   const { user, activeMode, driverStatus } = account;
   const driverMode = activeMode === 'DRIVER';
@@ -817,6 +860,23 @@ function renderAccount() {
         : ''
     }
 
+    ${support.cardHtml(account.supportUnread)}
+
+    <section class="card" aria-labelledby="pw-title">
+      <details class="pw-details">
+        <summary><h2 id="pw-title">Badilisha password</h2></summary>
+        <form id="password-form" class="pw-form" novalidate>
+          <label for="pw-current">Password ya sasa</label>
+          <input id="pw-current" type="password" autocomplete="current-password">
+          <label for="pw-new">Password mpya <span class="muted">(angalau herufi 8)</span></label>
+          <input id="pw-new" type="password" autocomplete="new-password" minlength="8">
+          <p class="alert alert-danger" id="pw-error" role="alert" hidden></p>
+          <button class="btn btn-primary btn-block" type="submit">Hifadhi password mpya</button>
+          <p class="muted small" style="margin-top:8px">Simu nyingine zote zilizoingia kwa akaunti hii zitatolewa.</p>
+        </form>
+      </details>
+    </section>
+
     <section class="card sound-card" aria-labelledby="sound-title">
       <div class="sound-row">
         <span><h2 id="sound-title">Sauti ya kufungua NAYA</h2><span class="muted">Sauti fupi logo inapojitengeneza app ikifunguka.</span></span>
@@ -828,6 +888,8 @@ function renderAccount() {
     <button class="btn btn-ghost btn-out" type="button" data-action="logout">Toka</button>
     <p class="version">NAYA ${VERSION} · TWENDE PAMOJA</p>`;
   loadNotificationSection();
+  support.loadCardList();
+  setSupportDot();
   if ($('sub-body')) loadSubscriptionSection();
 }
 
@@ -1342,6 +1404,7 @@ function signOutLocally() {
 
 $('retry-button').addEventListener('click', start);
 
+support.init({ api, handleError, toast, isDriver: () => account?.activeMode === 'DRIVER' });
 rides.init({
   api,
   pushState: () => pushState(api),
