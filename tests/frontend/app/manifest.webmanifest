@@ -1,0 +1,17 @@
+{
+  "name": "NAYA — Twende Pamoja",
+  "short_name": "NAYA",
+  "description": "Bodaboda na bajaji: safiri au endesha na NAYA",
+  "lang": "sw",
+  "start_url": "/app/",
+  "scope": "/app/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#06502F",
+  "theme_color": "#06502F",
+  "icons": [
+    { "src": "/shared/brand/naya-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/shared/brand/naya-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/shared/brand/naya-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

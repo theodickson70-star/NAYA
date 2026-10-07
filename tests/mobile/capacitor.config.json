@@ -1,0 +1,15 @@
+{
+  "appId": "tz.naya.app",
+  "appName": "NAYA",
+  "webDir": "www",
+  "server": {
+    "url": "https://naya-production-e5cf.up.railway.app/app/",
+    "cleartext": false,
+    "errorPath": "offline.html",
+    "allowNavigation": ["naya-production-e5cf.up.railway.app"]
+  },
+  "android": {
+    "backgroundColor": "#06502F",
+    "allowMixedContent": false
+  }
+}

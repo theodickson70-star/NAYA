@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="sw">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="NAYA — dashboard ya ofisi">
+  <meta name="theme-color" content="#0A6E47">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/shared/brand/naya-apple-180.png">
+  <title>NAYA — Ofisi</title>
+  <link rel="preload" href="/shared/fonts/bricolage-grotesque.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/shared/fonts/atkinson-hyperlegible-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/shared/fonts.css">
+  <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="/shared/naya.css">
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+  <!-- Inapakia (kuhakiki session iliyohifadhiwa) -->
+  <div id="view-loading" class="loading" aria-live="polite">Inapakia…</div>
+
+  <!-- Login -->
+  <main id="view-login" class="login" hidden>
+    <section class="brand-panel">
+      <img class="brand-photo" src="/shared/img/naya-hero.webp" alt="" width="791" height="466">
+      <div class="lockup">
+        <img class="brand-icon" src="/shared/brand/naya-icon-light.svg" alt="" width="72" height="72">
+        <img class="brand-wordmark" src="/shared/brand/naya-wordmark-white.svg" alt="NAYA" width="438" height="124">
+        <span class="slogan">TWENDE PAMOJA</span>
+      </div>
+      <p class="brand-note">Bodaboda na bajaji za Urambo, mahali pamoja.</p>
+    </section>
+
+    <section class="form-panel">
+      <form id="login-form" class="login-form" novalidate>
+        <h1>Ingia ofisini</h1>
+        <p class="muted">Kwa wasimamizi wa NAYA tu.</p>
+
+        <label for="phone">Namba ya simu</label>
+        <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="username" placeholder="0712 345 678" required>
+
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required>
+
+        <p id="login-error" class="alert alert-danger" role="alert" hidden></p>
+        <button id="login-button" class="btn btn-primary" type="submit">Ingia</button>
+      </form>
+      <p class="status-line"><span id="login-health" class="dot dot-wait"></span><span id="login-health-text">Inaangalia mfumo…</span></p>
+    </section>
+  </main>
+
+  <!-- Seva haipatikani wakati wa kuhakiki session (session haifutwi) -->
+  <main id="view-offline" class="center-card" hidden>
+    <div class="card">
+      <h1>Hatukuweza kufika kwenye mfumo</h1>
+      <p class="muted" id="offline-reason">Angalia mtandao wako, kisha jaribu tena.</p>
+      <div class="actions">
+        <button id="retry-button" class="btn btn-primary" type="button">Jaribu tena</button>
+        <button id="offline-logout" class="btn btn-ghost" type="button">Toka</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- Ndani ya ofisi -->
+  <div id="view-app" hidden>
+    <header class="topbar">
+      <a class="topbar-brand" href="#/">
+        <img src="/shared/brand/naya-icon.svg" alt="" width="34" height="34">
+        <img class="topbar-wordmark" src="/shared/brand/naya-wordmark-white.svg" alt="NAYA" width="88" height="25">
+        <span class="topbar-area">Ofisi</span><span id="admin-live" class="live-dot" title="Inaunganisha…"></span>
+      </a>
+      <nav class="topnav" aria-label="Sehemu za ofisi">
+        <a href="#/" data-nav="overview">Muhtasari</a>
+        <a href="#/safari" data-nav="rides">Safari <span id="nav-active" class="nav-count" hidden></span></a>
+        <a href="#/madereva" data-nav="drivers">Madereva <span id="nav-pending" class="nav-count" hidden></span></a>
+        <a href="#/maeneo" data-nav="locations">Maeneo</a>
+        <a href="#/bei" data-nav="fares">Bei</a>
+        <a href="#/ada" data-nav="subscriptions">Ada</a>
+        <a href="#/dharura" data-nav="sos">Dharura <span id="nav-sos" class="nav-count nav-count-sos" hidden></span></a>
+      </nav>
+      <div class="topbar-user">
+        <span id="me-name" class="me-name"></span>
+        <button id="logout-button" class="btn btn-ghost btn-small" type="button">Toka</button>
+      </div>
+    </header>
+    <a id="sos-banner" class="sos-banner" href="#/dharura" role="alert" hidden></a>
+
+    <!-- Muhtasari -->
+    <main id="page-overview" class="page" hidden>
+      <h1 id="greeting" class="greeting">Habari</h1>
+      <p class="muted" id="today"></p>
+
+      <section class="stat-strip" aria-label="Takwimu">
+        <div class="stat"><span class="stat-value" id="stat-members">–</span><span class="stat-label">Watumiaji wa app</span></div>
+        <div class="stat"><span class="stat-value" id="stat-drivers">–</span><span class="stat-label">Madereva waliothibitishwa</span></div>
+        <a class="stat stat-link" href="#/madereva?hali=PENDING"><span class="stat-value" id="stat-pending">–</span><span class="stat-label">Wanasubiri uthibitisho</span></a>
+        <div class="stat"><span class="stat-value" id="stat-new">–</span><span class="stat-label">Wapya leo</span></div>
+      </section>
+
+      <section class="stat-strip stat-strip-rides" aria-label="Safari">
+        <a class="stat stat-link" href="#/safari"><span class="stat-value" id="stat-active">–</span><span class="stat-label">Safari zinazoendelea</span></a>
+        <div class="stat"><span class="stat-value" id="stat-completed">–</span><span class="stat-label">Zilizokamilika leo</span></div>
+        <div class="stat"><span class="stat-value stat-money" id="stat-value">–</span><span class="stat-label">Thamani ya safari leo</span></div>
+        <div class="stat"><span class="stat-value" id="stat-online">–</span><span class="stat-label">Madereva online sasa</span></div>
+      </section>
+
+      <section class="stat-strip stat-strip-money" aria-label="Ada na usalama">
+        <a class="stat stat-link" href="#/ada"><span class="stat-value stat-money" id="stat-sub-month">–</span><span class="stat-label">Ada zilizolipwa mwezi huu</span></a>
+        <a class="stat stat-link" href="#/ada"><span class="stat-value" id="stat-sub-expired">–</span><span class="stat-label">Madereva wenye ada iliyoisha</span></a>
+        <a class="stat stat-link" href="#/dharura"><span class="stat-value" id="stat-sos">–</span><span class="stat-label">Dharura zilizo wazi</span></a>
+      </section>
+
+      <p id="dashboard-error" class="alert alert-danger" role="alert" hidden></p>
+
+      <section class="panel" aria-labelledby="setup-title">
+        <h2 id="setup-title">Maandalizi ya safari</h2>
+        <p class="muted small">Haya yakikamilika, abiria wanaona bei halisi kwenye app ("Unaenda wapi?").</p>
+        <ul class="setup-list" id="setup-list"></ul>
+      </section>
+
+      <section class="panel" aria-labelledby="system-title">
+        <h2 id="system-title">Hali ya mfumo</h2>
+        <ul class="system-list">
+          <li><span id="sys-api" class="dot dot-wait"></span>Server ya NAYA</li>
+          <li><span id="sys-db" class="dot dot-wait"></span>Database (Supabase)</li>
+          <li><span id="sys-sms" class="dot dot-wait"></span><span id="sys-sms-text">SMS (Beem)</span></li>
+          <li><span id="sys-app" class="dot dot-wait"></span><span id="sys-app-text">App ya Android (kengele ya maombi)</span></li>
+        </ul>
+        <p class="muted small" id="sys-version"></p>
+      </section>
+
+      <section class="panel" aria-labelledby="sms-title" id="sms-panel" hidden>
+        <h2 id="sms-title">SMS</h2>
+        <section class="stat-strip stat-strip-sms" aria-label="SMS">
+          <div class="stat"><span class="stat-value" id="sms-balance">–</span><span class="stat-label">Salio la Beem</span></div>
+          <div class="stat"><span class="stat-value" id="sms-today">–</span><span class="stat-label">Zilizotumwa leo</span></div>
+          <div class="stat"><span class="stat-value" id="sms-month">–</span><span class="stat-label">Mwezi huu</span></div>
+        </section>
+        <p class="alert alert-warn" id="sms-failed" hidden></p>
+        <ul class="history" id="sms-recent"></ul>
+      </section>
+
+      <section class="panel" aria-labelledby="roadmap-title">
+        <h2 id="roadmap-title">Ujenzi wa NAYA</h2>
+        <ol class="roadmap">
+          <li class="done">Msingi, login na dashboard ya ofisi</li>
+          <li class="done">Madereva: usajili, nyaraka na uthibitisho</li>
+          <li class="done">App moja ya NAYA: abiria na dereva, kubadili mode</li>
+          <li class="done">Bei na maeneo ya Urambo</li>
+          <li class="done">Kuomba safari na kumpata dereva</li>
+          <li class="done">Mode ya dereva: online, maombi, mapato</li>
+          <li class="done">Taarifa za papo hapo na arifa za simu</li>
+          <li class="done">Ada ya mwezi, ramani ya live na usalama wa safari</li>
+          <li class="done">SMS: kuthibitisha namba na kurejesha password</li>
+          <li>Malipo kwa simu</li>
+          <li>Msaidizi wa AI</li>
+          <li>Ripoti na takwimu</li>
+        </ol>
+      </section>
+    </main>
+
+    <!-- Orodha ya madereva -->
+    <main id="page-drivers" class="page" hidden>
+      <div class="page-head">
+        <h1>Madereva</h1>
+        <form id="driver-search" class="search" role="search">
+          <label class="sr-only" for="driver-q">Tafuta dereva</label>
+          <input id="driver-q" type="search" placeholder="Tafuta kwa jina, simu au plate">
+        </form>
+      </div>
+      <div id="driver-filters" class="filters" role="group" aria-label="Chuja kwa hali"></div>
+      <p id="drivers-error" class="alert alert-danger" role="alert" hidden></p>
+      <div id="driver-list" class="driver-list" aria-live="polite"></div>
+    </main>
+
+    <!-- Safari -->
+    <main id="page-rides" class="page" hidden>
+      <div class="page-head">
+        <h1>Safari</h1>
+        <div class="filters" role="group" aria-label="Chuja safari">
+          <button type="button" class="chip" data-scope="active" aria-pressed="true">Zinazoendelea</button>
+          <button type="button" class="chip" data-scope="all" aria-pressed="false">Zote</button>
+        </div>
+      </div>
+      <p class="muted small">Inajisasisha yenyewe safari ikibadilika.</p>
+      <p id="rides-error" class="alert alert-danger" role="alert" hidden></p>
+      <div id="ride-list" class="driver-list" aria-live="polite"></div>
+    </main>
+
+    <main id="page-ride" class="page" hidden>
+      <a class="back-link" href="#/safari">Rudi kwa safari</a>
+      <p id="ride-error" class="alert alert-danger" role="alert" hidden></p>
+      <div id="ride-detail"></div>
+    </main>
+
+    <!-- Maeneo -->
+    <main id="page-locations" class="page page-wide" hidden>
+      <div class="page-head">
+        <h1>Maeneo</h1>
+        <form id="location-search" class="search" role="search">
+          <label class="sr-only" for="location-q">Tafuta eneo</label>
+          <input id="location-q" type="search" placeholder="Tafuta eneo au mtaa">
+        </form>
+      </div>
+      <p class="muted">Bonyeza kwenye ramani kuweka mahali, kisha jaza jina. Abiria watachagua maeneo haya kwenye app.</p>
+      <div class="locations-layout">
+        <div id="location-map" class="map" role="application" aria-label="Ramani ya maeneo ya NAYA"></div>
+        <div>
+          <form id="location-form" class="decision" novalidate>
+            <h2 id="location-form-title">Ongeza eneo</h2>
+            <label for="loc-name">Jina la eneo</label>
+            <input id="loc-name" name="name" maxlength="80" placeholder="Mf. Stendi ya Mabasi" required>
+            <label for="loc-category">Aina</label>
+            <select id="loc-category" name="category"></select>
+            <label for="loc-area">Mtaa <span class="muted">(si lazima)</span></label>
+            <input id="loc-area" name="area" maxlength="80">
+            <div class="coords">
+              <div><label for="loc-lat">Latitude</label><input id="loc-lat" name="lat" inputmode="decimal" required></div>
+              <div><label for="loc-lng">Longitude</label><input id="loc-lng" name="lng" inputmode="decimal" required></div>
+            </div>
+            <p class="muted small" id="coords-hint">Bonyeza ramani kujaza latitude na longitude.</p>
+            <button type="button" class="btn btn-ghost btn-gps" id="loc-gps">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg>
+              Tumia mahali nilipo sasa (GPS)
+            </button>
+            <p class="muted small" id="gps-hint" hidden></p>
+            <p class="alert alert-danger" id="location-error" role="alert" hidden></p>
+            <div class="actions">
+              <button class="btn btn-primary" type="submit" id="location-save">Hifadhi eneo</button>
+              <button class="btn btn-ghost" type="button" id="location-cancel" hidden>Ghairi</button>
+            </div>
+          </form>
+          <section class="suggest" id="location-suggest" aria-labelledby="suggest-title" hidden>
+            <h2 id="suggest-title">Maeneo ya kuanzia Urambo</h2>
+            <p class="muted small">Bonyeza jina, kisha weka mahali pake sahihi: simama hapo na ubonyeze <strong>GPS</strong>, au bonyeza ramani. Badilisha jina kama linajulikana kwa jina jingine.</p>
+            <div class="suggest-list" id="suggest-list"></div>
+          </section>
+          <div id="location-list" class="location-list" aria-live="polite"></div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Bei -->
+    <main id="page-fares" class="page" hidden>
+      <h1>Bei za safari</h1>
+
+      <section class="route-fares" aria-labelledby="route-title">
+        <h2 id="route-title">Bei maalum kati ya maeneo</h2>
+        <p class="muted">Chagua eneo la kuanzia, kisha andika bei kwenda kila eneo. Bei ni ile ile kwenda na kurudi. Abiria akiwa ndani ya mita 300 kutoka eneo (kwa GPS), bei ya eneo hilo inatumika. Kisanduku kitupu = safari hiyo inatumia bei za kawaida kwa km (chini).</p>
+        <div class="route-from">
+          <label for="route-from">Kutoka</label>
+          <select id="route-from"></select>
+        </div>
+        <p class="alert alert-danger" id="route-error" role="alert" hidden></p>
+        <form id="route-form" novalidate hidden>
+          <div class="route-table-wrap">
+            <table class="route-table">
+              <thead><tr><th scope="col">Kwenda</th><th scope="col">Bodaboda (TSh)</th><th scope="col">Bajaji (TSh)</th></tr></thead>
+              <tbody id="route-rows"></tbody>
+            </table>
+          </div>
+          <p class="alert alert-danger" id="route-form-error" role="alert" hidden></p>
+          <p class="alert alert-ok" id="route-saved" role="status" hidden>Bei zimehifadhiwa.</p>
+          <div class="actions"><button class="btn btn-primary" type="submit" id="route-save">Hifadhi bei</button></div>
+        </form>
+      </section>
+
+      <h2 class="fares-subtitle">Bei za kawaida (kwa km)</h2>
+      <p class="muted">Zinatumika kwa safari zisizo na bei maalum. Nauli = bei ya kuanzia + (bei kwa km × umbali wa barabara), isipungue nauli ya chini, ikizungushwa juu. Umbali wa barabara ≈ umbali wa moja kwa moja × kizidisho cha barabara.</p>
+      <p class="alert alert-danger" id="fares-error" role="alert" hidden></p>
+      <div id="fare-cards" class="fare-cards"></div>
+    </main>
+
+    <!-- Ada ya mwezi -->
+    <main id="page-subscriptions" class="page" hidden>
+      <div class="page-head">
+        <h1>Ada ya mwezi</h1>
+        <div class="filters" id="sub-filters" role="group" aria-label="Chuja madereva">
+          <button type="button" class="chip" data-filter="expired" aria-pressed="true">Zimeisha</button>
+          <button type="button" class="chip" data-filter="due" aria-pressed="false">Zinaisha wiki hii</button>
+          <button type="button" class="chip" data-filter="all" aria-pressed="false">Wote</button>
+        </div>
+      </div>
+      <section class="stat-strip stat-strip-sub" aria-label="Ada">
+        <div class="stat"><span class="stat-value stat-money" id="sub-month">–</span><span class="stat-label" id="sub-month-count">Mwezi huu</span></div>
+        <div class="stat"><span class="stat-value" id="sub-expired">–</span><span class="stat-label">Ada zimeisha</span></div>
+        <div class="stat"><span class="stat-value" id="sub-due">–</span><span class="stat-label">Zinaisha ndani ya siku 7</span></div>
+      </section>
+      <p class="muted small">Kurekodi malipo: fungua dereva, kisha "Ada ya mwezi" → Rekodi malipo.</p>
+      <p id="sub-error" class="alert alert-danger" role="alert" hidden></p>
+      <div id="sub-list" class="driver-list" aria-live="polite"></div>
+
+      <form class="decision sub-settings" id="sub-settings-form" novalidate>
+        <h2>Mipangilio ya ada</h2>
+        <div class="pay-grid">
+          <div><label for="set-fee">Ada kwa siku 30 (TSh)</label><input id="set-fee" type="number" min="0" step="500" inputmode="numeric"></div>
+          <div><label for="set-trial">Siku za bure kwa dereva mpya</label><input id="set-trial" type="number" min="0" max="90" inputmode="numeric"></div>
+          <div><label for="set-grace">Siku za kuvumiliwa baada ya kuisha</label><input id="set-grace" type="number" min="0" max="14" inputmode="numeric"></div>
+        </div>
+        <label for="set-instructions">Maelekezo ya kulipa (madereva wanayaona kwenye app)</label>
+        <textarea id="set-instructions" maxlength="500" placeholder="Mf. Lipa kwa M-Pesa namba 07XX XXX XXX (jina: NAYA), kisha tuma SMS ya muamala kwa ofisi."></textarea>
+        <p class="alert alert-danger" id="sub-settings-error" role="alert" hidden></p>
+        <p class="alert alert-ok" id="sub-settings-saved" role="status" hidden>Imehifadhiwa</p>
+        <div class="actions"><button class="btn btn-primary" type="submit">Hifadhi mipangilio</button></div>
+      </form>
+    </main>
+
+    <!-- Dharura -->
+    <main id="page-sos" class="page" hidden>
+      <div class="page-head">
+        <h1>Dharura</h1>
+        <div class="filters" id="sos-filters" role="group" aria-label="Chuja dharura">
+          <button type="button" class="chip" data-scope="open" aria-pressed="true">Zilizo wazi</button>
+          <button type="button" class="chip" data-scope="all" aria-pressed="false">Zote</button>
+        </div>
+      </div>
+      <p class="muted small">Abiria au dereva akibonyeza "Dharura" kwenye app, inaonekana hapa papo hapo na kengele inalia. Mpigie kwanza; ukiona hatari, wasiliana na Polisi (112).</p>
+      <p id="sos-error" class="alert alert-danger" role="alert" hidden></p>
+      <div id="sos-list" aria-live="polite"></div>
+    </main>
+
+    <!-- Dereva mmoja -->
+    <main id="page-driver" class="page" hidden>
+      <a class="back-link" href="#/madereva">Rudi kwa madereva</a>
+      <p id="driver-error" class="alert alert-danger" role="alert" hidden></p>
+      <div id="driver-detail"></div>
+    </main>
+  </div>
+
+  <dialog id="doc-viewer" class="doc-viewer" aria-labelledby="doc-viewer-title">
+    <div class="doc-viewer-head">
+      <h2 id="doc-viewer-title"></h2>
+      <button class="btn btn-ghost btn-small" type="button" data-close>Funga</button>
+    </div>
+    <div id="doc-viewer-body" class="doc-viewer-body"></div>
+  </dialog>
+
+  <script src="admin.js" type="module"></script>
+</body>
+</html>
