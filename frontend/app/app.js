@@ -11,6 +11,7 @@ import {
   LOCATION_CATEGORIES,
   VEHICLE_TYPES,
 } from '/shared/labels.js';
+import { isNativeApp, nativeInfo, openFullScreenSettings, openNotificationSettings, syncNative, testRing } from '/shared/native.js';
 import { disablePush, enablePush, pushState } from '/shared/push.js';
 import { connectRealtime } from '/shared/realtime.js';
 import { introSeen, setupIntro } from './intro.js';
@@ -22,7 +23,7 @@ const api = createApi('naya_app_token');
 const $ = (id) => document.getElementById(id);
 const views = ['view-loading', 'view-intro', 'view-auth', 'view-verify', 'view-role', 'view-offline', 'view-app'];
 const MAX_BYTES = 3 * 1024 * 1024;
-const VERSION = '0.9.5';
+const VERSION = '0.10.0';
 
 let account = null; // { user, activeMode, driverStatus, canDrive }
 let driver = null; // wasifu wa udereva (mode ya Dereva)
@@ -331,6 +332,8 @@ async function loadAccount() {
   account = await api.get('/api/account');
   if (account.verificationRequired) return showVerify();
   startRealtime();
+  // App ya Android: sajili simu hii kwa kengele ya maombi (kimya; ruhusa ikiwa imeshatolewa).
+  syncNative(api).catch(() => {});
   if (!account.activeMode) return showRoleChoice();
   show('view-app');
   route();
@@ -800,8 +803,19 @@ function renderAccount() {
       <p class="muted" id="push-status">Inaangalia…</p>
       <p class="alert alert-danger" id="push-error" role="alert" hidden></p>
       <div id="push-action"></div>
+      <div id="ring-box" hidden></div>
       <ul class="notes" id="note-list"></ul>
     </section>
+
+    ${
+      account.androidApkUrl && driverStatus && !isNativeApp() && /Android/i.test(navigator.userAgent)
+        ? `<section class="card apk-card" aria-labelledby="apk-title">
+            <h2 id="apk-title">App ya NAYA ya Android</h2>
+            <p class="muted">Ukiwa na app, simu inalia kengele kwa sekunde 30 ombi la safari likiingia — hata ukiwa unatumia app nyingine au skrini imezimwa.</p>
+            <a class="btn btn-primary btn-block" href="${esc(account.androidApkUrl)}" rel="noopener">Pakua app (APK)</a>
+          </section>`
+        : ''
+    }
 
     <section class="card sound-card" aria-labelledby="sound-title">
       <div class="sound-row">
@@ -865,16 +879,46 @@ const PUSH_TEXT = {
   unsupported: 'Browser hii haiwezi kupokea arifa. Tumia Chrome kwenye Android, au sakinisha app kwenye iPhone (Add to Home Screen).',
 };
 
+/** Dereva ndani ya app ya Android: jaribu kengele, na ruhusa ya kuonyesha ombi juu ya skrini iliyofungwa. */
+async function loadRingBox() {
+  let info;
+  try {
+    info = await nativeInfo();
+  } catch {
+    return;
+  }
+  const box = $('ring-box');
+  if (!box || tab !== 'account') return;
+  box.innerHTML = `
+    <div class="ring-box">
+      <p><strong>Kengele ya maombi</strong><br><span class="muted">Sikia jinsi simu itakavyolia ombi jipya likifika.</span></p>
+      <button class="btn btn-ghost btn-block" type="button" data-action="test-ring">Jaribu kengele</button>
+      ${
+        info.fullScreen
+          ? ''
+          : `<p class="alert alert-warn" role="note">Ruhusu NAYA ionyeshe ombi juu ya skrini iliyofungwa (kama simu inayoingia).</p>
+             <button class="btn btn-primary btn-block" type="button" data-action="fullscreen-settings">Ruhusu</button>`
+      }
+    </div>`;
+  box.hidden = false;
+}
+
+const NATIVE_ON = 'Arifa zimewashwa. Ukiwa dereva, simu italia kengele kwa sekunde 30 ombi likiingia — hata app ikiwa imefungwa au skrini imezimwa.';
+
 async function loadNotificationSection() {
   const state = await pushState(api).catch(() => 'server-off');
   if (tab !== 'account' || !$('push-status')) return;
-  $('push-status').textContent = PUSH_TEXT[state];
+  const native = isNativeApp();
+  $('push-status').textContent = native && state === 'on' ? NATIVE_ON : PUSH_TEXT[state];
   $('push-action').innerHTML =
     state === 'off'
       ? '<button class="btn btn-primary btn-block" type="button" data-action="push-on">Washa arifa</button>'
       : state === 'on'
-        ? '<button class="btn btn-ghost btn-block" type="button" data-action="push-off">Zima arifa kwenye kifaa hiki</button>'
+        ? native
+          ? '<button class="btn btn-ghost btn-block" type="button" data-action="native-settings">Mipangilio ya arifa za simu</button>'
+          : '<button class="btn btn-ghost btn-block" type="button" data-action="push-off">Zima arifa kwenye kifaa hiki</button>'
         : '';
+  if (native && state === 'on' && account?.driverStatus) loadRingBox();
   try {
     const notes = await api.get('/api/notifications');
     if (!$('note-list')) return;
@@ -1214,6 +1258,13 @@ $('app-content').addEventListener('click', async (event) => {
       .catch((err) => handleError(err));
   }
   if (action === 'logout') return logout();
+  if (action === 'native-settings') return openNotificationSettings().catch(() => {});
+  if (action === 'fullscreen-settings') return openFullScreenSettings().catch(() => {});
+  if (action === 'test-ring') {
+    return testRing(8)
+      .then(() => toast('Sikiliza kengele — gusa skrini kuizima'))
+      .catch(() => toast('Kengele haikuweza kulia. Angalia ruhusa ya arifa.'));
+  }
   if (action === 'push-on' || action === 'push-off') {
     const button = event.target.closest('[data-action]');
     button.disabled = true;

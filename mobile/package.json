@@ -1,0 +1,15 @@
+{
+  "name": "naya-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "NAYA — app ya Android (Capacitor). Inapakia NAYA ya production na kuongeza kengele ya dereva ya sekunde 30.",
+  "scripts": {
+    "sync": "cap sync android",
+    "open": "cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.2",
+    "@capacitor/cli": "8.5.2",
+    "@capacitor/core": "8.5.2"
+  }
+}

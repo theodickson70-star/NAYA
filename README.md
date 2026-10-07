@@ -13,8 +13,8 @@ Mfumo wa bodaboda na bajaji. Unajengwa phase moja baada ya nyingine; kila phase 
 | 7 | Realtime (papo hapo) na arifa za simu (Web Push), arifa ndani ya app, ofisi inajisasisha yenyewe | ✅ |
 | 8 | Ada ya mwezi ya madereva, ramani ya live ya dereva, PIN ya safari, kushiriki safari, dharura (SOS) | ✅ |
 | 9 | SMS (Beem): kuthibitisha namba ya simu, "Umesahau password?", SMS za taarifa muhimu | ✅ |
-| 9.5 | Muonekano mpya: animation ya logo wakati wa kufungua, utangulizi wa slaidi 3, skrini mpya za kuingia na kila skrini ya app | ✅ sasa |
-| 10 | APK ya Android (Play Store) | |
+| 9.5 | Muonekano mpya: animation ya logo wakati wa kufungua, utangulizi wa slaidi 3, skrini mpya za kuingia na kila skrini ya app | ✅ |
+| 10 | App ya Android (APK): kengele ya ombi ya sekunde 30 hata app ikiwa imefungwa (Firebase), inajengwa na GitHub Actions | ✅ sasa |
 | 11 | Malipo kwa simu (M-Pesa, Airtel, Mixx/Tigo, HaloPesa) | |
 | 12 | Msaidizi wa AI (Claude) unaotumia data halisi | |
 | 13 | Ripoti, CSV, takwimu, ukaguzi wa usalama | |
@@ -33,6 +33,8 @@ database/migrations/   SQL (tables zote ziko kwenye schema "naya")
 frontend/app/          App MOJA ya NAYA (abiria + dereva) — / na /dereva/ zinaelekeza hapa
 frontend/admin/        Ofisi (admin)
 frontend/shared/brand/ Logo ya NAYA (SVG) na icons za app (PNG)
+mobile/                App ya Android (Capacitor): inafungua NAYA ya production + kengele ya maombi (Java)
+.github/workflows/     android.yml — GitHub inajenga APK yenyewe
 tests/                 Tests za API
 ```
 
@@ -148,6 +150,54 @@ Bila funguo za Beem, SMS zimezimwa: hakuna anayeombwa kuthibitisha namba, na "Um
 - Picha ya bodaboda na bajaji: `frontend/shared/img/naya-hero.webp`.
 - Simu zote: imejaribiwa upana 320px hadi kompyuta; heshima kwa "punguza mwendo" (reduced motion) ya simu.
 
+## App ya Android — APK (Phase 10)
+
+App ya Android ni "ganda" jembamba (Capacitor) linalofungua `https://naya-production-e5cf.up.railway.app/app/`. Kwa hiyo kila
+mabadiliko ya NAYA yanayopushiwa Railway yanaonekana kwenye app papo hapo — **APK inahitaji kujengwa upya tu sehemu ya simu
+(`mobile/`) ikibadilika.** Kitu ambacho browser haiwezi, app inakiweza:
+
+- **Kengele ya ombi la safari:** ombi likimfikia dereva, simu inalia kama simu inayoingia — sauti ya NAYA inajirudia mpaka
+  **sekunde 30** (au mpaka ombi liishe), hata app ikiwa imefungwa, dereva yuko WhatsApp, au skrini imezimwa. Kwenye skrini iliyofungwa
+  NAYA inajitokeza juu yake. Kengele inasimama dereva akigusa arifa/app, akibonyeza "Zima kengele", au ombi likichukuliwa,
+  likighairiwa au likiisha muda (server inatuma `offer_cancel`).
+- Taarifa nyingine (dereva amepatikana, ada, nk.) zinakuja kama arifa za kawaida.
+- Akaunti → Arifa: "Washa arifa", "Jaribu kengele", na ruhusa ya kuonyesha ombi juu ya skrini iliyofungwa (Android 14+).
+- Server inatuma kupitia Firebase Cloud Messaging (HTTP v1, `src/services/fcm.ts`); simu zinasajiliwa kwenye `naya.fcm_tokens`
+  (`POST /api/push/fcm`). Mtumiaji akitoka, simu zake zote zinafutwa. Ofisi → Hali ya mfumo inaonyesha madereva wenye kengele.
+
+### Kuwasha (mara moja tu, kwa kubofya — hakuna code)
+
+1. **Firebase:** [console.firebase.google.com](https://console.firebase.google.com) → Add project → "NAYA" (Analytics si lazima).
+   Ndani ya project: Add app → **Android** → Package name: `tz.naya.app` → Register → **Download google-services.json**.
+2. **GitHub:** repo ya NAYA → Settings → Secrets and variables → Actions → New repository secret →
+   Name: `GOOGLE_SERVICES_JSON`, Secret: fungua google-services.json kwa Notepad, nakili maandishi YOTE na ubandike.
+3. **Railway:** Firebase → ⚙ Project settings → Service accounts → **Generate new private key** (faili la JSON).
+   Railway → NAYA → Variables → `FIREBASE_SERVICE_ACCOUNT` = maandishi yote ya faili hilo. (Ni siri — usiliweke GitHub.)
+4. Push code. GitHub → **Actions** → "NAYA Android (APK)" inajenga (dakika 5–10). Ikimaliza: GitHub → **Releases** → `NAYA.apk`.
+   Kwa mkono wakati wowote: Actions → NAYA Android (APK) → Run workflow.
+5. (Si lazima) Railway → Variables → `ANDROID_APK_URL` = `https://github.com/theodickson70-star/NAYA/releases/latest/download/NAYA.apk`
+   — madereva wanaotumia Chrome wataona "Pakua app (APK)" kwenye Akaunti. Link hii inafanya kazi tu repo ikiwa **public**;
+   repo ikiwa private, pakua APK wewe mwenyewe na uwatumie madereva (WhatsApp/Bluetooth).
+
+### Kwenye simu ya dereva
+
+- Fungua `NAYA.apk` → ruhusu "Install unknown apps" → Install. Ingia, Akaunti → **Washa arifa** → **Jaribu kengele**.
+- Android 14+: bonyeza **Ruhusu** ili ombi lijitokeze juu ya skrini iliyofungwa.
+- Simu za Tecno, Infinix, itel, Xiaomi, Oppo huzima apps zilizo nyuma ili kuokoa betri: Settings → Apps → NAYA → Battery →
+  **No restrictions / Usizuie**, na washa **Autostart** kama ipo. Bila hivyo kengele inaweza kuchelewa.
+- Bila `GOOGLE_SERVICES_JSON` APK bado inafanya kazi (kama app ya kawaida), lakini bila kengele app ikiwa imefungwa.
+
+### Play Store (baadaye)
+
+- Akaunti ya Google Play Console ni malipo ya mara moja (~USD 25).
+- Tengeneza keystore ya NAYA mara moja na uiweke kama secrets `NAYA_KEYSTORE_BASE64`, `NAYA_KEYSTORE_PASSWORD`, `NAYA_KEY_ALIAS`,
+  `NAYA_KEY_PASSWORD` — workflow itajenga APK iliyosainiwa na `NAYA-playstore.aab`. **Usipoteze keystore**: bila hiyo huwezi
+  kutoa update ya app hiyo hiyo Play Store.
+- Sera ya Google: ruhusa ya "full-screen" (`USE_FULL_SCREEN_INTENT`) inaruhusiwa moja kwa moja kwa apps za simu/kengele tu;
+  kwa NAYA Google inaweza kuomba maelezo au kuizima — kengele ya sekunde 30 bado inalia, ila haitajitokeza juu ya skrini iliyofungwa.
+- Bila keystore, APK ni ya "debug" (inafaa kwa kusambaza moja kwa moja). GitHub inahifadhi ufunguo wake ili update isakinike juu
+  ya ya zamani; ikitokea simu ikakataa ("App not installed"), futa NAYA ya zamani kisha usakinishe mpya.
+
 ## Nyaraka za madereva
 
 Picha na PDF za nyaraka zinahifadhiwa ndani ya Supabase (table `naya.document_files`), kwa hiyo hazipotei Railway ikideploy upya.
@@ -172,6 +222,7 @@ Tests (kwenye database ya majaribio tu, kamwe ya production): `npm test`
 - Build: `npm run build` · Start: `npm start` (tayari kwenye `railway.json`)
 - Variables za lazima: `DATABASE_URL` (Supabase Session pooler, port 5432) na `JWT_SECRET`
 - Kwa SMS: `BEEM_API_KEY`, `BEEM_SECRET_KEY`, `BEEM_SENDER_ID`
+- Kwa kengele ya app ya Android: `FIREBASE_SERVICE_ACCOUNT` (na si lazima: `ANDROID_APK_URL`)
 - Kwa arifa za simu: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (kutoka `npm run vapid-keys`; usizibadilishe baadaye, la sivyo simu zote zitahitaji kuwasha arifa upya)
 - Migrations zinaendeshwa zenyewe server inapoanza
 - Hakikisha: `/health` → `{"success":true,"status":"ok","database":"ok"}`, kisha `/admin/`

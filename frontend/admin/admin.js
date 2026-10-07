@@ -191,6 +191,10 @@ async function loadOverview() {
     $('sys-sms-text').textContent = data.sms.enabled ? 'SMS (Beem) zimewashwa' : 'SMS (Beem) hazijawashwa — weka BEEM_API_KEY na BEEM_SECRET_KEY';
     if (data.sms.enabled) loadSms();
     else $('sms-panel').hidden = true;
+    setDot('sys-app', data.app.enabled ? 'ok' : 'wait');
+    $('sys-app-text').textContent = data.app.enabled
+      ? `App ya Android: madereva ${n(data.app.drivers)} wana kengele ya maombi (watumiaji ${n(data.app.users)} kwa jumla)`
+      : 'App ya Android: kengele haijawashwa — weka FIREBASE_SERVICE_ACCOUNT';
   } catch (err) {
     if (handleAuthError(err)) return;
     showError('dashboard-error', err);

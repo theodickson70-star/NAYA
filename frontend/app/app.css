@@ -678,6 +678,11 @@ input, select, textarea { font-size: 17px; padding: 13px 14px; border-radius: va
 /* ---- Arifa ---- */
 .push-prompt { margin-top: 16px; padding: 14px; border-radius: 18px; background: #FFF6D6; color: var(--warning-ink); text-align: left; display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .push-prompt p { margin: 0; flex: 1 1 200px; font-size: 15px; }
+.ring-box { margin-top: 14px; padding: 14px; border-radius: 18px; background: var(--surface-2, #F1F6F3); display: grid; gap: 10px; }
+.ring-box p, .ring-box .alert { margin: 0; }
+.ring-box .btn { margin: 0; }
+.apk-card p { margin: 0 0 14px; }
+.apk-card .btn { display: flex; align-items: center; justify-content: center; text-decoration: none; }
 .push-prompt .btn { background: var(--white); border-color: var(--warning-ink); color: var(--warning-ink); box-shadow: none; }
 .live-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--offline); margin-right: 8px; }
 .live-dot.on { background: #7CE3A8; box-shadow: 0 0 0 0 rgba(124, 227, 168, 0.6); animation: live 2s ease-out infinite; }

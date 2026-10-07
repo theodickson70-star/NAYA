@@ -21,6 +21,32 @@ function required(name: string, hint: string): string {
   return value ?? '';
 }
 
+export interface ServiceAccount {
+  projectId: string;
+  clientEmail: string;
+  privateKey: string;
+  tokenUri: string;
+}
+
+function parseServiceAccount(raw: string | undefined): ServiceAccount | undefined {
+  if (!raw) return undefined;
+  try {
+    const text = raw.startsWith('{') ? raw : Buffer.from(raw, 'base64').toString('utf8');
+    const json = JSON.parse(text) as Record<string, unknown>;
+    const projectId = json.project_id;
+    const clientEmail = json.client_email;
+    const privateKey = json.private_key;
+    if (typeof projectId !== 'string' || typeof clientEmail !== 'string' || typeof privateKey !== 'string' || !privateKey.includes('PRIVATE KEY')) {
+      throw new Error('haina project_id/client_email/private_key');
+    }
+    const tokenUri = typeof json.token_uri === 'string' ? json.token_uri : 'https://oauth2.googleapis.com/token';
+    return { projectId, clientEmail, privateKey: privateKey.replace(/\\n/g, '\n'), tokenUri };
+  } catch {
+    problems.push('FIREBASE_SERVICE_ACCOUNT si sahihi — bandika JSON nzima ya service account kutoka Firebase (au ifute)');
+    return undefined;
+  }
+}
+
 const nodeEnv = read('NODE_ENV') ?? 'development';
 const isProduction = nodeEnv === 'production';
 
@@ -55,8 +81,16 @@ export const env = {
   beemSenderId: read('BEEM_SENDER_ID') ?? 'INFO',
   /** Si lazima: anwani ya API ya SMS ya Beem (kwa majaribio tu; usiweke kwenye Railway). */
   beemBaseUrl: (read('BEEM_BASE_URL') ?? 'https://apisms.beem.africa').replace(/\/$/, ''),
+  /**
+   * App ya Android (kengele ya dereva app ikiwa imefungwa): "service account" ya Firebase — JSON nzima
+   * (au JSON hiyo ikiwa base64). Firebase Console → Project settings → Service accounts → Generate new private key.
+   */
+  firebaseServiceAccount: parseServiceAccount(read('FIREBASE_SERVICE_ACCOUNT')),
+  /** Si lazima: link ya kupakua APK (mf. https://github.com/<mmiliki>/NAYA/releases/latest/download/NAYA.apk). */
+  androidApkUrl: read('ANDROID_APK_URL'),
 };
 
+if (env.androidApkUrl && !/^https:\/\//.test(env.androidApkUrl)) problems.push('ANDROID_APK_URL lazima ianze na https://');
 if (env.beemSenderId.length > 11) problems.push('BEEM_SENDER_ID isizidi herufi 11');
 if (!!env.beemApiKey !== !!env.beemSecretKey) problems.push('Weka BEEM_API_KEY na BEEM_SECRET_KEY zote mbili (au usiweke zote)');
 

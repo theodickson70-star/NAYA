@@ -2,6 +2,7 @@
 import bcrypt from 'bcryptjs';
 import { db, one, transaction } from '../db/pool.js';
 import { AppError, conflict, forbidden, isUniqueViolation, unauthorized } from '../utils/http.js';
+import { removeAllFcmTokens } from './fcm.js';
 import { consumeOtp, issueOtp, OTP_RESEND_SECONDS } from './otp.js';
 import { smsEnabled } from './sms.js';
 import {
@@ -52,6 +53,8 @@ export async function login(input: { phone: string; password: string }, allowedR
 
 export async function logout(userId: string): Promise<void> {
   await bumpTokenVersion(db, userId);
+  // Vikao vyote vimefungwa → simu zisipokee tena kengele/arifa za mtumiaji huyu.
+  await removeAllFcmTokens(userId);
 }
 
 // ------------------------------------------------------------------ Namba ya simu na password kwa SMS

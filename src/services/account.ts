@@ -4,6 +4,7 @@ import { db, transaction } from '../db/pool.js';
 import { notFound } from '../utils/http.js';
 import { driverStatusOf, ensureDriverProfile } from './drivers.js';
 import { assertCanSwitchMode, dispatchRide } from './rides.js';
+import { env } from '../config/env.js';
 import { smsEnabled } from './sms.js';
 import { findUserById, toPublicUser, type AppMode, type UserRow } from './users.js';
 
@@ -20,6 +21,8 @@ export async function getAccount(user: UserRow) {
     /** SMS zikiwa zimewashwa, mtumiaji mpya anathibitisha namba kabla ya kuendelea. */
     verificationRequired: smsEnabled() && !user.phone_verified_at,
     smsEnabled: smsEnabled(),
+    /** Link ya kupakua app ya Android (APK) — kwa madereva wanaotaka kengele ya maombi. */
+    androidApkUrl: env.androidApkUrl ?? null,
   };
 }
 

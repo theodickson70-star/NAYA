@@ -1,5 +1,8 @@
 // Arifa za simu (Web Push): simu ilie ombi la safari likiingia, hata app ikiwa imefungwa.
+// Ndani ya app ya Android (APK) arifa zinapita Firebase badala yake — angalia /shared/native.js.
 // Service worker (/app/sw.js) inaonyesha arifa tu — haihifadhi kurasa (kwa hiyo hakuna toleo la zamani linalokwama).
+
+import { enableNativePush, forgetNative, isNativeApp, nativePushState } from '/shared/native.js';
 
 const supported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 
@@ -20,6 +23,7 @@ function serverKey(api) {
 
 /** 'unsupported' | 'server-off' | 'denied' | 'on' | 'off' */
 export async function pushState(api) {
+  if (isNativeApp()) return nativePushState(api);
   if (!supported()) return 'unsupported';
   try {
     if (!(await serverKey(api))) return 'server-off';
@@ -34,6 +38,7 @@ export async function pushState(api) {
 
 /** Lazima iitwe ndani ya kubonyeza kitufe (browsers zinahitaji hivyo kuomba ruhusa). */
 export async function enablePush(api) {
+  if (isNativeApp()) return enableNativePush(api);
   if (!supported()) throw new Error('Simu au browser hii haiwezi kupokea arifa. Tumia Chrome kwenye Android, au sakinisha app kwenye iPhone.');
   const key = await serverKey(api);
   if (!key) throw new Error('Arifa bado hazijawashwa kwenye server ya NAYA.');
@@ -49,6 +54,7 @@ export async function enablePush(api) {
 }
 
 export async function disablePush(api) {
+  if (isNativeApp()) return forgetNative(api);
   if (!supported()) return;
   const reg = await navigator.serviceWorker.getRegistration('/app/');
   const sub = await reg?.pushManager.getSubscription();

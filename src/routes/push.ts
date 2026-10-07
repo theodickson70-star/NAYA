@@ -1,8 +1,9 @@
-// /api/push — usajili wa Web Push; /api/notifications — arifa za mtumiaji.
+// /api/push — usajili wa Web Push na wa app ya Android (FCM); /api/notifications — arifa za mtumiaji.
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authenticate } from '../middleware/auth.js';
 import { listNotifications, markNotificationsRead } from '../services/notify.js';
+import { fcmEnabled, isFcmToken, removeFcmToken, saveFcmToken } from '../services/fcm.js';
 import { publicKey, removeSubscription, saveSubscription } from '../services/push.js';
 import { badRequest, ok } from '../utils/http.js';
 
@@ -31,6 +32,27 @@ export async function pushRoutes(app: FastifyInstance): Promise<void> {
     const { endpoint } = z.object({ endpoint: z.string().max(2000) }).parse(request.body);
     await removeSubscription(request.currentUser.id, endpoint);
     return ok({ subscribed: false });
+  });
+
+  // App ya Android: simu inasajili token yake ya Firebase ili ipigiwe kengele ya ombi app ikiwa imefungwa.
+  const fcmSchema = z.object({
+    token: z.string().trim().refine(isFcmToken, 'Token ya arifa si sahihi'),
+    appVersion: z.string().trim().max(30).optional(),
+  });
+
+  /** Je, server inaweza kupigia simu kengele (FIREBASE_SERVICE_ACCOUNT ipo)? Ni ndiyo/hapana tu — hakuna siri. */
+  app.get('/api/push/fcm', async () => ok({ enabled: fcmEnabled() }));
+
+  app.post('/api/push/fcm', signedIn, async (request) => {
+    const { token, appVersion } = fcmSchema.parse(request.body);
+    await saveFcmToken(request.currentUser.id, token, appVersion);
+    return ok({ registered: true, enabled: fcmEnabled() });
+  });
+
+  app.post('/api/push/fcm/remove', signedIn, async (request) => {
+    const { token } = fcmSchema.pick({ token: true }).parse(request.body);
+    await removeFcmToken(request.currentUser.id, token);
+    return ok({ registered: false });
   });
 
   app.get('/api/notifications', signedIn, async (request) => ok(await listNotifications(request.currentUser.id)));

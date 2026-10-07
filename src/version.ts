@@ -1,3 +1,3 @@
 // Toleo la NAYA linaloonekana kwenye /health na dashboard.
-export const VERSION = '0.9.5';
-export const PHASE = 'Phase 9.5 — muonekano mpya wa NAYA (animation, utangulizi, skrini zote)';
+export const VERSION = '0.10.0';
+export const PHASE = 'Phase 10 — app ya Android (APK): kengele ya maombi ya sekunde 30 hata app ikiwa imefungwa';
