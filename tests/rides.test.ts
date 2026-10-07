@@ -126,7 +126,16 @@ describe('NAYA Phase 5+6 — safari', () => {
   it('dereva asiyethibitishwa hawezi kwenda online (403); online bila mahali inakataliwa (400)', async () => {
     assert.equal((await call('POST', '/api/driver/online', { online: true, locationId: locationIds[0] }, 'd4')).status, 403);
     assert.equal((await call('POST', '/api/driver/online', { online: true }, 'd1')).status, 400);
-    assert.equal((await call('POST', '/api/driver/online', { online: true, lat: -6.8, lng: 39.28 }, 'd1')).status, 400);
+  });
+
+  it('dereva akiwa mbali (Dar es Salaam) bado anaweza kwenda online — anaambiwa yuko mbali na maeneo ya NAYA', async () => {
+    const far = await call('POST', '/api/driver/online', { online: true, lat: -6.8, lng: 39.28 }, 'd1');
+    assert.equal(far.status, 200, far.json.message);
+    assert.equal(far.json.data.online, true);
+    assert.equal(far.json.data.serviceArea.far, true);
+    assert.ok(far.json.data.serviceArea.km > 500);
+    assert.equal(far.json.data.serviceArea.pickupKm, 10);
+    assert.equal((await call('POST', '/api/driver/online', { online: false }, 'd1')).status, 200);
   });
 
   it('madereva wanaenda online (eneo la orodha au GPS)', async () => {

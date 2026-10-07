@@ -155,6 +155,51 @@ describe('NAYA Phase 4 — maeneo na nauli', () => {
     assert.equal(est.json.data.destination.name, `Soko T${suffix}`);
   });
 
+  it('bei maalum kati ya maeneo: ofisi inaziandika, zinatumika kwenda na kurudi, na GPS iliyo karibu', async () => {
+    const url = `/api/admin/route-fares/${locationIds[0]}`;
+    assert.equal((await call('PUT', url, { routes: [{ toId: locationIds[1], fares: { BODABODA: 1000 } }] }, userToken)).status, 403);
+    assert.equal((await call('PUT', url, { routes: [{ toId: locationIds[1], fares: { BODABODA: -100 } }] }, adminToken)).status, 400);
+
+    const saved = await call('PUT', url, { routes: [{ toId: locationIds[1], fares: { BODABODA: 1000 } }] }, adminToken);
+    assert.equal(saved.status, 200, saved.json.message);
+    const row = saved.json.data.routes.find((r: any) => r.locationId === locationIds[1]);
+    assert.deepEqual(row.fares, { BODABODA: 1000 });
+
+    // Kutoka upande wa pili, ofisi inaona bei ile ile
+    const back = await call('GET', `/api/admin/route-fares/${locationIds[1]}`, undefined, adminToken);
+    assert.deepEqual(back.json.data.routes.find((r: any) => r.locationId === locationIds[0]).fares, { BODABODA: 1000 });
+    const counts = await call('GET', '/api/admin/route-fares/counts', undefined, adminToken);
+    assert.equal(counts.json.data[locationIds[0]], 1);
+
+    const est = async (pickup: object, to = locationIds[1]) =>
+      Object.fromEntries(
+        (await call('POST', '/api/fares/estimate', { pickup, destination: { locationId: to } }, userToken)).json.data.options.map((o: any) => [o.vehicleType, o]),
+      );
+    const go = await est({ locationId: locationIds[0] });
+    assert.equal(go.BODABODA.fare, 1000);
+    assert.equal(go.BODABODA.fixed, true);
+    assert.equal(go.BAJAJI.fare, 2500, 'bajaji haina bei maalum → hesabu ya km');
+    assert.equal(go.BAJAJI.fixed, false);
+    assert.equal((await est({ locationId: locationIds[1] }, locationIds[0])).BODABODA.fare, 1000, 'kurudi ni bei ile ile');
+    // Database ya majaribio inaweza kuwa na maeneo ya tests nyingine pale pale — yazime kwa muda ili stendi hii iwe ya karibu zaidi.
+    const others = await db.query(
+      `UPDATE naya.locations SET is_active = false
+        WHERE is_active AND id <> ALL($1::uuid[]) AND abs(lat - $2) < 0.01 AND abs(lng - $3) < 0.01 RETURNING id`,
+      [locationIds, A.lat, A.lng],
+    );
+    try {
+      assert.equal((await est({ lat: -5.0705, lng: 32.0502 })).BODABODA.fare, 1000, 'GPS mita ~60 kutoka stendi');
+      assert.equal((await est({ lat: -5.0745, lng: 32.05 })).BODABODA.fixed, false, 'GPS mita ~500 → hesabu ya km');
+    } finally {
+      await db.query('UPDATE naya.locations SET is_active = true WHERE id = ANY($1::uuid[])', [others.rows.map((r) => r.id)]);
+    }
+
+    // Kufuta (kisanduku kitupu) kunarudisha hesabu ya km
+    const cleared = await call('PUT', url, { routes: [{ toId: locationIds[1], fares: { BODABODA: null } }] }, adminToken);
+    assert.deepEqual(cleared.json.data.routes.find((r: any) => r.locationId === locationIds[1]).fares, {});
+    assert.equal((await est({ locationId: locationIds[0] })).BODABODA.fare, 1700);
+  });
+
   it('GPS ndani ya eneo la huduma inakubaliwa; nje (Dar es Salaam) inakataliwa kwa ujumbe wazi', async () => {
     const near = await call('POST', '/api/fares/estimate', { pickup: { lat: -5.072, lng: 32.051 }, destination: { locationId: locationIds[1] } }, userToken);
     assert.equal(near.status, 200);

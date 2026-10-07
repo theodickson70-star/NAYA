@@ -14,7 +14,7 @@ import { writeAudit } from './audit.js';
 import { readDocument } from './drivers.js';
 import { straightLineKm } from './fare-engine.js';
 import { notify, notifyAdmins } from './notify.js';
-import { estimateTrip, findLocation, insideServiceArea } from './places.js';
+import { estimateTrip, findLocation, nearestServicePoint, SERVICE_RADIUS_KM } from './places.js';
 import { openSosFor } from './safety.js';
 import { assertPhoneVerified } from './verification.js';
 import { assertSubscriptionOk, describeSubscription, getSettings, SUBSCRIPTION_OK_SQL } from './subscriptions.js';
@@ -508,8 +508,9 @@ export async function setOnline(
       if (!location || !location.isActive) throw notFound('Eneo halipatikani. Chagua jingine.');
       point = { lat: location.lat, lng: location.lng };
     } else if (input.lat !== undefined && input.lng !== undefined) {
+      // Dereva hazuiwi kwenda online popote alipo: anapokea maombi ya wateja walio ndani ya km MAX_PICKUP_KM tu,
+      // kwa hiyo akiwa mbali hapati maombi yasiyomhusu. App inamweleza (driverState.serviceArea).
       point = { lat: input.lat, lng: input.lng };
-      if (!(await insideServiceArea(point))) throw badRequest('Uko nje ya eneo la huduma la NAYA. Huwezi kwenda online hapa.');
     } else {
       throw badRequest('Tunahitaji mahali ulipo: washa GPS au chagua eneo ulilopo.');
     }
@@ -559,9 +560,9 @@ export async function updateDriverLocation(driverId: string, point: { lat: numbe
 
 /** Kila kitu dereva anahitaji kwenye skrini: online?, ombi linalosubiri, safari inayoendelea, mapato. */
 export async function driverState(driverId: string) {
-  const d = await one<{ status: string; is_online: boolean; paid_until: Date | null }>(
+  const d = await one<{ status: string; is_online: boolean; paid_until: Date | null; last_lat: number | null; last_lng: number | null }>(
     db,
-    'SELECT status, is_online, paid_until FROM naya.drivers WHERE user_id = $1',
+    'SELECT status, is_online, paid_until, last_lat, last_lng FROM naya.drivers WHERE user_id = $1',
     [driverId],
   );
   if (!d) throw notFound('Bado hujaomba kuwa dereva.');
@@ -614,9 +615,16 @@ export async function driverState(driverId: string) {
     [driverId],
   );
   const settings = await getSettings();
+  // Dereva online akiwa mbali na maeneo ya NAYA: mwambie (hapati maombi mpaka awe karibu na wateja).
+  let serviceArea: { far: true; km: number; nearest: string; pickupKm: number } | null = null;
+  if (d.is_online && d.last_lat !== null && d.last_lng !== null) {
+    const nearest = await nearestServicePoint({ lat: Number(d.last_lat), lng: Number(d.last_lng) });
+    if (nearest && nearest.km > SERVICE_RADIUS_KM) serviceArea = { far: true, km: Math.round(nearest.km), nearest: nearest.name, pickupKm: MAX_PICKUP_KM };
+  }
   return {
     driverStatus: d.status,
     online: d.is_online,
+    serviceArea,
     subscription: { ...describeSubscription(d.paid_until, settings), paymentInstructions: settings.paymentInstructions },
     offer,
     ride: rideRow ? await driverView(db, rideRow) : null,

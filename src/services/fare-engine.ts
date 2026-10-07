@@ -19,6 +19,8 @@ export interface FareQuote {
   fare: number;
   currency: 'TZS';
   distanceKm: number;
+  /** true = bei maalum ya njia hii iliyowekwa na ofisi (si hesabu ya km). */
+  fixed: boolean;
   breakdown: { baseFare: number; perKm: number; distanceCharge: number; minimumApplied: boolean };
 }
 
@@ -51,6 +53,7 @@ export function quoteFare(rule: FareRule, from: Point, to: Point): FareQuote {
     fare,
     currency: 'TZS',
     distanceKm,
+    fixed: false,
     breakdown: { baseFare: rule.baseFare, perKm: rule.perKm, distanceCharge, minimumApplied },
   };
 }

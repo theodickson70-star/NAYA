@@ -281,3 +281,19 @@
 .suggest-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .suggest-chip { font: inherit; font-size: 14px; font-weight: 700; padding: 7px 12px; border-radius: 999px; border: 1.5px solid #E2CB7A; background: var(--white); color: var(--ink); cursor: pointer; }
 .suggest-chip:hover { border-color: var(--naya-green); color: var(--naya-green); }
+
+/* ---- Bei maalum kati ya maeneo ---- */
+.route-fares { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 20px; margin-top: 18px; }
+.route-fares h2 { margin-top: 0; }
+.route-from { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 14px 0; }
+.route-from label { margin: 0; font-weight: 700; }
+.route-from select { flex: 1 1 260px; max-width: 420px; }
+.route-table-wrap { overflow-x: auto; }
+.route-table { width: 100%; border-collapse: collapse; min-width: 440px; }
+.route-table th { text-align: left; font-size: 14px; color: var(--muted, #5b6b62); padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.route-table td { padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.route-table td:first-child { font-weight: 600; }
+.route-table td:first-child small { display: block; font-weight: 400; color: var(--muted, #5b6b62); }
+.route-table input { width: 100%; max-width: 160px; margin: 0; }
+.route-table tr.changed td { background: #FFF8DF; }
+.fares-subtitle { margin-top: 32px; }

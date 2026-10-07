@@ -243,7 +243,30 @@
     <!-- Bei -->
     <main id="page-fares" class="page" hidden>
       <h1>Bei za safari</h1>
-      <p class="muted">Nauli = bei ya kuanzia + (bei kwa km × umbali wa barabara), isipungue nauli ya chini, ikizungushwa juu. Umbali wa barabara ≈ umbali wa moja kwa moja × kizidisho cha barabara.</p>
+
+      <section class="route-fares" aria-labelledby="route-title">
+        <h2 id="route-title">Bei maalum kati ya maeneo</h2>
+        <p class="muted">Chagua eneo la kuanzia, kisha andika bei kwenda kila eneo. Bei ni ile ile kwenda na kurudi. Abiria akiwa ndani ya mita 300 kutoka eneo (kwa GPS), bei ya eneo hilo inatumika. Kisanduku kitupu = safari hiyo inatumia bei za kawaida kwa km (chini).</p>
+        <div class="route-from">
+          <label for="route-from">Kutoka</label>
+          <select id="route-from"></select>
+        </div>
+        <p class="alert alert-danger" id="route-error" role="alert" hidden></p>
+        <form id="route-form" novalidate hidden>
+          <div class="route-table-wrap">
+            <table class="route-table">
+              <thead><tr><th scope="col">Kwenda</th><th scope="col">Bodaboda (TSh)</th><th scope="col">Bajaji (TSh)</th></tr></thead>
+              <tbody id="route-rows"></tbody>
+            </table>
+          </div>
+          <p class="alert alert-danger" id="route-form-error" role="alert" hidden></p>
+          <p class="alert alert-ok" id="route-saved" role="status" hidden>Bei zimehifadhiwa.</p>
+          <div class="actions"><button class="btn btn-primary" type="submit" id="route-save">Hifadhi bei</button></div>
+        </form>
+      </section>
+
+      <h2 class="fares-subtitle">Bei za kawaida (kwa km)</h2>
+      <p class="muted">Zinatumika kwa safari zisizo na bei maalum. Nauli = bei ya kuanzia + (bei kwa km × umbali wa barabara), isipungue nauli ya chini, ikizungushwa juu. Umbali wa barabara ≈ umbali wa moja kwa moja × kizidisho cha barabara.</p>
       <p class="alert alert-danger" id="fares-error" role="alert" hidden></p>
       <div id="fare-cards" class="fare-cards"></div>
     </main>

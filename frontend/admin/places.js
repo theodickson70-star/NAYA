@@ -311,6 +311,7 @@ const ROUNDING = [50, 100, 200, 500, 1000];
 const previewTimers = {};
 
 export async function loadFares() {
+  loadRouteSection();
   $('fares-error').hidden = true;
   $('fare-cards').innerHTML = '<p class="muted">Inapakia…</p>';
   try {
@@ -428,6 +429,144 @@ function bindFareCard(type) {
       $(`${type}-saved`).hidden = false;
     } catch (err) {
       fail(err, `${type}-error`);
+      button.disabled = false;
+    }
+  });
+}
+
+// =========================================================== Bei maalum kati ya maeneo
+const ROUTE_TYPES = ['BODABODA', 'BAJAJI'];
+let routeFrom = null; // id ya eneo la kuanzia lililochaguliwa
+let routeOriginal = new Map(); // toId -> { BODABODA, BAJAJI } kama ilivyotoka server
+let routeBound = false;
+
+const routeCountLabel = (n) => (n ? ` — njia ${n} ${n === 1 ? 'ina' : 'zina'} bei` : '');
+
+async function loadRouteSection() {
+  $('route-error').hidden = true;
+  if (!routeBound) bindRouteSection();
+  try {
+    const [locations, counts] = await Promise.all([ctx.api.get('/api/admin/locations'), ctx.api.get('/api/admin/route-fares/counts')]);
+    const active = locations.filter((l) => l.isActive);
+    const select = $('route-from');
+    if (active.length < 2) {
+      select.innerHTML = '<option value="">Weka angalau maeneo 2 kwanza (ukurasa wa Maeneo)</option>';
+      select.disabled = true;
+      $('route-form').hidden = true;
+      return;
+    }
+    select.disabled = false;
+    if (!routeFrom || !active.some((l) => l.id === routeFrom)) routeFrom = active[0].id;
+    select.innerHTML = active
+      .map((l) => {
+        const n = counts[l.id] ?? 0;
+        return `<option value="${esc(l.id)}" ${l.id === routeFrom ? 'selected' : ''}>${esc(l.name)}${routeCountLabel(n)}</option>`;
+      })
+      .join('');
+    await loadRoutes();
+  } catch (err) {
+    fail(err, 'route-error');
+  }
+}
+
+async function loadRoutes() {
+  $('route-form-error').hidden = true;
+  $('route-saved').hidden = true;
+  $('route-rows').innerHTML = '<tr><td colspan="3" class="muted">Inapakia…</td></tr>';
+  $('route-form').hidden = false;
+  try {
+    const data = await ctx.api.get(`/api/admin/route-fares/${encodeURIComponent(routeFrom)}`);
+    renderRoutes(data.routes);
+  } catch (err) {
+    $('route-form').hidden = true;
+    fail(err, 'route-error');
+  }
+}
+
+function renderRoutes(routes) {
+  routeOriginal = new Map(routes.map((r) => [r.locationId, r.fares]));
+  $('route-rows').innerHTML = routes
+    .map(
+      (r) => `<tr data-to="${esc(r.locationId)}">
+        <td>${esc(r.name)}${r.area ? `<small>${esc(r.area)}</small>` : ''}</td>
+        ${ROUTE_TYPES.map(
+          (t) => `<td><input name="${t}" inputmode="numeric" autocomplete="off" placeholder="kwa km"
+            aria-label="${esc(VEHICLE_TYPES[t])} kwenda ${esc(r.name)}" value="${r.fares[t] ?? ''}"></td>`,
+        ).join('')}
+      </tr>`,
+    )
+    .join('');
+}
+
+const parseFare = (value) => {
+  const clean = String(value).replace(/[,\s]/g, '');
+  if (clean === '' || clean === '0') return null;
+  return /^\d+$/.test(clean) ? Number(clean) : NaN;
+};
+
+function changedRoutes() {
+  const changes = [];
+  for (const tr of $('route-rows').querySelectorAll('tr[data-to]')) {
+    const toId = tr.dataset.to;
+    const before = routeOriginal.get(toId) ?? {};
+    const fares = {};
+    let changed = false;
+    for (const t of ROUTE_TYPES) {
+      const v = parseFare(tr.querySelector(`input[name="${t}"]`).value);
+      if (Number.isNaN(v)) return { error: `Bei ya ${VEHICLE_TYPES[t].toLowerCase()} kwenda "${tr.cells[0].firstChild.textContent}" si namba sahihi.` };
+      if ((before[t] ?? null) !== v) changed = true;
+      fares[t] = v;
+    }
+    tr.classList.toggle('changed', changed);
+    if (changed) changes.push({ toId, fares });
+  }
+  return { changes };
+}
+
+function bindRouteSection() {
+  routeBound = true;
+  $('route-from').addEventListener('change', async (event) => {
+    const { changes } = changedRoutes();
+    if (changes?.length && !confirm('Kuna bei ulizobadilisha ambazo hazijahifadhiwa. Ziache?')) {
+      event.target.value = routeFrom;
+      return;
+    }
+    routeFrom = event.target.value;
+    await loadRoutes();
+  });
+  $('route-rows').addEventListener('input', () => {
+    $('route-saved').hidden = true;
+    changedRoutes();
+  });
+  $('route-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    $('route-form-error').hidden = true;
+    const { changes, error } = changedRoutes();
+    if (error) {
+      $('route-form-error').textContent = error;
+      $('route-form-error').hidden = false;
+      return;
+    }
+    if (!changes.length) {
+      $('route-saved').textContent = 'Hakuna bei iliyobadilika.';
+      $('route-saved').hidden = false;
+      return;
+    }
+    const button = $('route-save');
+    button.disabled = true;
+    try {
+      const data = await ctx.api.put(`/api/admin/route-fares/${encodeURIComponent(routeFrom)}`, { routes: changes });
+      renderRoutes(data.routes);
+      $('route-saved').textContent = `Bei za njia ${changes.length} zimehifadhiwa.`;
+      $('route-saved').hidden = false;
+      const counts = await ctx.api.get('/api/admin/route-fares/counts');
+      for (const opt of $('route-from').options) {
+        const n = counts[opt.value] ?? 0;
+        opt.textContent = opt.textContent.replace(/ — njia \d+ (ina|zina) bei$/, '') + routeCountLabel(n);
+      }
+    } catch (err) {
+      fail(err, 'route-form-error');
+    } finally {
       button.disabled = false;
     }
   });

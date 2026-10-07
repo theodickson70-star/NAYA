@@ -14,7 +14,9 @@ Mfumo wa bodaboda na bajaji. Unajengwa phase moja baada ya nyingine; kila phase 
 | 8 | Ada ya mwezi ya madereva, ramani ya live ya dereva, PIN ya safari, kushiriki safari, dharura (SOS) | ✅ |
 | 9 | SMS (Beem): kuthibitisha namba ya simu, "Umesahau password?", SMS za taarifa muhimu | ✅ |
 | 9.5 | Muonekano mpya: animation ya logo wakati wa kufungua, utangulizi wa slaidi 3, skrini mpya za kuingia na kila skrini ya app | ✅ |
-| 10 | App ya Android (APK): kengele ya ombi ya sekunde 30 hata app ikiwa imefungwa (Firebase), inajengwa na GitHub Actions | ✅ sasa |
+| 10 | App ya Android (APK): kengele ya ombi ya sekunde 30 hata app ikiwa imefungwa (Firebase), inajengwa na GitHub Actions | ✅ |
+| 10.1 | Bei maalum kati ya maeneo (ofisi inaandika bei za njia; km kwa nyingine) | ✅ |
+| 10.2 | Dereva anaweza kwenda online popote (anapokea maombi ya wateja walio ndani ya km 10 tu) | ✅ sasa |
 | 11 | Malipo kwa simu (M-Pesa, Airtel, Mixx/Tigo, HaloPesa) | |
 | 12 | Msaidizi wa AI (Claude) unaotumia data halisi | |
 | 13 | Ripoti, CSV, takwimu, ukaguzi wa usalama | |
@@ -59,6 +61,13 @@ Majibu yote ya API: `{ "success": true, "data": ... }` au `{ "success": false, "
 - Umbali wa barabara ≈ umbali wa moja kwa moja × kizidisho cha barabara (kawaida 1.3).
 - Abiria anaanzia mahali alipo (GPS) au eneo la orodha; GPS lazima iwe ndani ya km 30 ya maeneo ya huduma.
 - Ramani: Leaflet (kutoka npm, inatolewa na server hii) + picha za OpenStreetMap.
+
+### Bei maalum kati ya maeneo (Phase 10.1)
+
+Ofisi → Bei → **Bei maalum kati ya maeneo**: chagua eneo la kuanzia, andika bei kwenda kila eneo (bodaboda na/au bajaji),
+bonyeza Hifadhi. Bei ni ile ile kwenda na kurudi. Abiria akitumia GPS ndani ya mita 300 kutoka eneo lililosajiliwa, bei ya
+eneo hilo inatumika. Njia isiyo na bei maalum (kisanduku kitupu) inatumia bei za kawaida kwa km. Kwenye app abiria anaona
+"bei ya njia hii" badala ya "makadirio". (`naya.route_fares`, `src/services/route-fares.ts`)
 
 ## Safari
 

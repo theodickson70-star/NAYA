@@ -455,6 +455,11 @@ function onlineHtml(s) {
     <h1>Uko online</h1>
     <p class="muted">${pushStatus === 'on' ? 'Unasubiri maombi ya safari. Simu italia ombi likiingia.' : 'Unasubiri maombi ya safari. Acha app wazi.'}</p>
     ${onlineError ? `<p class="alert alert-danger" role="alert">${esc(onlineError)}</p>` : ''}
+    ${
+      s.serviceArea?.far
+        ? `<p class="alert alert-warn" role="note">Uko km ${esc(s.serviceArea.km)} kutoka ${esc(s.serviceArea.nearest)}, eneo la karibu la NAYA. Utapokea maombi ya wateja walio ndani ya km ${esc(s.serviceArea.pickupKm)} kutoka ulipo tu.</p>`
+        : ''
+    }
     ${pushPrompt('Washa arifa ili usikose ombi hata ukifunga app.')}
     <button class="btn btn-ghost btn-block" type="button" data-ride="go-offline">Nenda offline</button>
     ${subscriptionNoteHtml(sub)}

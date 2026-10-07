@@ -23,7 +23,7 @@ const api = createApi('naya_app_token');
 const $ = (id) => document.getElementById(id);
 const views = ['view-loading', 'view-intro', 'view-auth', 'view-verify', 'view-role', 'view-offline', 'view-app'];
 const MAX_BYTES = 3 * 1024 * 1024;
-const VERSION = '0.10.0';
+const VERSION = '0.10.2';
 
 let account = null; // { user, activeMode, driverStatus, canDrive }
 let driver = null; // wasifu wa udereva (mode ya Dereva)
@@ -655,7 +655,7 @@ function estimateBlock() {
             <input type="radio" name="vehicle" value="${o.vehicleType}" ${o.vehicleType === trip.selected ? 'checked' : ''}>
             <span class="fare-body">
               <span class="fare-icon">${VEHICLE_ICON[o.vehicleType] ?? ''}</span>
-              <span class="fare-main"><strong>${esc(VEHICLE_TYPES[o.vehicleType])}</strong><span class="muted">km ${o.distanceKm.toLocaleString('en-US')} · makadirio</span></span>
+              <span class="fare-main"><strong>${esc(VEHICLE_TYPES[o.vehicleType])}</strong><span class="muted">km ${o.distanceKm.toLocaleString('en-US')} · ${o.fixed ? 'bei ya njia hii' : 'makadirio'}</span></span>
               <span class="fare-amount">${formatTsh(o.fare)}</span>
             </span>
           </label>`,

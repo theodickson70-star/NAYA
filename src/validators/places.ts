@@ -58,3 +58,22 @@ export const estimateSchema = z.object({
   pickup: placeRef,
   destination: z.object({ locationId: z.uuid({ error: 'Chagua unakoenda' }) }),
 });
+
+// Bei maalum kati ya maeneo (ofisi). Kisanduku kitupu = hakuna bei maalum (kanuni ya km inatumika).
+const routeFare = z
+  .number({ error: 'Bei iwe namba' })
+  .int('Bei iwe namba kamili ya shilingi')
+  .min(0, 'Bei haiwezi kuwa chini ya 0')
+  .max(1_000_000, 'Bei ni kubwa mno')
+  .nullable();
+
+export const routeFaresSchema = z.object({
+  routes: z
+    .array(
+      z.object({
+        toId: z.uuid({ error: 'Eneo halijapatikana' }),
+        fares: z.object({ BODABODA: routeFare.optional(), BAJAJI: routeFare.optional() }),
+      }),
+    )
+    .max(500, 'Njia nyingi mno kwa mara moja'),
+});
