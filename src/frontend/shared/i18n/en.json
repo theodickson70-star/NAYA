@@ -1,0 +1,1117 @@
+{
+ "exact": {
+  "Sauti imewashwa": "Sound on",
+  "Sauti imezimwa": "Sound off",
+  "Simu imezuia sauti. Ongeza sauti ya simu kisha ujaribu tena.": "Your phone blocked the sound. Turn up the volume and try again.",
+  "Onyesha password": "Show password",
+  "Ficha password": "Hide password",
+  "Karibu NAYA": "Welcome to NAYA",
+  "Karibu tena": "Welcome back",
+  "Subiri…": "Please wait…",
+  "Weka alama kwenye kisanduku kukubali Masharti ya Huduma na Sera ya Faragha.": "Tick the box to accept the Terms of Service and Privacy Policy.",
+  "Tuma namba kwa SMS": "Send code by SMS",
+  "Tuma tena": "Send again",
+  "SMS imetumwa tena": "SMS sent again",
+  "Badilisha password": "Change password",
+  "Password imebadilishwa": "Password changed",
+  "Tuma SMS tena": "Resend SMS",
+  "Namba imethibitishwa": "Number verified",
+  "Asante! Umekubali masharti ya NAYA.": "Thank you! You have accepted the NAYA terms.",
+  "Endelea": "Continue",
+  "Taarifa za papo hapo zimeunganishwa": "Live updates connected",
+  "Inaunganisha upya…": "Reconnecting…",
+  "Dereva": "Driver",
+  "Abiria": "Passenger",
+  "Habari za asubuhi": "Good morning",
+  "Habari za mchana": "Good afternoon",
+  "Habari za jioni": "Good evening",
+  "Umezuia ruhusa ya mahali. Chagua unapoanzia kwenye orodha.": "You blocked location access. Choose your pickup point from the list.",
+  "GPS haipatikani. Washa Location kwenye simu, au chagua unapoanzia kwenye orodha.": "GPS is not available. Turn on Location on your phone, or choose your pickup point from the list.",
+  "GPS imechelewa kupata mahali ulipo. Chagua unapoanzia kwenye orodha.": "GPS is taking too long to find you. Choose your pickup point from the list.",
+  "Mahali ulipo sasa (GPS)": "My current location (GPS)",
+  "Inatafuta mahali ulipo…": "Finding your location…",
+  "Chagua unapoanzia": "Choose pickup point",
+  "NAYA bado inaandaa maeneo ya Urambo. Jaribu tena baadaye.": "NAYA is still setting up places in Urambo. Please try again later.",
+  "Jaribu tena": "Try again",
+  "Ramani ya bodaboda na bajaji zilizo karibu nawe": "Map of motorbikes and bajajis near you",
+  "Unaenda wapi?": "Where are you going?",
+  "NAYA karibu nawe": "NAYA near you",
+  "Inatafuta bodaboda zilizo karibu…": "Looking for nearby motorbikes…",
+  "Safari zako": "Your trips",
+  "Bodaboda": "Motorbike",
+  "karibu nawe · iliyo karibu zaidi inafika baada ya": "near you · the closest arrives in",
+  "Hakuna bodaboda karibu kwa sasa ·": "No motorbikes nearby right now ·",
+  "Hakuna dereva online karibu nawe kwa sasa. Ukiagiza, tutakutafutia kwa dakika 10.": "No drivers are online near you right now. If you request, we will keep searching for 10 minutes.",
+  "Washa GPS, au chagua unapoanzia, uone bodaboda zilizo karibu nawe.": "Turn on GPS, or choose your pickup point, to see motorbikes near you.",
+  "Kutoka": "From",
+  "Kwenda": "To",
+  "Inahesabu nauli…": "Calculating fare…",
+  "Bei za safari bado hazijawekwa na ofisi ya NAYA. Jaribu tena baadaye.": "Trip prices have not been set by the NAYA office yet. Please try again later.",
+  "Chagua chombo": "Choose vehicle",
+  "Agiza safari": "Request ride",
+  "Malipo: taslimu kwa dereva. Nauli ni makadirio kwa umbali wa barabara.": "Payment: cash to the driver. The fare is estimated from the road distance.",
+  "Tafuta: stendi, soko, hospitali…": "Search: bus stand, market, hospital…",
+  "Rudi": "Back",
+  "Tafuta eneo": "Search for a place",
+  "Inapakia maeneo…": "Loading places…",
+  "Hakuna eneo linalolingana. Jaribu jina jingine.": "No matching place. Try another name.",
+  "Hujamaliza usajili": "Registration not finished",
+  "Inasubiri uthibitisho": "Waiting for approval",
+  "Umethibitishwa": "Approved",
+  "Rekebisha taarifa": "Fix your details",
+  "Umesimamishwa": "Suspended",
+  "Akaunti": "Account",
+  "Badili mode": "Switch mode",
+  "Mode ya sasa": "Current mode",
+  "Arifa": "Notifications",
+  "Inaangalia…": "Checking…",
+  "Password ya sasa": "Current password",
+  "Password mpya": "New password",
+  "Hifadhi password mpya": "Save new password",
+  "Simu nyingine zote zilizoingia kwa akaunti hii zitatolewa.": "All other phones signed in to this account will be signed out.",
+  "Sauti ya kufungua NAYA": "NAYA opening sound",
+  "Sauti fupi logo inapojitengeneza app ikifunguka.": "A short sound when the logo appears as the app opens.",
+  "Washa sauti ya kufungua": "Turn on opening sound",
+  "Sikiliza sauti": "Play sound",
+  "Masharti na faragha": "Terms and privacy",
+  "Masharti ya Huduma": "Terms of Service",
+  "Sera ya Faragha": "Privacy Policy",
+  "Toka": "Sign out",
+  "Iko hai": "Active",
+  "Imeisha — siku za kulipa": "Expired — grace days",
+  "Imeisha": "Expired",
+  "Haijaanza": "Not started",
+  "Taslimu": "Cash",
+  "Benki": "Bank",
+  "Mpaka": "Until",
+  "Lipa kabla ya": "Pay before",
+  "Lipa ili uendelee kupokea safari.": "Pay to keep receiving trips.",
+  "Ada": "Fee",
+  "Jinsi ya kulipa:": "How to pay:",
+  "Arifa zimewashwa kwenye kifaa hiki. Simu italia safari ikibadilika, hata app ikiwa imefungwa.": "Notifications are on for this device. Your phone will alert you when your trip changes, even when the app is closed.",
+  "Arifa zimezimwa. Ziwashe ujue dereva akipatikana, au upate maombi ya safari ukiwa dereva.": "Notifications are off. Turn them on to know when a driver is found, or to receive trip requests as a driver.",
+  "Umezuia arifa kwenye browser hii. Zifungue kwenye mipangilio ya browser (Site settings → Notifications).": "You blocked notifications in this browser. Allow them in the browser settings (Site settings → Notifications).",
+  "Arifa za simu bado hazijawashwa na NAYA. Utaziona hapa zikiwa tayari.": "Phone notifications are not enabled by NAYA yet. You will see them here when ready.",
+  "Browser hii haiwezi kupokea arifa. Tumia Chrome kwenye Android, au sakinisha app kwenye iPhone (Add to Home Screen).": "This browser cannot receive notifications. Use Chrome on Android, or install the app on iPhone (Add to Home Screen).",
+  "Kengele ya maombi": "Request alarm",
+  "Sikia jinsi simu itakavyolia ombi jipya likifika.": "Hear how your phone will ring when a new request arrives.",
+  "Jaribu kengele": "Test alarm",
+  "Arifa zimewashwa. Ukiwa dereva, simu italia kengele kwa sekunde 30 ombi likiingia — hata app ikiwa imefungwa au skrini imezimwa.": "Notifications are on. As a driver, your phone will ring for 30 seconds when a request arrives — even when the app is closed or the screen is off.",
+  "Washa arifa": "Turn on notifications",
+  "Mipangilio ya arifa za simu": "Phone notification settings",
+  "Zima arifa kwenye kifaa hiki": "Turn off notifications on this device",
+  "Bado huna arifa.": "No notifications yet.",
+  "Inapakia…": "Loading…",
+  "Taarifa zako": "Your details",
+  "Chombo": "Vehicle",
+  "Aina": "Type",
+  "Rangi": "Colour",
+  "Leseni": "Licence",
+  "Nyaraka": "Documents",
+  "Tumepokea taarifa zako": "We have received your details",
+  "Ofisi ya NAYA inakagua nyaraka zako. Utaona majibu hapa — rudi baadaye.": "The NAYA office is checking your documents. You will see the answer here — check back later.",
+  "Ulituma": "You submitted",
+  "Angalia tena": "Check again",
+  "Karibu NAYA. Kupokea maombi ya safari kutaanza hivi karibuni hapa hapa kwenye mode ya Dereva.": "Welcome to NAYA. You will start receiving trip requests right here in Driver mode.",
+  "Udereva wako umesimamishwa": "Your driver account is suspended",
+  "Wasiliana na ofisi ya NAYA kwa maelezo zaidi. Bado unaweza kusafiri kama abiria.": "Contact the NAYA office for more details. You can still travel as a passenger.",
+  "Kuwa dereva wa NAYA": "Become a NAYA driver",
+  "Chombo chako": "Your vehicle",
+  "Tuma kwa uthibitisho": "Submit for approval",
+  "Nimesoma na ninakubali": "I have read and accept the",
+  "Masharti ya Dereva": "Driver Terms",
+  "wa NAYA: kofia mbili, bei ya app tu, PIN kabla ya safari, na ada ya mwezi.": "of NAYA: two helmets, app price only, PIN before the trip, and the monthly fee.",
+  "· Leseni": "· Licence",
+  "Badilisha": "Change",
+  "Mf. Boxer, TVS, Bajaj": "e.g. Boxer, TVS, Bajaj",
+  "Mf. BM 150": "e.g. BM 150",
+  "Mf. Nyekundu": "e.g. Red",
+  "Tarakimu 20": "20 digits",
+  "Aina ya chombo": "Vehicle type",
+  "Namba ya plate": "Plate number",
+  "Kampuni / aina": "Make / brand",
+  "Modeli": "Model",
+  "Namba ya leseni ya udereva": "Driving licence number",
+  "Namba ya NIDA": "NIDA number",
+  "Hifadhi chombo": "Save vehicle",
+  "Inahifadhi…": "Saving…",
+  "Chombo kimehifadhiwa": "Vehicle saved",
+  "PDF ni kubwa mno (mwisho MB 3). Piga picha ya nyaraka badala yake.": "The PDF is too large (max 3 MB). Take a photo of the document instead.",
+  "Chagua picha au PDF.": "Choose a photo or PDF.",
+  "Picha hii haifunguki. Jaribu picha nyingine (JPG au PNG).": "This photo cannot be opened. Try another photo (JPG or PNG).",
+  "Picha ni kubwa mno. Jaribu kupiga picha upya.": "The photo is too large. Try taking it again.",
+  "Uko kwenye mode ya Dereva": "You are in Driver mode",
+  "Uko kwenye mode ya Abiria": "You are in Passenger mode",
+  "Inaagiza…": "Requesting…",
+  "Sikiliza kengele — gusa skrini kuizima": "Listen to the alarm — tap the screen to stop it",
+  "Kengele haikuweza kulia. Angalia ruhusa ya arifa.": "The alarm could not ring. Check notification permission.",
+  "Arifa zimewashwa": "Notifications on",
+  "Arifa zimezimwa": "Notifications off",
+  "Weka alama kukubali Masharti ya Dereva kwanza.": "Tick the box to accept the Driver Terms first.",
+  "Inatuma…": "Sending…",
+  "Internet haipo. Tafadhali hakikisha umeunganishwa.": "No internet. Please make sure you are connected.",
+  "Ramani haikupakia. Angalia internet.": "The map did not load. Check your internet.",
+  "Tunakutafutia dereva mwingine": "Finding you another driver",
+  "Tunatafuta dereva karibu nawe…": "Looking for a driver near you…",
+  "Dereva wa awali ameghairi. Usijali — tunamtafuta mwingine sasa hivi.": "The previous driver cancelled. Don't worry — we are finding another one right now.",
+  "Safari yako imepokelewa. Subiri kidogo.": "Your trip has been received. Please wait a moment.",
+  "Dereva anakuja": "Driver is on the way",
+  "Dereva amefika!": "Your driver has arrived!",
+  "Safari inaendelea": "Trip in progress",
+  "Hakuna dereva aliyepatikana karibu kwa sasa": "No driver was found nearby right now",
+  "Jaribu tena baada ya dakika chache.": "Try again in a few minutes.",
+  "Safari imeghairiwa": "Trip cancelled",
+  "Ofisi ya NAYA:": "NAYA office:",
+  "PIN ya safari": "Trip PIN",
+  "Mpe dereva PIN hii ukishapanda — kwanza hakikisha plate ni sahihi.": "Give the driver this PIN once you are on board — first check that the plate is correct.",
+  "Una dharura?": "Emergency?",
+  "Ofisi ya NAYA itapata ujumbe wako papo hapo pamoja na safari hii na mahali ulipo, na itakupigia.": "The NAYA office will get your message immediately with this trip and your location, and will call you.",
+  "Piga Polisi · 112": "Call Police · 112",
+  "Link ya safari": "Trip link",
+  "Tuma link hii kwa ndugu au rafiki": "Send this link to family or a friend",
+  "Ataona safari yako na dereva kwenye ramani mpaka ufike.": "They will see your trip and driver on the map until you arrive.",
+  "Nakili link": "Copy link",
+  "Dharura imetumwa.": "Emergency sent.",
+  "Ofisi ya NAYA imepokea na itakupigia sasa hivi. Ukiwa hatarini piga": "The NAYA office has received it and will call you right away. If you are in danger, call",
+  "Mapato": "Earnings",
+  "Leo": "Today",
+  "Wiki hii": "This week",
+  "Uko wapi sasa?": "Where are you now?",
+  "GPS haipatikani. Chagua eneo ulilopo ili upokee maombi ya karibu.": "GPS is not available. Choose where you are to receive nearby requests.",
+  "Habari,": "Hello,",
+  "Ukiwa online utapokea maombi ya safari yaliyo karibu nawe.": "When you are online you will receive trip requests near you.",
+  "NENDA ONLINE": "GO ONLINE",
+  "Uko online": "You are online",
+  "Nenda offline": "Go offline",
+  "Ada yako ya mwezi imeisha.": "Your monthly fee has expired.",
+  "Jinsi ya kulipa": "How to pay",
+  "Ada ya mwezi iko hai mpaka": "Monthly fee active until",
+  "Ada ya mwezi imeisha": "Monthly fee expired",
+  "Lipa": "Pay",
+  "kwa mwezi ili uendelee kupokea safari za NAYA.": "per month to keep receiving NAYA trips.",
+  "Ofisi ikishapokea malipo yako, utaweza kwenda online mara moja.": "Once the office receives your payment, you can go online immediately.",
+  "Nimeshalipa — angalia tena": "I have paid — check again",
+  "Ombi jipya la safari": "New trip request",
+  "Kubali": "Accept",
+  "Kataa": "Decline",
+  "Nenda kwa abiria": "Go to the passenger",
+  "Mahali pa kumchukua:": "Pickup point:",
+  "Nimefika": "I have arrived",
+  "Subiri abiria": "Wait for the passenger",
+  "Anza safari": "Start trip",
+  "Mpeleke": "Take them to",
+  "Endesha kwa uangalifu.": "Drive carefully.",
+  "Maliza safari": "End trip",
+  "Pokea": "Collect",
+  "Tuma": "Send",
+  "Ruka": "Skip",
+  "Abiria ameghairi safari": "The passenger cancelled the trip",
+  "Sawa": "OK",
+  "PIN ya abiria": "Passenger PIN",
+  "Muulize abiria PIN iliyo kwenye app yake, kisha anza safari.": "Ask the passenger for the PIN in their app, then start the trip.",
+  "Hakuna maeneo bado.": "No places yet.",
+  "Safari yangu ya NAYA": "My NAYA trip",
+  "Link ya safari imetumwa": "Trip link sent",
+  "Link imenakiliwa": "Link copied",
+  "Bonyeza link kwa muda, kisha \"Copy\"": "Press and hold the link, then \"Copy\"",
+  "Dharura imetumwa kwa ofisi ya NAYA": "Emergency sent to the NAYA office",
+  "Uko offline": "You are offline",
+  "Umekubali safari": "You accepted the trip",
+  "Safari imeanza": "Trip started",
+  "Asante kwa maoni yako": "Thank you for your feedback",
+  "Asante": "Thank you",
+  "Bado hujasafiri na NAYA.": "You have not travelled with NAYA yet.",
+  "Imekamilika": "Completed",
+  "Imeghairiwa": "Cancelled",
+  "Hakuna dereva": "No driver",
+  "Msaada": "Help",
+  "Ripoti tatizo": "Report a problem",
+  "Tatizo la safari, nauli, umesahau kitu, au lolote — ofisi ya NAYA inakujibu hapa na kwenye simu yako.": "A trip problem, fare, something you forgot, or anything else — the NAYA office answers you here and on your phone.",
+  "Hujaripoti tatizo lolote.": "You have not reported any problem.",
+  "Mf. Nilisahau begi kwenye bodaboda MC 123 ABC jana saa 2 usiku.": "e.g. I forgot a bag on motorbike MC 123 ABC yesterday at 8 pm.",
+  "‹ Akaunti": "‹ Account",
+  "Eleza kilichotokea. Ofisi ya NAYA itakujibu haraka iwezekanavyo.": "Describe what happened. The NAYA office will reply as soon as possible.",
+  "Tatizo linahusu nini?": "What is the problem about?",
+  "Safari husika": "Related trip",
+  "Inapakia safari zako…": "Loading your trips…",
+  "Eleza tatizo": "Describe the problem",
+  "Tuma kwa ofisi": "Send to the office",
+  "Hatari au dharura ukiwa safarini? Tumia kitufe cha": "Danger or emergency during a trip? Use the",
+  "Dharura": "Emergency",
+  "kwenye safari, au piga 112.": "button on the trip, or call 112.",
+  "Hakuna safari maalum": "No specific trip",
+  "Ombi la": "Request",
+  "Andika ujumbe": "Write a message",
+  "Tumepokea. Ofisi itakujibu hapa.": "Received. The office will reply here.",
+  "Mbaya sana": "Very bad",
+  "Mbaya": "Bad",
+  "Wastani": "Average",
+  "Nzuri": "Good",
+  "Nzuri sana": "Very good",
+  "Mfano: bei, madereva, app, au wazo la kuboresha NAYA": "For example: prices, drivers, the app, or an idea to improve NAYA",
+  "Toa maoni": "Give feedback",
+  "Unaonaje huduma ya NAYA? Maoni yako yanafika moja kwa moja ofisini na yanafanyiwa kazi.": "How do you find the NAYA service? Your feedback goes straight to the office and is acted on.",
+  "Nyota": "Stars",
+  "Kuhusu": "About",
+  "Maoni yako": "Your feedback",
+  "Tuma maoni": "Send feedback",
+  "Maoni uliyotuma": "Feedback you sent",
+  "Chagua nyota (1 hadi 5).": "Choose stars (1 to 5).",
+  "Asante! Maoni yako yamefika ofisini.": "Thank you! Your feedback has reached the office.",
+  "Masharti hayakupatikana. Jaribu tena.": "The terms could not be loaded. Try again.",
+  "Masharti ya NAYA": "NAYA Terms",
+  "Funga": "Close",
+  "Inapakia masharti…": "Loading terms…",
+  "Tumeweka masharti ya huduma na sera ya faragha ili kulinda abiria na madereva wote. Yasome, kisha ukubali ili kuendelea kutumia NAYA.": "We have set terms of service and a privacy policy to protect all passengers and drivers. Read them, then accept to continue using NAYA.",
+  "Nakubali, endelea": "I accept, continue",
+  "Weka alama kwenye kisanduku kukubali masharti.": "Tick the box to accept the terms.",
+  "Anza sasa": "Get started",
+  "Inapakia mfumo…": "Loading…",
+  "Tunakuletea uzoefu bora…": "Getting the best experience ready…",
+  "NAYA inafunguka": "NAYA is opening",
+  "Bodaboda na bajaji za NAYA barabarani": "NAYA motorbikes and bajajis on the road",
+  "Chagua": "Choose",
+  "Mf. Juma Hamisi": "e.g. Juma Hamisi",
+  "Angalau herufi 8": "At least 8 characters",
+  "Andika password yako": "Enter your password",
+  "Inaunganisha…": "Connecting…",
+  "Menyu kuu": "Main menu",
+  "Inakuandaa NAYA…": "Getting NAYA ready…",
+  "Usafiri rahisi, salama na wa kuaminika": "Easy, safe and reliable transport",
+  "Agiza bodaboda au bajaji kwa sekunde chache. Unajua nauli kabla hujapanda.": "Request a motorbike or bajaji in seconds. Know the fare before you ride.",
+  "Dakika 3": "3 min",
+  "Mwone dereva wako akija": "Watch your driver coming",
+  "Ramani ya moja kwa moja, muda wa kufika, na PIN ya safari kwa usalama wako.": "Live map, arrival time, and a trip PIN for your safety.",
+  "Nenda": "Go",
+  "Safari mpya": "New trip",
+  "Una chombo? Endesha na NAYA": "Have a vehicle? Drive with NAYA",
+  "Akaunti ile ile. Pokea safari zilizo karibu nawe na ufuatilie mapato yako kila siku.": "The same account. Receive trips near you and track your earnings every day.",
+  "Bodaboda na bajaji za Urambo. Akaunti moja — safiri au endesha.": "Motorbikes and bajajis in Urambo. One account — ride or drive.",
+  "Jisajili": "Sign up",
+  "Nina akaunti": "I have an account",
+  "Jina kamili": "Full name",
+  "Namba ya simu": "Phone number",
+  "Tengeneza password": "Create a password",
+  "Kwa kujisajili, unakubali": "By signing up, you accept the",
+  "ya NAYA, na kwamba una miaka 18 au zaidi.": "of NAYA, and confirm you are 18 or older.",
+  "Umesahau password?": "Forgot password?",
+  "Ingia": "Sign in",
+  "Tutakutumia SMS yenye namba ya tarakimu 6.": "We will send you an SMS with a 6-digit code.",
+  "Namba ya simu uliyosajili": "Your registered phone number",
+  "Namba kutoka kwenye SMS": "Code from the SMS",
+  "Rudi kuingia": "Back to sign in",
+  "Thibitisha namba yako": "Verify your number",
+  "Tumekutumia SMS yenye namba ya tarakimu 6.": "We sent you an SMS with a 6-digit code.",
+  "Thibitisha": "Verify",
+  "Si namba yako?": "Not your number?",
+  "Toka, ujisajili upya": "Sign out and register again",
+  "Utatumiaje NAYA?": "How will you use NAYA?",
+  "Chagua aina ya akaunti. Unaweza kubadilisha baadaye kwenye Akaunti.": "Choose an account type. You can change it later in Account.",
+  "Agiza safari, ufike unapoenda.": "Request a trip and get where you are going.",
+  "Endesha, pokea maombi ya safari, fuatilia mapato.": "Drive, receive trip requests, track your earnings.",
+  "Hatukuweza kufika kwenye mfumo": "We could not reach the system",
+  "Nyumbani": "Home",
+  "Jibu jipya kutoka ofisi": "New reply from the office",
+  "Hajamaliza usajili": "Registration not finished",
+  "Anasubiri uthibitisho": "Waiting for approval",
+  "Amethibitishwa": "Approved",
+  "Amekataliwa": "Rejected",
+  "Amesimamishwa": "Suspended",
+  "Picha yako": "Your photo",
+  "Picha ya uso wako, wazi, bila miwani ya jua wala kofia.": "A clear photo of your face, without sunglasses or a hat.",
+  "Leseni ya udereva": "Driving licence",
+  "Upande wa mbele wa leseni, maandishi yasomeke.": "The front side of the licence, with readable text.",
+  "Kitambulisho cha NIDA": "NIDA ID card",
+  "Kitambulisho cha taifa au namba ya NIDA iliyochapishwa.": "National ID card or printed NIDA number.",
+  "Picha ya chombo": "Vehicle photo",
+  "Chombo kizima, namba ya plate ionekane wazi.": "The whole vehicle, with the plate number clearly visible.",
+  "Bima ya chombo": "Vehicle insurance",
+  "Si lazima, lakini inaongeza imani ya wateja.": "Optional, but it builds customer trust.",
+  "Imepakiwa": "Uploaded",
+  "Imekubaliwa": "Accepted",
+  "Ibadilishe": "Replace it",
+  "Tatizo la safari": "Trip problem",
+  "Nauli": "Fare",
+  "Kuhusu dereva": "About the driver",
+  "Kuhusu abiria": "About the passenger",
+  "Nimesahau kitu": "I forgot something",
+  "Usalama": "Safety",
+  "App haifanyi kazi vizuri": "The app is not working well",
+  "Akaunti yangu": "My account",
+  "Mengineyo": "Other",
+  "Kwa ujumla": "General",
+  "App ya NAYA": "The NAYA app",
+  "Bei": "Prices",
+  "Madereva / abiria": "Drivers / passengers",
+  "Wazo jipya": "New idea",
+  "Mapya": "New",
+  "Yamesomwa": "Read",
+  "Yamefanyiwa kazi": "Acted on",
+  "Inasubiri ofisi": "Waiting for the office",
+  "Imejibiwa": "Answered",
+  "Imetatuliwa": "Resolved",
+  "Stendi": "Bus stand",
+  "Soko": "Market",
+  "Hospitali / zahanati": "Hospital / clinic",
+  "Shule / chuo": "School / college",
+  "Ofisi / taasisi": "Office / institution",
+  "Kanisa / msikiti": "Church / mosque",
+  "Mtaa": "Street",
+  "Mengine": "Other",
+  "Hakuna mawasiliano na mfumo. Angalia mtandao wako.": "No connection to the system. Check your network.",
+  "Faili halikupatikana": "File not found",
+  "Simu au browser hii haiwezi kupokea arifa. Tumia Chrome kwenye Android, au sakinisha app kwenye iPhone.": "This phone or browser cannot receive notifications. Use Chrome on Android, or install the app on iPhone.",
+  "Arifa bado hazijawashwa kwenye server ya NAYA.": "Notifications are not enabled on the NAYA server yet.",
+  "Umekataa ruhusa ya arifa. Ifungue kwenye mipangilio ya browser (Site settings → Notifications).": "You denied notification permission. Allow it in the browser settings (Site settings → Notifications).",
+  "Si app ya NAYA": "Not the NAYA app",
+  "Ruhusu arifa za NAYA kwenye mipangilio ya simu, kisha rudi hapa.": "Allow NAYA notifications in your phone settings, then come back here.",
+  "Toleo hili la app halina huduma ya arifa. Pakua toleo jipya la NAYA.": "This app version does not support notifications. Download the new version of NAYA.",
+  "Ramani haikupakia": "The map did not load",
+  "Kuchukuliwa": "Pickup",
+  "Unakoenda": "Destination",
+  "Uko hapa": "You are here",
+  "Dereva anaenda kumchukua": "Driver is going to pick them up",
+  "Dereva amefika kumchukua": "Driver has arrived for pickup",
+  "Wako safarini": "On the trip",
+  "Amefika salama": "Arrived safely",
+  "Safari hii haiendelei tena.": "This trip is no longer in progress.",
+  "Safari haikufanyika": "The trip did not happen",
+  "Hakuna dereva aliyepatikana.": "No driver was found.",
+  "Hakuna mtandao. Tunajaribu tena…": "No network. Trying again…",
+  "Link hii si sahihi au imeisha muda.": "This link is invalid or has expired.",
+  "Kama una wasiwasi kuhusu usalama wake, mpigie kwanza. Dharura:": "If you are worried about their safety, call them first. Emergency:",
+  "Inasasishwa yenyewe · dereva alionekana": "Updates automatically · driver last seen",
+  "Iliisha": "Ended",
+  "Safari haipatikani": "Trip not found",
+  "Link ya safari ya NAYA inafanya kazi wakati safari inaendelea tu.": "A NAYA trip link only works while the trip is in progress.",
+  "Link hii si sahihi.": "This link is not valid.",
+  "Safari ya NAYA": "NAYA trip",
+  "Safari iliyoshirikiwa": "Shared trip",
+  "Inapakia safari…": "Loading trip…",
+  "Muda wa kuingia umeisha au token si sahihi. Ingia tena.": "Your session has expired or the token is invalid. Please sign in again.",
+  "Token si sahihi. Ingia tena.": "Invalid token. Please sign in again.",
+  "Umetoka. Ingia tena.": "You have signed out. Please sign in again.",
+  "Akaunti hii imesimamishwa. Wasiliana na NAYA.": "This account has been suspended. Contact NAYA.",
+  "Tiketi ya taarifa za papo hapo imeisha muda.": "The live updates ticket has expired.",
+  "Tiketi si sahihi.": "Invalid ticket.",
+  "Akaunti hii imesimamishwa.": "This account has been suspended.",
+  "Maombi mengi mno. Subiri kidogo kisha ujaribu tena.": "Too many requests. Wait a moment and try again.",
+  "Faili ni kubwa mno (mwisho MB 3)": "The file is too large (max 3 MB)",
+  "Aina ya faili hairuhusiwi. Tuma picha (JPG, PNG, WEBP) au PDF.": "This file type is not allowed. Send a photo (JPG, PNG, WEBP) or PDF.",
+  "Ombi si sahihi": "Invalid request",
+  "Hitilafu ya mfumo. Jaribu tena baadaye.": "System error. Please try again later.",
+  "Hakuna dereva aliyepatikana": "No driver was found",
+  "Samahani, hakuna dereva karibu kwa sasa. Jaribu tena baada ya dakika chache.": "Sorry, there is no driver nearby right now. Try again in a few minutes.",
+  "Uko online kama dereva. Nenda offline kwanza ili kuagiza safari.": "You are online as a driver. Go offline first to request a trip.",
+  "Bei za chombo hiki bado hazijawekwa. Chagua chombo kingine.": "Prices for this vehicle have not been set yet. Choose another vehicle.",
+  "Una safari inayoendelea tayari.": "You already have a trip in progress.",
+  "Safari haikupatikana": "Trip not found",
+  "Safari imeshaanza. Huwezi kughairi sasa.": "The trip has already started. You cannot cancel now.",
+  "Safari hii imeshaisha.": "This trip has already ended.",
+  "Abiria ameghairi": "Passenger cancelled",
+  "Unaweza kutoa nyota baada ya safari kuisha tu.": "You can rate only after the trip has ended.",
+  "Umeshampa dereva nyota kwa safari hii.": "You have already rated the driver for this trip.",
+  "Safari bado inaendelea.": "The trip is still in progress.",
+  "Picha haipatikani": "Photo not available",
+  "Bado hujaomba kuwa dereva.": "You have not applied to be a driver yet.",
+  "Udereva wako haujathibitishwa. Huwezi kupokea safari kwa sasa.": "Your driver account is not approved. You cannot receive trips right now.",
+  "Maliza safari yako kwanza kabla ya kwenda offline.": "Finish your trip before going offline.",
+  "Una safari inayoendelea kama abiria. Imalize kwanza.": "You have a trip in progress as a passenger. Finish it first.",
+  "Eneo halipatikani. Chagua jingine.": "Place not available. Choose another one.",
+  "Tunahitaji mahali ulipo: washa GPS au chagua eneo ulilopo.": "We need your location: turn on GPS or choose where you are.",
+  "Ombi halikupatikana.": "Request not found.",
+  "Ombi hili limeisha muda.": "This request has expired.",
+  "Safari hii haipatikani tena.": "This trip is no longer available.",
+  "Una safari nyingine inayoendelea.": "You have another trip in progress.",
+  "Dereva amepatikana": "Driver found",
+  "anakuja ·": "is coming ·",
+  "PIN imekosewa mara nyingi. Mpigie abiria, au wasiliana na ofisi ya NAYA.": "Wrong PIN too many times. Call the passenger, or contact the NAYA office.",
+  "Muulize abiria PIN yake ya tarakimu 4.": "Ask the passenger for their 4-digit PIN.",
+  "Abiria ameghairi safari hii.": "The passenger cancelled this trip.",
+  "Hatua hii haiwezekani kwa sasa.": "This step is not possible right now.",
+  "Umefika": "You have arrived at",
+  "Huwezi kughairi safari iliyoanza au kuisha.": "You cannot cancel a trip that has started or ended.",
+  "Dereva ameghairi:": "The driver cancelled:",
+  "Dereva ameghairi": "The driver cancelled",
+  "Usijali — tunakutafutia dereva mwingine sasa hivi.": "Don't worry — we are finding you another driver right now.",
+  "Umeshampa abiria nyota kwa safari hii.": "You have already rated the passenger for this trip.",
+  "Maliza safari yako ya udereva kwanza.": "Finish your driver trip first.",
+  "Safari imeghairiwa na ofisi ya NAYA": "The trip was cancelled by the NAYA office",
+  "Safari hii haitafuti dereva tena.": "This trip is no longer looking for a driver.",
+  "Ofisi inaweza kumaliza safari inayoendelea (imeanza) tu.": "The office can only finish a trip that is in progress (started).",
+  "Imemalizwa na ofisi": "Finished by the office",
+  "Safari imekamilishwa na ofisi ya NAYA.": "The trip was completed by the NAYA office.",
+  "Eleza tatizo kwa maneno machache zaidi.": "Describe the problem in a few more words.",
+  "Una maombi mengi ya msaada ambayo bado yanashughulikiwa. Subiri majibu ya ofisi kwanza.": "You have many help requests still being handled. Wait for the office to reply first.",
+  "Safari hiyo haikupatikana kwenye akaunti yako.": "That trip was not found in your account.",
+  "Ombi la msaada halikupatikana": "Help request not found",
+  "Andika jibu": "Write a reply",
+  "Ofisi ya NAYA imekujibu": "The NAYA office has replied to you",
+  "Thibitisha namba yako ya simu kwanza (Akaunti → Thibitisha namba).": "Verify your phone number first (Account → Verify number).",
+  "Mtumiaji hakupatikana": "User not found",
+  "Ujumbe kutoka ofisi ya NAYA": "Message from the NAYA office",
+  "Umetolewa online na ofisi": "You were taken offline by the office",
+  "Ukiwa tayari kupokea safari, nenda online tena.": "When you are ready to receive trips, go online again.",
+  "Faili ni tupu": "The file is empty",
+  "Faili halilingani na aina yake. Jaribu kuchagua faili tena.": "The file does not match its type. Try choosing the file again.",
+  "Bado hujaomba kuwa dereva. Chagua mode ya Dereva kwanza.": "You have not applied to be a driver yet. Choose Driver mode first.",
+  "Taarifa zako zinakaguliwa na ofisi. Subiri majibu kabla ya kubadilisha.": "Your details are being checked by the office. Wait for the answer before making changes.",
+  "Taarifa za dereva aliyethibitishwa zinabadilishwa na ofisi ya NAYA tu.": "An approved driver's details can only be changed by the NAYA office.",
+  "Namba hii ya plate tayari imesajiliwa na dereva mwingine.": "This plate number is already registered by another driver.",
+  "Nyaraka hii haijapakiwa": "This document has not been uploaded",
+  "Faili la nyaraka hii halikupatikana": "The file for this document was not found",
+  "Jaza taarifa za chombo chako kwanza.": "Fill in your vehicle details first.",
+  "Pakia nyaraka zote zinazohitajika kwanza.": "Upload all the required documents first.",
+  "Badilisha nyaraka zilizokataliwa kwanza.": "Replace the rejected documents first.",
+  "Dereva hajapatikana": "Driver not found",
+  "Umethibitishwa kuwa dereva wa NAYA!": "You are approved as a NAYA driver!",
+  "Fungua NAYA, bonyeza NENDA ONLINE upokee safari.": "Open NAYA and press GO ONLINE to receive trips.",
+  "NAYA: Hongera! Umethibitishwa kuwa dereva wa NAYA. Fungua app ya NAYA na ubonyeze NENDA ONLINE upokee safari.": "NAYA: Congratulations! You are approved as a NAYA driver. Open the NAYA app and press GO ONLINE to receive trips.",
+  "Ombi lako la udereva linahitaji marekebisho": "Your driver application needs corrections",
+  "Umerudishwa kazini": "You are back at work",
+  "Unaweza kwenda online na kupokea safari tena.": "You can go online and receive trips again.",
+  "Akaunti haikupatikana": "Account not found",
+  "Umeomba namba mara nyingi. Jaribu tena baada ya saa moja, au wasiliana na ofisi ya NAYA.": "You have requested a code too many times. Try again in an hour, or contact the NAYA office.",
+  "SMS haikutumwa kwa sasa. Jaribu tena baada ya dakika moja.": "The SMS could not be sent right now. Try again in a minute.",
+  "Namba si sahihi au imeisha muda. Omba namba mpya.": "The code is wrong or has expired. Request a new code.",
+  "Lipa ada yako ofisini kwa NAYA. Ofisi itarekodi malipo yako na utaweza kwenda online mara moja.": "Pay your fee at the NAYA office. The office will record your payment and you can go online immediately.",
+  "Dereva huyu bado hajathibitishwa.": "This driver is not approved yet.",
+  "Ada imepokelewa — asante!": "Fee received — thank you!",
+  "Ada yako ya mwezi inakaribia kuisha": "Your monthly fee is about to expire",
+  "Ada yako ya mwezi imeisha": "Your monthly fee has expired",
+  "Namba hii ya simu tayari imesajiliwa. Ingia badala yake.": "This phone number is already registered. Sign in instead.",
+  "Namba ya simu au password si sahihi": "Wrong phone number or password",
+  "Akaunti hii haina ruhusa ya kuingia hapa": "This account is not allowed to sign in here",
+  "Huduma ya SMS bado haijawashwa. Wasiliana na ofisi ya NAYA.": "The SMS service is not enabled yet. Contact the NAYA office.",
+  "Namba yako tayari imethibitishwa.": "Your number is already verified.",
+  "Password ya sasa si sahihi.": "The current password is wrong.",
+  "Chagua password tofauti na ya sasa.": "Choose a password different from the current one.",
+  "Eneo halijapatikana": "Place not found",
+  "Unaweza kushiriki safari dereva akishapatikana na kabla haijaisha.": "You can share the trip once a driver is found and before it ends.",
+  "Safari hii haiendelei. Kwa dharura piga 112.": "This trip is not in progress. For emergencies call 112.",
+  "Mahali pa abiria (GPS)": "Passenger location (GPS)",
+  "Karibu na": "Near",
+  "Eneo la kuanzia halipatikani tena. Chagua jingine.": "The pickup place is no longer available. Choose another one.",
+  "Eneo unakoenda halipatikani tena. Chagua jingine.": "The destination is no longer available. Choose another one.",
+  "Mahali ulipo": "My location",
+  "Uko nje ya eneo la huduma la NAYA kwa sasa. Chagua unapoanzia kwenye orodha ya maeneo.": "You are outside the NAYA service area for now. Choose your pickup point from the list of places.",
+  "Mahali pa kuanzia na unakoenda ni pamoja. Chagua unakoenda kwingine.": "The pickup and destination are the same. Choose a different destination.",
+  "Andika maoni yako kwa maneno machache.": "Write your feedback in a few words.",
+  "Asante! Umeshatuma maoni mengi leo — tutayasoma yote. Jaribu tena kesho.": "Thank you! You have sent a lot of feedback today — we will read it all. Try again tomorrow.",
+  "Maoni hayakupatikana": "Feedback not found",
+  "Tumefanyia kazi maoni yako": "We acted on your feedback",
+  "Ofisi imesoma maoni yako": "The office has read your feedback",
+  "Password iwe na angalau herufi 8": "Password must have at least 8 characters",
+  "Maelezo ni marefu mno": "The description is too long",
+  "Chagua aina ya chombo: bodaboda au bajaji": "Choose the vehicle type: motorbike or bajaji",
+  "Weka namba ya plate": "Enter the plate number",
+  "Namba ya plate si sahihi (mfano: MC 123 ABC)": "Invalid plate number (example: MC 123 ABC)",
+  "Weka aina ya chombo (mf. Boxer, TVS, Bajaj)": "Enter the vehicle make (e.g. Boxer, TVS, Bajaj)",
+  "Aina ya chombo ni ndefu mno": "The vehicle make is too long",
+  "Weka rangi ya chombo": "Enter the vehicle colour",
+  "Rangi ni ndefu mno": "The colour is too long",
+  "Weka namba ya leseni ya udereva": "Enter the driving licence number",
+  "Namba ya leseni si sahihi": "Invalid licence number",
+  "Namba ya leseni ni ndefu mno": "The licence number is too long",
+  "Namba ya NIDA iwe na tarakimu 20": "The NIDA number must have 20 digits",
+  "Aina ya nyaraka haijulikani": "Unknown document type",
+  "Sababu ni ndefu mno": "The reason is too long",
+  "Weka namba ya simu": "Enter a phone number",
+  "Namba ya simu si sahihi (mfano: 0712 345 678)": "Invalid phone number (example: 0712 345 678)",
+  "Weka password": "Enter a password",
+  "Password ni ndefu mno": "The password is too long",
+  "Weka jina kamili": "Enter your full name",
+  "Jina liwe na angalau herufi 3": "Name must have at least 3 characters",
+  "Jina ni refu mno": "The name is too long",
+  "Weka alama kwenye kisanduku kukubali Masharti ya Huduma na Sera ya Faragha": "Tick the box to accept the Terms of Service and Privacy Policy",
+  "Weka namba uliyopokea kwa SMS": "Enter the code you received by SMS",
+  "Namba ya SMS ina tarakimu 6": "The SMS code has 6 digits",
+  "Chagua unakoenda": "Choose your destination",
+  "Tafadhali ingia kwanza": "Please sign in first",
+  "Huna ruhusa ya kufanya hili": "You are not allowed to do this",
+  "Haikupatikana": "Not found",
+  "Chagua bodaboda au bajaji": "Choose motorbike or bajaji",
+  "Andika sababu": "Write a reason",
+  "Andika sababu fupi (angalau herufi 3)": "Write a short reason (at least 3 characters)",
+  "Chagua nyota 1 hadi 5": "Choose 1 to 5 stars",
+  "Maoni ni marefu mno": "The comment is too long",
+  "PIN ni tarakimu 4": "The PIN has 4 digits",
+  "Usajili wa arifa si sahihi": "Invalid notification registration",
+  "Token ya arifa si sahihi": "Invalid notification token",
+  "Tuma faili la picha (JPG, PNG, WEBP) au PDF.": "Send a photo file (JPG, PNG, WEBP) or PDF.",
+  "Weka alama kukubali Masharti ya Dereva kwanza": "Tick the box to accept the Driver Terms first",
+  "Chagua: Abiria au Dereva": "Choose: Passenger or Driver",
+  "Weka alama kukubali masharti": "Tick the box to accept the terms",
+  "Weka password ya sasa": "Enter your current password",
+  "Chagua aina ya tatizo": "Choose the type of problem",
+  "Eleza tatizo lako": "Describe your problem",
+  "Chagua nyota": "Choose stars",
+  "Andika maoni yako": "Write your feedback",
+  "DHARURA imetumwa": "EMERGENCY sent",
+  "bajaji": "Bajajis:",
+  "karibu": "nearby",
+  "(angalau herufi 8)": "(at least 8 characters)",
+  "uendelee kupokea safari.": "to keep receiving trips.",
+  "kwa siku 30": "for 30 days",
+  "zimepakiwa": "uploaded",
+  "(si lazima)": "(optional)",
+  ": imepakiwa": ": uploaded",
+  "makadirio": "estimate",
+  "Udereva wako": "Your driving",
+  "Fungua mode ya Dereva": "Open Driver mode",
+  "Una bodaboda au bajaji?": "Have a motorbike or bajaji?",
+  "Endesha na NAYA kwa akaunti hii hii. Pakia nyaraka zako, ofisi ikuthibitishe.": "Drive with NAYA using this same account. Upload your documents and the office will approve you.",
+  "Kuwa dereva": "Become a driver",
+  "· bajaji": "· Bajajis:",
+  "Weka unakoenda": "Set your destination",
+  "bei ya njia hii": "fixed route price",
+  "Unaanzia wapi?": "Where are you starting from?",
+  "Tumia mahali nilipo sasa": "Use my current location",
+  "GPS ya simu yako": "Your phone's GPS",
+  "Badili kwenda Abiria": "Switch to Passenger",
+  "Badili kwenda Dereva": "Switch to Driver",
+  "Utafungua ombi la udereva kwa akaunti hii hii — hakuna akaunti mpya.": "You will open a driver application with this same account — no new account.",
+  "Ada ya mwezi": "Monthly fee",
+  "App ya NAYA ya Android": "NAYA Android app",
+  "Ukiwa na app, simu inalia kengele kwa sekunde 30 ombi la safari likiingia — hata ukiwa unatumia app nyingine au skrini imezimwa.": "With the app, your phone rings for 30 seconds when a trip request arrives — even when you are using another app or the screen is off.",
+  "Pakua app (APK)": "Download the app (APK)",
+  "Masharti ya Abiria": "Passenger Terms",
+  "Malipo yako": "Your payments",
+  "→ mpaka": "→ until",
+  "Bado hujalipa ada. Malipo yako yataonekana hapa.": "You have not paid the fee yet. Your payments will appear here.",
+  "Ruhusu NAYA ionyeshe ombi juu ya skrini iliyofungwa (kama simu inayoingia).": "Allow NAYA to show requests over the locked screen (like an incoming call).",
+  "Ruhusu": "Allow",
+  "Sababu:": "Reason:",
+  "Ofisi imeomba urekebishe:": "The office asked you to fix:",
+  "Rekebisha kilichoombwa, kisha tuma tena.": "Fix what was requested, then submit again.",
+  "Kamilisha hatua hizi tatu ili ofisi ikuthibitishe.": "Complete these three steps so the office can approve you.",
+  "Tayari": "Done",
+  "Kila kitu kiko tayari. Ofisi ya NAYA itakagua na kukujibu hapa.": "Everything is ready. The NAYA office will review and answer you here.",
+  "Jaza taarifa za chombo": "Fill in the vehicle details",
+  "Pakia:": "Upload:",
+  "Badilisha:": "Replace:",
+  "Bado": "Pending",
+  "Badilisha picha": "Change photo",
+  "Pakia picha": "Upload photo",
+  "Washa arifa ujue dereva akipatikana, hata ukifunga app.": "Turn on notifications to know when a driver is found, even if you close the app.",
+  "Ramani: mahali pa kuchukuliwa, unakoenda, na dereva": "Map: pickup, destination and driver",
+  "Mf. Aliendesha kwa uangalifu": "e.g. Drove carefully",
+  "Maoni": "Comment",
+  "Ghairi safari hii?": "Cancel this trip?",
+  "Ndiyo, ghairi": "Yes, cancel",
+  "Hapana": "No",
+  "Ghairi safari": "Cancel trip",
+  "Tuma dharura kwa ofisi ya NAYA": "Send emergency to the NAYA office",
+  "Fuatilia safari yangu ya NAYA:": "Follow my NAYA trip:",
+  "Shiriki safari": "Share trip",
+  "Dereva mpya": "New driver",
+  "Piga simu ·": "Call ·",
+  "Washa arifa ili simu ilie ombi la safari likiingia, hata app ikiwa imefungwa.": "Turn on notifications so your phone rings when a trip request arrives, even when the app is closed.",
+  "Unasubiri maombi ya safari. Simu italia ombi likiingia.": "Waiting for trip requests. Your phone will ring when one arrives.",
+  "Unasubiri maombi ya safari. Acha app wazi.": "Waiting for trip requests. Keep the app open.",
+  "Washa arifa ili usikose ombi hata ukifunga app.": "Turn on notifications so you don't miss a request even if you close the app.",
+  "Piga simu": "Call",
+  "Ramani": "Map",
+  "Kwa nini unaghairi?": "Why are you cancelling?",
+  "Abiria hapatikani": "Passenger not found",
+  "Hitilafu ya chombo / pancha": "Vehicle problem / flat tyre",
+  "Abiria ameniomba nighairi": "The passenger asked me to cancel",
+  "Sababu nyingine": "Other reason",
+  "· kutoka": "· from",
+  "jipya": "new",
+  "Ofisi ya NAYA": "NAYA office",
+  "Wewe": "You",
+  "Ofisi imepokea ombi lako. Utapata jibu hapa na kwenye simu yako.": "The office has received your request. You will get an answer here and on your phone.",
+  "Bado lina tatizo? Andika hapa…": "Still a problem? Write here…",
+  "Andika ujumbe…": "Write a message…",
+  "Hatua ya ofisi:": "Office action:",
+  "(pamoja na Masharti ya Dereva)": "(including the Driver Terms)",
+  "Ramani ya safari na dereva": "Map of the trip and driver",
+  "Lugha": "Language",
+  "leo": "today",
+  "na": "and",
+  "ziko karibu nawe · iliyo karibu zaidi inafika baada ya": "near you · the closest arrives in",
+  "iko karibu nawe · iliyo karibu zaidi inafika baada ya": "near you · it arrives in",
+  "ziko karibu": "nearby",
+  "iko karibu": "nearby",
+  "Ni akaunti ile ile; unaweza kubadili wakati wowote.": "It is the same account; you can switch at any time.",
+  "Habari za asubuhi,": "Good morning,",
+  "Habari za mchana,": "Good afternoon,",
+  "Habari za jioni,": "Good evening,",
+  "jana": "yesterday"
+ },
+ "patterns": [
+  [
+   "Uko km {} kutoka {}, eneo la karibu la NAYA. Utapokea maombi ya wateja walio ndani ya km {} kutoka ulipo tu.",
+   "You are {} km from {}, the nearest NAYA place. You will only receive requests from passengers within {} km of you."
+  ],
+  [
+   "Uko nje ya eneo la huduma la NAYA kwa sasa (km {} kutoka {}). Chagua unapoanzia kwenye orodha ya maeneo.",
+   "You are outside the NAYA service area for now ({} km from {}). Choose your pickup point from the list of places."
+  ],
+  [
+   "NAYA: Namba ya kubadilisha password ni {}. Inaisha baada ya dakika {}. Kama hukuomba, puuza ujumbe huu.",
+   "NAYA: Your password reset code is {}. It expires in {} minutes. If you did not request it, ignore this message."
+  ],
+  [
+   "Kama {} imesajiliwa NAYA, utapokea SMS sasa hivi. Andika namba yake na password mpya.",
+   "If {} is registered with NAYA, you will receive an SMS now. Enter the code and your new password."
+  ],
+  [
+   "NAYA: Ombi lako la udereva linahitaji marekebisho: {}. Fungua app ya NAYA urekebishe.",
+   "NAYA: Your driver application needs corrections: {}. Open the NAYA app to fix it."
+  ],
+  [
+   "NAYA: Namba yako ya kuthibitisha ni {}. Inaisha baada ya dakika {}. Usimpe mtu yeyote.",
+   "NAYA: Your verification code is {}. It expires in {} minutes. Do not share it with anyone."
+  ],
+  [
+   "NAYA: Password yako mpya ya muda ni {}. Ingia, kisha ibadilishe kwenye Akaunti.",
+   "NAYA: Your new temporary password is {}. Sign in, then change it in Account."
+  ],
+  [
+   "Ada yako ya mwezi (TSh {}) imeisha. Lipa ili uendelee kupokea safari. {}",
+   "Your monthly fee (TSh {}) has expired. Pay to keep receiving trips. {}"
+  ],
+  [
+   "NAYA: Ada yako ya mwezi imeisha. Lipa {} ili uendelee kupokea safari. {}",
+   "NAYA: Your monthly fee has expired. Pay {} to keep receiving trips. {}"
+  ],
+  [
+   "Ada yako ya mwezi (TSh {}) imeisha. Lipa ili uendelee kupokea safari.",
+   "Your monthly fee (TSh {}) has expired. Pay to keep receiving trips."
+  ],
+  [
+   "NAYA: Ada yako ya mwezi imeisha. Lipa {} ili uendelee kupokea safari.",
+   "NAYA: Your monthly fee has expired. Pay {} to keep receiving trips."
+  ],
+  [
+   "NAYA: Ada yako ya mwezi inaisha {}. Lipa {} mapema ili usikose safari.",
+   "NAYA: Your monthly fee expires {}. Pay {} early so you don't miss trips."
+  ],
+  [
+   "Nimesoma na ninakubali masharti{} na sera ya faragha ya NAYA.",
+   "I have read and accept the terms{} and privacy policy of NAYA."
+  ],
+  [
+   "Una siku {} za kulipa {} kabla hujaacha kupokea safari.",
+   "You have {} days to pay {} before you stop receiving trips."
+  ],
+  [
+   "{} karibu nawe · iliyo karibu zaidi inafika baada ya",
+   "{} near you · the closest arrives in"
+  ],
+  [
+   "Lipa dereva {} taslimu. Asante kwa kusafiri na NAYA.",
+   "Pay the driver {} in cash. Thank you for travelling with NAYA."
+  ],
+  [
+   "Tumetuma SMS yenye namba ya tarakimu 6 kwenda {}.",
+   "We sent an SMS with a 6-digit code to {}."
+  ],
+  [
+   "{} · safari ya km {} · abiria yuko km {} kutoka kwako",
+   "{} · {} km trip · passenger is {} km from you"
+  ],
+  [
+   "Subiri sekunde {} kabla ya kuomba namba nyingine.",
+   "Wait {} seconds before requesting another code."
+  ],
+  [
+   "· safari ya km {} · abiria yuko km {} kutoka kwako",
+   "· {} km trip · passenger is {} km from you"
+  ],
+  [
+   "TSh {} imerekodiwa. Ada yako iko hai mpaka {}.",
+   "TSh {} recorded. Your fee is active until {}."
+  ],
+  [
+   "Inaisha {}. Lipa {} mapema ili usikose safari.",
+   "It expires {}. Pay {} early so you don't miss trips."
+  ],
+  [
+   "Lipa {} kabla ya {} uendelee kupokea safari.",
+   "Pay {} before {} to keep receiving trips."
+  ],
+  [
+   "Inasasishwa yenyewe · dereva alionekana {}",
+   "Updates automatically · driver last seen {}"
+  ],
+  [
+   "Hitilafu ya mfumo (HTTP {}). Jaribu tena.",
+   "System error (HTTP {}). Try again."
+  ],
+  [
+   "Namba si sahihi. Umebakiza majaribio {}.",
+   "Wrong code. You have {} attempts left."
+  ],
+  [
+   "PIN si sahihi. Umebakiza majaribio {}.",
+   "Wrong PIN. You have {} attempts left."
+  ],
+  [
+   "Ada yako inaisha {} ({}). Lipa {} mapema.",
+   "Your fee expires {} ({}). Pay {} early."
+  ],
+  [
+   "Uko {}. Abiria akipanda, anza safari.",
+   "You are at {}. When the passenger is on board, start the trip."
+  ],
+  [
+   "Lipa {} ili uendelee kupokea safari.",
+   "Pay {} to keep receiving trips."
+  ],
+  [
+   "Ujumbe ni mrefu mno (herufi {} tu)",
+   "The message is too long ({} characters only)"
+  ],
+  [
+   "Fuatilia safari yangu ya NAYA: {}",
+   "Follow my NAYA trip: {}"
+  ],
+  [
+   "Fuatilia safari yangu ya NAYA{}:",
+   "Follow my NAYA trip{}:"
+  ],
+  [
+   "Ada ya mwezi iko hai mpaka {}",
+   "Monthly fee active until {}"
+  ],
+  [
+   "Anafika baada ya dakika ~{}{}.",
+   "Arrives in ~{} min{}."
+  ],
+  [
+   "Tafuta {} {} yenye plate hii",
+   "Look for {} {} with this plate"
+  ],
+  [
+   "Safari ya {} imeghairiwa.",
+   "The trip to {} was cancelled."
+  ],
+  [
+   "Lipa dereva {} taslimu.",
+   "Pay the driver {} in cash."
+  ],
+  [
+   "Mahali pa kumchukua: {}",
+   "Pickup point: {}"
+  ],
+  [
+   "Taslimu kutoka kwa {}.",
+   "Cash from {}."
+  ],
+  [
+   "PIN imekosewa mara {}",
+   "Wrong PIN {} times"
+  ],
+  [
+   "Habari za asubuhi, {}",
+   "Good morning, {}"
+  ],
+  [
+   "{} Piga Polisi · 112",
+   "{} Call Police · 112"
+  ],
+  [
+   "Dereva ameghairi: {}",
+   "The driver cancelled: {}"
+  ],
+  [
+   "Habari za mchana, {}",
+   "Good afternoon, {}"
+  ],
+  [
+   "Umethibitishwa, {}!",
+   "You are approved, {}!"
+  ],
+  [
+   "Abiria · {} taslimu",
+   "Passenger · {} cash"
+  ],
+  [
+   "Habari za jioni, {}",
+   "Good evening, {}"
+  ],
+  [
+   "Nyota {} kati ya 5",
+   "{} out of 5 stars"
+  ],
+  [
+   "Ofisi ya NAYA: {}",
+   "NAYA office: {}"
+  ],
+  [
+   "{} Shiriki safari",
+   "{} Share trip"
+  ],
+  [
+   "baada ya siku {}",
+   "in {} days"
+  ],
+  [
+   "Anakusubiri {}.",
+   "Waiting for you {}."
+  ],
+  [
+   "{} Piga simu · {}",
+   "{} Call · {}"
+  ],
+  [
+   "Njia {} {} haipo",
+   "Route {} {} does not exist"
+  ],
+  [
+   "{} kwa siku 30",
+   "{} for 30 days"
+  ],
+  [
+   "{} anasubiri {}.",
+   "{} is waiting at {}."
+  ],
+  [
+   "{} anaelekea {}.",
+   "{} is heading to {}."
+  ],
+  [
+   "★ {} ({} safari)",
+   "★ {} ({} trips)"
+  ],
+  [
+   "Piga simu · {}",
+   "Call · {}"
+  ],
+  [
+   "{} Piga simu ·",
+   "{} Call ·"
+  ],
+  [
+   "Unaelekea {}{}.",
+   "Heading to {}{}."
+  ],
+  [
+   "{} anakuja · {}",
+   "{} is coming · {}"
+  ],
+  [
+   "{} (sekunde {})",
+   "{} ({} seconds)"
+  ],
+  [
+   "{} zimepakiwa",
+   "{} uploaded"
+  ],
+  [
+   "{}: imepakiwa",
+   "{}: uploaded"
+  ],
+  [
+   "anasubiri {}.",
+   "is waiting at {}."
+  ],
+  [
+   "anaelekea {}.",
+   "is heading to {}."
+  ],
+  [
+   "· miezi {} · {}{}",
+   "· {} months · {}{}"
+  ],
+  [
+   "· miezi {} · {}",
+   "· {} months · {}"
+  ],
+  [
+   "Badilisha: {}",
+   "Replace: {}"
+  ],
+  [
+   "{} · Leseni {}",
+   "{} · Licence {}"
+  ],
+  [
+   "anakuja · {}",
+   "is coming · {}"
+  ],
+  [
+   "{} anakuja ·",
+   "{} is coming ·"
+  ],
+  [
+   "Karibu na {}",
+   "Near {}"
+  ],
+  [
+   "(sekunde {})",
+   "({} seconds)"
+  ],
+  [
+   "{} amefika {}.",
+   "{} has arrived at {}."
+  ],
+  [
+   "· yuko km {}",
+   "· {} km away"
+  ],
+  [
+   "· dakika ~{}",
+   "· ~{} min"
+  ],
+  [
+   "Mpe {} nyota",
+   "Rate {}"
+  ],
+  [
+   "{} Piga simu",
+   "{} Call"
+  ],
+  [
+   "{} · kutoka {}",
+   "{} · from {}"
+  ],
+  [
+   "Bodaboda {}",
+   "Motorbikes: {}"
+  ],
+  [
+   "· Leseni {}",
+   "· Licence {}"
+  ],
+  [
+   "{} · Leseni",
+   "{} · Licence"
+  ],
+  [
+   "Anakuja {}.",
+   "Coming {}."
+  ],
+  [
+   "Umefika {}!",
+   "You have arrived at {}!"
+  ],
+  [
+   "amefika {}.",
+   "has arrived at {}."
+  ],
+  [
+   "· bajaji {}",
+   "· Bajajis: {}"
+  ],
+  [
+   "{} → mpaka {}",
+   "{} → until {}"
+  ],
+  [
+   "{} · kutoka",
+   "{} · from"
+  ],
+  [
+   "· kutoka {}",
+   "· from {}"
+  ],
+  [
+   "dakika ~{}",
+   "~{} min"
+  ],
+  [
+   "Ulituma {}",
+   "You submitted {}"
+  ],
+  [
+   "Habari, {}",
+   "Hello, {}"
+  ],
+  [
+   "Mpeleke {}",
+   "Take them to {}"
+  ],
+  [
+   "Ombi la {}",
+   "Request {}"
+  ],
+  [
+   "Iliisha {}",
+   "Ended {}"
+  ],
+  [
+   "Umefika {}",
+   "You have arrived at {}"
+  ],
+  [
+   "{} → mpaka",
+   "{} → until"
+  ],
+  [
+   "→ mpaka {}",
+   "→ until {}"
+  ],
+  [
+   "{} Dharura",
+   "{} Emergency"
+  ],
+  [
+   "· siku {}",
+   "· {} days"
+  ],
+  [
+   "bajaji {}",
+   "Bajajis: {}"
+  ],
+  [
+   "{} karibu",
+   "{} nearby"
+  ],
+  [
+   "safari {}",
+   "{} trips"
+  ],
+  [
+   "{} yuko {}.",
+   "{} is at {}."
+  ],
+  [
+   "Pakia: {}",
+   "Upload: {}"
+  ],
+  [
+   "{} Ramani",
+   "{} Map"
+  ],
+  [
+   "{} · km {}",
+   "{} · {} km"
+  ],
+  [
+   "Pokea {}",
+   "Collect {}"
+  ],
+  [
+   "Msaada{}",
+   "Help{}"
+  ],
+  [
+   "Nyota {}",
+   "{} stars"
+  ],
+  [
+   "yuko {}.",
+   "is at {}."
+  ],
+  [
+   "km {} · {}",
+   "{} km · {}"
+  ],
+  [
+   "{} jipya",
+   "{} new"
+  ],
+  [
+   "· km {}",
+   "· {} km"
+  ],
+  [
+   "km {} ·",
+   "{} km ·"
+  ]
+ ]
+}

@@ -26,6 +26,7 @@ export const registerSchema = z.object({
     .max(120, 'Jina ni refu mno'),
   phone: phoneSchema,
   password: passwordSchema,
+  acceptTerms: z.literal(true, { error: 'Weka alama kwenye kisanduku kukubali Masharti ya Huduma na Sera ya Faragha' }),
 });
 
 export const loginSchema = z.object({

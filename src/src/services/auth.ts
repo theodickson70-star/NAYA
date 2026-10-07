@@ -1,4 +1,5 @@
 // Usajili na kuingia kwa namba ya simu + password.
+import { acceptTerms } from './terms.js';
 import bcrypt from 'bcryptjs';
 import { db, one, transaction } from '../db/pool.js';
 import { AppError, conflict, forbidden, isUniqueViolation, unauthorized } from '../utils/http.js';
@@ -21,7 +22,7 @@ const DUMMY_HASH = bcrypt.hashSync('naya-dummy-password', BCRYPT_ROUNDS);
 export const hashPassword = (plain: string) => bcrypt.hash(plain, BCRYPT_ROUNDS);
 
 /** Mtu yeyote anajisajili kama mtumiaji wa NAYA; baadaye anachagua kuwa abiria au dereva (mode). */
-export async function registerUser(input: { fullName: string; phone: string; password: string }): Promise<UserRow> {
+export async function registerUser(input: { fullName: string; phone: string; password: string; acceptTerms: true }): Promise<UserRow> {
   try {
     const user = await insertUser(db, {
       phone: input.phone,
@@ -29,6 +30,8 @@ export async function registerUser(input: { fullName: string; phone: string; pas
       role: 'USER',
       passwordHash: await hashPassword(input.password),
     });
+    // Amekubali masharti ya sasa wakati wa kujisajili (kisanduku ni lazima — registerSchema).
+    if (input.acceptTerms) await acceptTerms(db, user!.id);
     // SMS zikiwa zimewashwa: code ya kuthibitisha namba inatumwa mara moja (bila kuchelewesha jibu).
     if (smsEnabled()) void issueOtp(user!.phone, 'VERIFY_PHONE', { silent: true }).catch(() => {});
     return user!;

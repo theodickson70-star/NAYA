@@ -15,6 +15,7 @@ export interface UserRow {
   password_hash: string;
   token_version: number;
   active_mode: AppMode | null;
+  language: 'sw' | 'en';
   phone_verified_at: Date | null;
   last_login_at: Date | null;
   created_at: Date;

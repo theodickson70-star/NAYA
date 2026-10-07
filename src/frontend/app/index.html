@@ -15,6 +15,7 @@
   <link rel="preload" as="image" href="/shared/img/naya-hero.webp" type="image/webp">
   <link rel="stylesheet" href="/shared/naya.css">
   <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="/masharti/masharti.css">
   <script src="boot.js"></script>
 </head>
 <body>
@@ -55,6 +56,7 @@
 
   <!-- ================= Utangulizi (mara ya kwanza tu) ================= -->
   <main id="view-intro" class="intro" hidden>
+    <div class="lang-switch lang-glass lang-intro" role="group" aria-label="Lugha / Language" translate="no"><button type="button" data-lang="sw" aria-pressed="true" lang="sw">Kiswahili</button><button type="button" data-lang="en" aria-pressed="false" lang="en">English</button></div>
     <button class="intro-skip" type="button" id="intro-skip">Ruka</button>
     <div class="intro-track" id="intro-track">
       <section class="intro-slide" aria-labelledby="intro-1">
@@ -117,6 +119,7 @@
     <header class="auth-hero">
       <img class="auth-photo" src="/shared/img/naya-hero.webp" alt="" width="791" height="466">
       <div class="auth-shade" aria-hidden="true"></div>
+      <div class="lang-switch lang-glass lang-auth" role="group" aria-label="Lugha / Language" translate="no"><button type="button" data-lang="sw" aria-pressed="true" lang="sw">Kiswahili</button><button type="button" data-lang="en" aria-pressed="false" lang="en">English</button></div>
       <div class="auth-brand">
         <img class="auth-icon" src="/shared/brand/naya-icon-light.svg" alt="" width="64" height="64">
         <img class="auth-wordmark" src="/shared/brand/naya-wordmark-white.svg" alt="NAYA" width="438" height="124">
@@ -151,6 +154,10 @@
           <span class="field-main"><span class="field-label">Tengeneza password</span>
           <input id="reg-password" type="password" autocomplete="new-password" placeholder="Angalau herufi 8" required></span>
           <button class="field-eye" type="button" data-eye="reg-password" aria-label="Onyesha password"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        </label>
+        <label class="terms-check" for="reg-terms">
+          <input type="checkbox" id="reg-terms">
+          <span>Kwa kujisajili, unakubali <a href="/masharti/#jumla" data-terms="jumla">Masharti ya Huduma</a> na <a href="/masharti/#faragha" data-terms="faragha">Sera ya Faragha</a> ya NAYA, na kwamba una miaka 18 au zaidi.</span>
         </label>
         <p class="alert alert-danger" id="register-error" role="alert" hidden></p>
         <button class="btn btn-primary btn-block btn-arrow" type="submit">Jisajili</button>

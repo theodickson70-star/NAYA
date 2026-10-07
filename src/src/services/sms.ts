@@ -2,6 +2,7 @@
 // - Funguo (BEEM_API_KEY / BEEM_SECRET_KEY) zinakaa kwenye server tu; hazitumwi kwa app wala kuandikwa kwenye logs.
 // - Kila SMS inaandikwa kwenye naya.sms_log (aina na matokeo tu — kamwe si maandishi, kwa sababu OTP ni siri).
 // - Bila funguo, SMS zimezimwa: sendSms inarudisha false bila kosa.
+import { phoneLang, tr } from './i18n.js';
 import { env } from '../config/env.js';
 import { db, one } from '../db/pool.js';
 
@@ -67,6 +68,7 @@ export function toGsm(text: string): string {
 /** Tuma SMS moja. Inarudisha true ikifika kwa Beem. Haitupi kosa kamwe. */
 export async function sendSms(phone: string, message: string, kind: string): Promise<boolean> {
   if (!smsEnabled()) return false;
+  message = tr(message, await phoneLang(phone).catch(() => 'sw' as const));
   const result = await (testSender ?? beemSend)(phone, toGsm(message));
   try {
     await db.query('INSERT INTO naya.sms_log (phone, kind, status, request_id, error) VALUES ($1, $2, $3, $4, $5)', [

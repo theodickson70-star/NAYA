@@ -18,9 +18,11 @@ Mfumo wa bodaboda na bajaji. Unajengwa phase moja baada ya nyingine; kila phase 
 | 10.1 | Bei maalum kati ya maeneo (ofisi inaandika bei za njia; km kwa nyingine) | ✅ |
 | 10.2 | Dereva anaweza kwenda online popote (anapokea maombi ya wateja walio ndani ya km 10 tu) | ✅ |
 | 11 | Ofisi kuu: wateja, msaada (malalamiko), ramani live, kuingilia safari, matangazo, ripoti + CSV, utafutaji mmoja | ✅ |
-| 11.1 | Maoni: abiria na madereva wanatoa nyota + maoni kwenye Akaunti; ofisi inayafanyia kazi na mtoaji anajulishwa | ✅ sasa |
-| 12 | Malipo kwa simu (M-Pesa, Airtel, Mixx/Tigo, HaloPesa) | |
-| 13 | Msaidizi wa AI (Claude) unaotumia data halisi | |
+| 11.1 | Maoni: abiria na madereva wanatoa nyota + maoni kwenye Akaunti; ofisi inayafanyia kazi na mtoaji anajulishwa | ✅ |
+| 11.2 | Masharti ya huduma (abiria + dereva) na sera ya faragha; kukubali wakati wa kujisajili, kutuma ombi la udereva, na kwa watumiaji wa zamani | ✅ |
+| 12 | Lugha mbili: Kiswahili na English (app ya abiria/dereva, makosa ya server, arifa, SMS, masharti) | ✅ sasa |
+| 13 | Malipo kwa simu (M-Pesa, Airtel, Mixx/Tigo, HaloPesa) | |
+| 14 | Msaidizi wa AI (Claude) unaotumia data halisi | |
 
 ## Muundo
 
@@ -80,7 +82,7 @@ Dereva akighairi baada ya kukubali → safari inarudi SEARCHING (dereva mwingine
 ```
 
 - **Kumpata dereva:** server inaendesha dispatch kila sekunde 3 (`src/server.ts`). Ombi linaenda kwa dereva aliyethibitishwa, aliye online,
-  mwenye chombo sahihi, aliye karibu zaidi (ndani ya km 10). Ana **dakika 3** kukubali (app inamkumbusha kwa kengele kila sekunde 20); akikataa, anayefuata anapewa papo hapo. Bila dereva kwa dakika 10 → NO_DRIVER.
+  mwenye chombo sahihi, aliye karibu zaidi (ndani ya km 10). Ana **dakika 1** kukubali (app inamkumbusha kwa kengele kila sekunde 20); akikataa, anayefuata anapewa papo hapo. Bila dereva kwa dakika 10 → NO_DRIVER.
 - **Usalama wa data:** unique indexes zinazuia dereva au abiria kuwa na safari mbili zinazoendelea; dereva ana ombi moja tu linalosubiri;
   kukubali kunafanyika chini ya row lock (madereva wawili hawawezi kupata safari moja).
 - **Nauli** inahesabiwa na server wakati wa kuagiza (haitoki kwenye app). Malipo kwa sasa ni taslimu.
@@ -207,6 +209,23 @@ mabadiliko ya NAYA yanayopushiwa Railway yanaonekana kwenye app papo hapo — **
   kwa NAYA Google inaweza kuomba maelezo au kuizima — kengele ya sekunde 30 bado inalia, ila haitajitokeza juu ya skrini iliyofungwa.
 - Bila keystore, APK ni ya "debug" (inafaa kwa kusambaza moja kwa moja). GitHub inahifadhi ufunguo wake ili update isakinike juu
   ya ya zamani; ikitokea simu ikakataa ("App not installed"), futa NAYA ya zamani kisha usakinishe mpya.
+
+## Lugha mbili (Phase 12)
+
+- Mtumiaji anachagua **Kiswahili | English** kwenye skrini ya kwanza, ya kujisajili, au Akaunti → Lugha / Language. Chaguo linabaki kwenye simu.
+- Maandishi ya app yameandikwa kwa Kiswahili; kamusi moja **`frontend/shared/i18n/en.json`** inayatafsiri (app) na server inaitumia kwa makosa, arifa (push/FCM) na SMS kwa lugha ya mtumiaji (`users.language`, migration `014_lugha.sql`).
+- Masharti: `frontend/masharti/index.html` (Kiswahili) na `frontend/masharti/en.html` (English).
+- **Ukiongeza maandishi mapya kwenye app**, ongeza tafsiri yake kwenye `en.json` (`exact`: maandishi kamili; `patterns`: yenye `{}` kwa sehemu zinazobadilika). Bila tafsiri, maandishi yanaonekana kwa Kiswahili.
+- Ofisi (admin) inabaki kwa Kiswahili. Majina ya maeneo, ujumbe wa ofisi na matangazo vinaonekana kama vilivyoandikwa.
+
+## Masharti na faragha (Phase 11.2)
+
+- Maandishi yote yako **`frontend/masharti/index.html`** (ukurasa wa umma: `/masharti/`). Sehemu: Kwa wote, Abiria, Dereva, Faragha.
+- **Kujisajili:** kisanduku "Nakubali Masharti ya Huduma na Sera ya Faragha" ni lazima (server inakataa bila `acceptTerms: true`).
+- **Ombi la udereva:** kisanduku cha Masharti ya Dereva kabla ya "Tuma kwa uthibitisho" (`acceptDriverTerms: true`).
+- **Watumiaji wa zamani:** wakifungua app wanaona dirisha la "Nakubali, endelea" mara moja.
+- **Kubadilisha masharti:** hariri ukurasa, kisha ongeza `TERMS_VERSION` / `DRIVER_TERMS_VERSION` kwenye `src/services/terms.ts` — wote wataombwa kukubali toleo jipya.
+- Ofisi → Wateja → wasifu unaonyesha tarehe aliyokubali. Migration `013_masharti.sql` inaongeza safu tupu tu.
 
 ## Maoni (Phase 11.1)
 

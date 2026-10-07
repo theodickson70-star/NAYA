@@ -5,6 +5,7 @@ import { db, many, one } from '../db/pool.js';
 import { type EventType, publish } from '../realtime/hub.js';
 import { sendFcm } from './fcm.js';
 import { sendPush } from './push.js';
+import { userLang, tr } from './i18n.js';
 import { sendSms, smsEnabled } from './sms.js';
 
 export interface Notice {
@@ -21,8 +22,16 @@ export interface Notice {
   sms?: string;
 }
 
-export async function notify(n: Notice): Promise<void> {
+export async function notify(input: Notice): Promise<void> {
   try {
+    // Maandishi kwa lugha ya mtumiaji (Kiswahili / English).
+    const lang = input.title || input.sms ? await userLang(input.userId) : 'sw';
+    const n: Notice = {
+      ...input,
+      title: input.title && tr(input.title, lang),
+      body: input.body && tr(input.body, lang),
+      sms: input.sms && tr(input.sms, lang),
+    };
     await publish({ type: n.event, userId: n.userId, rideId: n.rideId ?? null });
     if (n.title) {
       await db.query('INSERT INTO naya.notifications (user_id, kind, title, body, ride_id) VALUES ($1, $2, $3, $4, $5)', [

@@ -22,8 +22,8 @@ import { assertSubscriptionOk, describeSubscription, getSettings, SUBSCRIPTION_O
 export type RideStatus = 'SEARCHING' | 'ACCEPTED' | 'ARRIVED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'NO_DRIVER';
 type VehicleType = 'BODABODA' | 'BAJAJI';
 
-export const OFFER_SECONDS = 180; // dakika 3: muda wa dereva kukubali ombi (akikataa, linaenda kwa anayefuata papo hapo)
-export const SEARCH_TIMEOUT_SECONDS = 600; // dakika 10 bila dereva → NO_DRIVER (madereva ~3 wanaweza kujaribiwa)
+export const OFFER_SECONDS = 60; // dakika 1: muda wa dereva kukubali ombi (akikataa, linaenda kwa anayefuata papo hapo)
+export const SEARCH_TIMEOUT_SECONDS = 600; // dakika 10 bila dereva → NO_DRIVER (madereva ~10 wanaweza kujaribiwa, dakika 1 kila mmoja)
 export const NEARBY_LIMIT = 3; // "NAYA karibu nawe": madereva wangapi wa kila chombo abiria anawaona
 export const MAX_PICKUP_KM = 10; // dereva awe ndani ya umbali huu kutoka kwa abiria
 export const DRIVER_STALE_SECONDS = 120; // dereva asiyeonekana kwa muda huu hapewi maombi

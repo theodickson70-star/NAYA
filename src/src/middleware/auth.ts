@@ -49,6 +49,12 @@ export async function authenticate(request: FastifyRequest, _reply: FastifyReply
   if (!user || user.token_version !== payload.tv) throw unauthorized('Umetoka. Ingia tena.');
   if (user.status !== 'ACTIVE') throw forbidden('Akaunti hii imesimamishwa. Wasiliana na NAYA.');
   request.currentUser = user;
+  // Lugha ya app ya mtumiaji (kichwa x-naya-lang): ihifadhiwe ili arifa na SMS zimfikie kwa lugha hiyo.
+  const lang = request.headers['x-naya-lang'];
+  if ((lang === 'en' || lang === 'sw') && user.language && lang !== user.language && user.role === 'USER') {
+    await db.query('UPDATE naya.users SET language = $2 WHERE id = $1', [user.id, lang]);
+    user.language = lang;
+  }
 }
 
 /** Lazima awe ameingia NA awe na moja ya roles hizi. */

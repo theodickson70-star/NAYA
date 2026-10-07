@@ -3,6 +3,16 @@
 // - Mode ya mwisho ilikuwa Dereva: logo ya njano ya NAYA Dereva.
 (function () {
   var root = document.documentElement;
+  // Lugha: English → ficha ukurasa kwa muda mfupi mpaka tafsiri iwe tayari (shared/i18n.js inaondoa darasa hili).
+  try {
+    if (localStorage.getItem('naya_lang') === 'en') {
+      root.lang = 'en';
+      root.classList.add('i18n-pending');
+      setTimeout(function () { root.classList.remove('i18n-pending'); }, 2500);
+    }
+  } catch (e) {
+    /* storage imezuiwa — Kiswahili */
+  }
   var quick = false;
   var soundOn = true;
   try {

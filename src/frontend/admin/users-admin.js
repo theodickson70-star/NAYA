@@ -118,6 +118,7 @@ function render(data) {
         <div class="tags">
           ${suspended ? tag('bad', 'Akaunti imesimamishwa') : tag('ok', 'Akaunti iko hai')}
           ${u.phoneVerifiedAt ? tag('ok', 'Namba imethibitishwa') : tag('warn', 'Namba haijathibitishwa')}
+          ${u.termsAcceptedAt ? tag('muted', `Masharti: alikubali ${formatDate(u.termsAcceptedAt)}`) : tag('warn', 'Bado hajakubali masharti')}
           ${d ? tag(DRIVER_STATUS[d.status]?.tone ?? 'muted', `Dereva: ${DRIVER_STATUS[d.status]?.label ?? d.status}`) : tag('muted', 'Abiria')}
           ${d?.online ? tag('ok', 'Online sasa') : ''}
           ${devices?.androidApp ? tag('ok', 'Ana app ya Android') : ''}
