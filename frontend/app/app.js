@@ -18,13 +18,15 @@ import { introSeen, setupIntro } from './intro.js';
 import { nearbyMap } from '/shared/map.js';
 import * as rides from './rides.js';
 import * as support from './support.js';
+import * as feedback from './feedback.js';
+import * as terms from './terms.js';
 import { finishSplash, previewSound, setSoundEnabled, soundEnabled, splashActive, splashReady } from './splash.js';
 
 const api = createApi('naya_app_token');
 const $ = (id) => document.getElementById(id);
 const views = ['view-loading', 'view-intro', 'view-auth', 'view-verify', 'view-role', 'view-offline', 'view-app'];
 const MAX_BYTES = 3 * 1024 * 1024;
-const VERSION = '0.11.0';
+const VERSION = '0.11.2';
 
 let account = null; // { user, activeMode, driverStatus, canDrive }
 let driver = null; // wasifu wa udereva (mode ya Dereva)
@@ -176,7 +178,15 @@ async function submitAuth(event, work, errorId) {
 $('register-form').addEventListener('submit', (e) =>
   submitAuth(
     e,
-    () => api.post('/api/auth/register', { fullName: $('reg-name').value, phone: $('reg-phone').value, password: $('reg-password').value }),
+    () => {
+      if (!$('reg-terms').checked) throw new Error('Weka alama kwenye kisanduku kukubali Masharti ya Huduma na Sera ya Faragha.');
+      return api.post('/api/auth/register', {
+        fullName: $('reg-name').value,
+        phone: $('reg-phone').value,
+        password: $('reg-password').value,
+        acceptTerms: true,
+      });
+    },
     'register-error',
   ),
 );
@@ -335,9 +345,24 @@ async function loadAccount() {
   startRealtime();
   // App ya Android: sajili simu hii kwa kengele ya maombi (kimya; ruhusa ikiwa imeshatolewa).
   syncNative(api).catch(() => {});
+  askTermsIfNeeded();
   if (!account.activeMode) return showRoleChoice();
   show('view-app');
   route();
+}
+
+/** Watumiaji wa zamani (kabla ya masharti) au toleo jipya la masharti: wakubali kwanza. */
+function askTermsIfNeeded() {
+  const t = account?.terms;
+  if (!t || (t.accepted && t.driverAccepted !== false)) return;
+  terms.askToAccept({
+    api,
+    needDriver: t.driverAccepted === false,
+    onDone: (state) => {
+      account.terms = state;
+      toast('Asante! Umekubali masharti ya NAYA.');
+    },
+  });
 }
 
 function showRoleChoice() {
@@ -399,7 +424,13 @@ function startRealtime() {
           account = await api.get('/api/account');
           setSupportDot();
           if (support.openTicketId()) support.renderTicket(support.openTicketId());
-          else if (tab === 'account' && location.hash === '#/akaunti') renderAccount();
+          else if (tab === 'account' && location.hash === '#/akaunti') {
+            // Usifute maoni anayoandika sasa hivi — sasisha orodha tu.
+            if (feedback.isTyping()) {
+              feedback.loadCardList();
+              support.loadCardList();
+            } else renderAccount();
+          }
         } catch (err) {
           handleError(err);
         }
@@ -862,6 +893,8 @@ function renderAccount() {
 
     ${support.cardHtml(account.supportUnread)}
 
+    ${feedback.cardHtml()}
+
     <section class="card" aria-labelledby="pw-title">
       <details class="pw-details">
         <summary><h2 id="pw-title">Badilisha password</h2></summary>
@@ -885,10 +918,20 @@ function renderAccount() {
       <button class="link-btn" type="button" id="sound-test">Sikiliza sauti</button>
     </section>
 
+    <section class="card terms-card" aria-labelledby="terms-title">
+      <h2 id="terms-title">Masharti na faragha</h2>
+      <ul class="terms-links">
+        <li><a href="/masharti/#jumla" data-terms="jumla">Masharti ya Huduma</a></li>
+        <li><a href="/masharti/#${driverMode || driverStatus ? 'dereva' : 'abiria'}" data-terms="${driverMode || driverStatus ? 'dereva' : 'abiria'}">${driverMode || driverStatus ? 'Masharti ya Dereva' : 'Masharti ya Abiria'}</a></li>
+        <li><a href="/masharti/#faragha" data-terms="faragha">Sera ya Faragha</a></li>
+      </ul>
+    </section>
+
     <button class="btn btn-ghost btn-out" type="button" data-action="logout">Toka</button>
     <p class="version">NAYA ${VERSION} · TWENDE PAMOJA</p>`;
   loadNotificationSection();
   support.loadCardList();
+  feedback.loadCardList();
   setSupportDot();
   if ($('sub-body')) loadSubscriptionSection();
 }
@@ -1101,6 +1144,10 @@ function renderOnboarding() {
                   ...req.rejectedDocuments.map((t) => `<li>Badilisha: ${esc(DOCUMENTS[t].label)}</li>`),
                 ].join('')}</ul>`
           }
+          <label class="terms-check" for="driver-terms">
+            <input type="checkbox" id="driver-terms">
+            <span>Nimesoma na ninakubali <a href="/masharti/#dereva" data-terms="dereva">Masharti ya Dereva</a> wa NAYA: kofia mbili, bei ya app tu, PIN kabla ya safari, na ada ya mwezi.</span>
+          </label>
           <p class="alert alert-danger" id="submit-error" role="alert" hidden></p>
           <button class="btn btn-primary btn-block" type="button" data-action="submit" ${req.canSubmit ? '' : 'disabled'}>Tuma kwa uthibitisho</button>
         </div>
@@ -1347,10 +1394,15 @@ $('app-content').addEventListener('click', async (event) => {
   }
   if (action === 'submit') {
     const button = event.target.closest('[data-action]');
+    if (!$('driver-terms')?.checked) {
+      $('submit-error').textContent = 'Weka alama kukubali Masharti ya Dereva kwanza.';
+      $('submit-error').hidden = false;
+      return;
+    }
     button.disabled = true;
     button.textContent = 'Inatuma…';
     try {
-      driver = await api.post('/api/drivers/me/submit');
+      driver = await api.post('/api/drivers/me/submit', { acceptDriverTerms: true });
       account.driverStatus = driver.driver.status;
       renderDriver();
       window.scrollTo(0, 0);
@@ -1405,6 +1457,7 @@ function signOutLocally() {
 $('retry-button').addEventListener('click', start);
 
 support.init({ api, handleError, toast, isDriver: () => account?.activeMode === 'DRIVER' });
+feedback.init({ api, handleError, toast });
 rides.init({
   api,
   pushState: () => pushState(api),

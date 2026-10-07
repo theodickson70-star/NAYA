@@ -7,6 +7,7 @@ import { assertCanSwitchMode, dispatchRide } from './rides.js';
 import { env } from '../config/env.js';
 import { smsEnabled } from './sms.js';
 import { unreadSupportCount } from './support.js';
+import { termsState } from './terms.js';
 import { findUserById, toPublicUser, type AppMode, type UserRow } from './users.js';
 
 export async function getAccount(user: UserRow) {
@@ -26,6 +27,8 @@ export async function getAccount(user: UserRow) {
     androidApkUrl: env.androidApkUrl ?? null,
     /** Majibu ya ofisi (Msaada) ambayo mtumiaji bado hajasoma. */
     supportUnread: await unreadSupportCount(user.id),
+    /** Masharti: amekubali toleo la sasa? (wa zamani wanaombwa kukubali kwenye app) */
+    terms: await termsState(db, user.id),
   };
 }
 

@@ -4,6 +4,7 @@ import { createApi, escapeHtml as esc, fetchHealth } from '/shared/api.js';
 import { connectRealtime } from '/shared/realtime.js';
 import * as broadcastAdmin from './broadcast-admin.js';
 import { barChart, shortDay } from './charts.js';
+import * as feedbackAdmin from './feedback-admin.js';
 import * as liveAdmin from './live-admin.js';
 import * as places from './places.js';
 import * as reportsAdmin from './reports-admin.js';
@@ -28,7 +29,7 @@ const $ = (id) => document.getElementById(id);
 const views = ['view-loading', 'view-login', 'view-offline', 'view-app'];
 const pages = [
   'page-overview', 'page-drivers', 'page-driver', 'page-locations', 'page-fares', 'page-rides', 'page-ride', 'page-subscriptions', 'page-sos',
-  'page-live', 'page-users', 'page-user', 'page-support', 'page-ticket', 'page-reports', 'page-broadcast',
+  'page-live', 'page-users', 'page-user', 'page-support', 'page-ticket', 'page-reports', 'page-broadcast', 'page-feedback',
 ];
 let me = null;
 
@@ -102,6 +103,7 @@ function onAdminEvent(_type, data) {
     else if (!$('page-sos').hidden && !document.activeElement?.closest('#sos-list form')) safetyAdmin.loadPage();
     else if (!$('page-subscriptions').hidden) subsAdmin.loadList();
     else if (!$('page-live').hidden) liveAdmin.refresh().catch(() => {});
+    else if (!$('page-feedback').hidden && !feedbackAdmin.isTyping()) feedbackAdmin.load();
     else if (!$('page-support').hidden) supportAdmin.loadList(new URLSearchParams(location.hash.split('?')[1] ?? ''));
     else if (!$('page-ticket').hidden && !supportAdmin.isTyping()) {
       const id = supportAdmin.openTicketId();
@@ -149,6 +151,7 @@ function route() {
   else if (parts[0] === 'msaada') page = 'page-support';
   else if (parts[0] === 'ripoti') page = 'page-reports';
   else if (parts[0] === 'matangazo') page = 'page-broadcast';
+  else if (parts[0] === 'maoni') page = 'page-feedback';
   closeMenu();
   ridesAdmin.stop();
   liveAdmin.stop();
@@ -157,7 +160,7 @@ function route() {
   const navFor = {
     'page-overview': 'overview', 'page-drivers': 'drivers', 'page-driver': 'drivers', 'page-locations': 'locations', 'page-fares': 'fares',
     'page-rides': 'rides', 'page-ride': 'rides', 'page-subscriptions': 'subscriptions', 'page-sos': 'sos', 'page-live': 'live',
-    'page-users': 'users', 'page-user': 'users', 'page-support': 'support', 'page-ticket': 'support', 'page-reports': 'reports', 'page-broadcast': 'broadcast',
+    'page-users': 'users', 'page-user': 'users', 'page-support': 'support', 'page-ticket': 'support', 'page-reports': 'reports', 'page-broadcast': 'broadcast', 'page-feedback': 'feedback',
   };
   for (const a of document.querySelectorAll('[data-nav]')) {
     const active = a.dataset.nav === navFor[page];
@@ -181,6 +184,7 @@ function route() {
   if (page === 'page-ticket') supportAdmin.loadTicket(parts[1]);
   if (page === 'page-reports') reportsAdmin.load();
   if (page === 'page-broadcast') broadcastAdmin.load();
+  if (page === 'page-feedback') feedbackAdmin.load();
 }
 
 // ---------- Menyu ya simu ----------
@@ -350,6 +354,8 @@ async function loadSms() {
 }
 
 function setNavCounts(data) {
+  $('nav-feedback').textContent = data.feedbackNew;
+  $('nav-feedback').hidden = !data.feedbackNew;
   $('nav-support').textContent = data.supportOpen;
   $('nav-support').hidden = !data.supportOpen;
   $('nav-online').textContent = data.rides.driversOnline;
@@ -369,6 +375,7 @@ async function renderQueue(data) {
     [data.sosOpen, 'bad', 'Dharura zilizo wazi', 'Mpigie mtu aliyeomba msaada sasa hivi', '#/dharura', 'Shughulikia'],
     [searching, 'bad', 'Wateja wanasubiri dereva', 'Mpe dereva maalum kutoka ramani au ukurasa wa safari', '#/ramani', 'Fungua ramani'],
     [data.supportOpen, 'warn', 'Maombi ya msaada yanasubiri jibu', 'Malalamiko na maswali kutoka kwenye app', '#/msaada?hali=OPEN', 'Jibu'],
+    [data.feedbackNew, 'warn', 'Maoni mapya ya wateja na madereva', 'Yasome na uyafanyie kazi — mtoaji anajulishwa', '#/maoni', 'Soma'],
     [data.drivers.PENDING, 'warn', 'Madereva wanasubiri uthibitisho', 'Kagua nyaraka, kisha thibitisha au kataa', '#/madereva?hali=PENDING', 'Kagua'],
     [data.subscriptions.expiredDrivers, 'warn', 'Madereva wenye ada iliyoisha', 'Hawapokei safari mpaka walipe', '#/ada', 'Angalia'],
     [data.rides.noDriverToday, 'warn', 'Safari zilizokosa dereva leo', 'Waombe madereva zaidi waende online saa za shughuli', '#/ripoti', 'Ripoti'],
@@ -774,4 +781,5 @@ supportAdmin.setup({ api, onAuthError: handleAuthError });
 liveAdmin.setup({ api, onAuthError: handleAuthError });
 reportsAdmin.setup({ api, onAuthError: handleAuthError });
 broadcastAdmin.setup({ api, onAuthError: handleAuthError });
+feedbackAdmin.setup({ api, onAuthError: handleAuthError });
 start();

@@ -94,7 +94,7 @@ describe('NAYA Phase 3 — madereva', () => {
   let driverId = '';
 
   it('akaunti mpya: role USER, bado hajachagua mode; huduma za dereva bado hazipo (404)', async () => {
-    const reg = await call('POST', '/api/auth/register', { fullName: 'Juma Dereva', phone: driverPhone, password: PASSWORD });
+    const reg = await call('POST', '/api/auth/register', { fullName: 'Juma Dereva', phone: driverPhone, password: PASSWORD, acceptTerms: true });
     assert.equal(reg.status, 201);
     assert.equal(reg.json.data.user.role, 'USER');
     assert.equal(reg.json.data.user.activeMode, null);
@@ -110,7 +110,7 @@ describe('NAYA Phase 3 — madereva', () => {
     assert.equal(early.status, 404);
     assert.match(early.json.message, /mode ya Dereva/);
 
-    const reg2 = await call('POST', '/api/auth/register', { fullName: 'Asha Dereva', phone: driver2Phone, password: PASSWORD });
+    const reg2 = await call('POST', '/api/auth/register', { fullName: 'Asha Dereva', phone: driver2Phone, password: PASSWORD, acceptTerms: true });
     driver2Token = reg2.json.data.token;
     ids.push(reg2.json.data.user.id);
     await call('PUT', '/api/account/mode', { mode: 'DRIVER' }, driver2Token);
@@ -177,7 +177,7 @@ describe('NAYA Phase 3 — madereva', () => {
   });
 
   it('hawezi kutuma kabla ya nyaraka zote (409)', async () => {
-    assert.equal((await call('POST', '/api/drivers/me/submit', {}, driverToken)).status, 409);
+    assert.equal((await call('POST', '/api/drivers/me/submit', { acceptDriverTerms: true }, driverToken)).status, 409);
   });
 
   it('faili hatari au zisizo sahihi zinakataliwa', async () => {
@@ -227,8 +227,15 @@ describe('NAYA Phase 3 — madereva', () => {
     assert.equal((await upload('PROFILE_PHOTO', JPEG(), customerToken)).status, 404);
   });
 
+  it('bila kukubali Masharti ya Dereva hawezi kutuma (400)', async () => {
+    const res = await call('POST', '/api/drivers/me/submit', {}, driverToken);
+    assert.equal(res.status, 400);
+  });
+
   it('anatuma → PENDING; wakati wa ukaguzi hawezi kubadilisha', async () => {
-    const sub = await call('POST', '/api/drivers/me/submit', {}, driverToken);
+    const prior = await db.query('SELECT driver_terms_version FROM naya.drivers d JOIN naya.users u ON u.id = d.user_id WHERE u.phone = $1', [`255${driverPhone.slice(1)}`]);
+    assert.equal(prior.rows[0].driver_terms_version, null);
+    const sub = await call('POST', '/api/drivers/me/submit', { acceptDriverTerms: true }, driverToken);
     assert.equal(sub.status, 200);
     assert.equal(sub.json.data.driver.status, 'PENDING');
     assert.equal((await upload('PROFILE_PHOTO', JPEG(), driverToken)).status, 403);
@@ -281,7 +288,7 @@ describe('NAYA Phase 3 — madereva', () => {
 
   it('anarekebisha, anatuma tena, ofisi inamthibitisha; kila hatua imeandikwa', async () => {
     assert.equal((await upload('DRIVING_LICENSE', JPEG(), driverToken)).status, 200);
-    assert.equal((await call('POST', '/api/drivers/me/submit', {}, driverToken)).json.data.driver.status, 'PENDING');
+    assert.equal((await call('POST', '/api/drivers/me/submit', { acceptDriverTerms: true }, driverToken)).json.data.driver.status, 'PENDING');
     const ok = await call('POST', `/api/admin/drivers/${driverId}/approve`, {}, adminToken);
     assert.equal(ok.status, 200);
     assert.equal(ok.json.data.driver.status, 'APPROVED');

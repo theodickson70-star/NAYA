@@ -101,6 +101,7 @@ export async function buildApp(options: { logger?: boolean } = {}): Promise<Fast
   app.get('/admin', async (_request, reply) => reply.redirect('/admin/'));
   app.get('/app', async (_request, reply) => reply.redirect('/app/'));
   app.get('/safari', async (_request, reply) => reply.redirect('/safari/'));
+  app.get('/masharti', async (_request, reply) => reply.redirect('/masharti/'));
   // Mwanzo na anwani ya zamani ya app ya dereva → app moja ya NAYA.
   app.get('/', async (_request, reply) => reply.redirect('/app/'));
   app.get('/dereva', async (_request, reply) => reply.redirect('/app/'));

@@ -287,3 +287,40 @@ describe('NAYA Phase 11 — ramani, kuingilia safari, matangazo, ripoti, utafuta
     assert.equal((await call('POST', `/api/admin/users/${ids.d2}/offline`, {}, 'admin')).status, 409);
   });
 });
+
+describe('NAYA Phase 11.1 — Maoni', () => {
+  let fid = '';
+  it('abiria na dereva wanatoa maoni; uhakiki wa nyota', async () => {
+    assert.equal((await call('POST', '/api/feedback', { rating: 0, body: 'Nzuri sana' }, 'p1')).status, 400);
+    const p = await call('POST', '/api/feedback', { rating: 4, topic: 'PRICES', body: 'Bei ni nzuri, ila ongezeni bajaji usiku.' }, 'p1');
+    assert.equal(p.status, 201, p.json.message);
+    assert.equal(p.json.data.status, 'NEW');
+    fid = p.json.data.id;
+    const d = await call('POST', '/api/feedback', { rating: 5, body: 'Kengele ya maombi inasaidia sana.' }, 'd1');
+    assert.equal(d.json.data.role, 'DRIVER');
+    assert.equal((await call('GET', '/api/feedback', undefined, 'p1')).json.data.length, 1);
+  });
+
+  it('ofisi inaona maoni mapya, wastani wa nyota, na kuyafanyia kazi; mtoaji anajulishwa', async () => {
+    const list = await call('GET', '/api/admin/feedback?status=NEW', undefined, 'admin');
+    assert.ok(list.json.data.items.some((f: any) => f.id === fid));
+    assert.ok(list.json.data.summary.NEW >= 2);
+    assert.equal(typeof list.json.data.summary.avg30, 'number');
+    assert.ok((await call('GET', '/api/admin/dashboard', undefined, 'admin')).json.data.feedbackNew >= 2);
+    assert.equal((await call('GET', '/api/admin/feedback', undefined, 'p1')).status, 403);
+    const acted = await call('POST', `/api/admin/feedback/${fid}`, { status: 'ACTED', note: 'Tumeongeza bajaji 2 za usiku kuanzia wiki hii.' }, 'admin');
+    assert.equal(acted.status, 200, acted.json.message);
+    assert.equal(acted.json.data.status, 'ACTED');
+    assert.equal(acted.json.data.handledBy, 'Msimamizi Kuu');
+    const mine = (await call('GET', '/api/feedback', undefined, 'p1')).json.data[0];
+    assert.equal(mine.officeNote, 'Tumeongeza bajaji 2 za usiku kuanzia wiki hii.');
+    const n = await db.query(`SELECT title FROM naya.notifications WHERE user_id = $1 AND kind = 'feedback_reply'`, [ids.p1]);
+    assert.equal(n.rows[0].title, 'Tumefanyia kazi maoni yako');
+  });
+
+  it('maoni ya safari (nyota za abiria) yanaonekana ofisini', async () => {
+    const r = await call('GET', '/api/admin/ride-comments?all=1', undefined, 'admin');
+    assert.equal(r.status, 200);
+    assert.ok(Array.isArray(r.json.data));
+  });
+});

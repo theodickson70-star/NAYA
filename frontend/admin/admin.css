@@ -537,3 +537,20 @@ a.kpi:hover { border-color: var(--naya-green); }
 .cand-list { display: grid; gap: 8px; margin-top: 10px; }
 .cand { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 12px; background: var(--white); border: 1px solid var(--line); }
 .cand small { display: block; color: var(--muted); }
+
+/* ---- Maoni ---- */
+.fb-list { display: grid; gap: 10px; }
+.fb-card { background: var(--white); border: 1px solid var(--line); border-radius: 16px; padding: 16px 18px; }
+.fb-card.is-new { border-color: #E9CF6E; box-shadow: inset 4px 0 0 var(--warning); }
+.fb-card.is-low { border-color: #F1B9AE; }
+.fb-card header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.fb-card header .badge { margin-left: auto; }
+.fb-body { margin: 10px 0 6px; font-size: 17px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.fb-card a { color: var(--naya-green); }
+.fb-note { margin: 10px 0 0; padding: 10px 12px; background: var(--naya-mint); border-radius: 10px; }
+.fb-actions { margin-top: 10px; }
+.fb-actions textarea { min-height: 56px; }
+.fb-actions .actions { margin-top: 8px; }
+.stars { color: #E2A800; font-size: 18px; letter-spacing: 1px; }
+.stars-off { color: #D9DFDB; }
+.filter-gap { width: 12px; }

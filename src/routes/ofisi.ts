@@ -20,6 +20,7 @@ import {
   verifyPhoneManually,
 } from '../services/admin-users.js';
 import { AUDIENCES, audienceSizes, listBroadcasts, sendBroadcast } from '../services/broadcast.js';
+import { FEEDBACK_TOPICS, giveFeedback, handleFeedback, listFeedback, myFeedback, rideComments } from '../services/feedback.js';
 import { dailyReport, ridesCsv } from '../services/reports.js';
 import { candidatesForRide, completeByAdmin, liveOverview, offerRideToDriver } from '../services/rides.js';
 import {
@@ -66,6 +67,38 @@ export async function ofisiRoutes(app: FastifyInstance): Promise<void> {
     const { id } = idParam.parse(request.params);
     const { body } = z.object({ body: text(1000) }).parse(request.body);
     return ok(await replyAsUser(request.currentUser.id, id, body));
+  });
+
+  // ------------------------------------------------------------ Maoni (app)
+  app.get('/api/feedback', user, async (request) => ok(await myFeedback(request.currentUser.id)));
+  app.post('/api/feedback', { ...user, config: { rateLimit: { max: 10, timeWindow: '1 hour' } } }, async (request, reply) => {
+    const input = z
+      .object({
+        rating: z.number({ error: 'Chagua nyota' }).int().min(1, 'Chagua nyota').max(5),
+        topic: z.enum(FEEDBACK_TOPICS).default('GENERAL'),
+        body: text(1000, 'Andika maoni yako'),
+      })
+      .parse(request.body);
+    const role = request.currentUser.active_mode === 'DRIVER' ? 'DRIVER' : 'PASSENGER';
+    return reply.status(201).send(ok(await giveFeedback(request.currentUser.id, { ...input, role })));
+  });
+
+  // ------------------------------------------------------------ Ofisi: maoni
+  app.get('/api/admin/feedback', adminOnly, async (request) => {
+    const q = z
+      .object({ status: z.enum(['NEW', 'REVIEWED', 'ACTED', 'ALL']).default('NEW'), role: z.enum(['PASSENGER', 'DRIVER']).optional() })
+      .parse(request.query);
+    return ok(await listFeedback(q));
+  });
+  app.post('/api/admin/feedback/:id', adminOnly, async (request) => {
+    const input = z
+      .object({ status: z.enum(['REVIEWED', 'ACTED'], { error: 'Chagua hatua' }), note: z.string().trim().max(500, 'Maelezo ni marefu mno').optional() })
+      .parse(request.body);
+    return ok(await handleFeedback(request.currentUser.id, idParam.parse(request.params).id, input));
+  });
+  app.get('/api/admin/ride-comments', adminOnly, async (request) => {
+    const { all } = z.object({ all: z.enum(['0', '1']).default('0') }).parse(request.query);
+    return ok(await rideComments(all === '0'));
   });
 
   // ------------------------------------------------------------ Ofisi: watumiaji

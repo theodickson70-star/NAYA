@@ -46,6 +46,8 @@ export const AUDIT_ACTIONS = {
   'support.replied': 'Ofisi ilijibu ombi la msaada',
   'support.resolved': 'Ombi la msaada lilitatuliwa',
   'support.reopened': 'Ombi la msaada lilifunguliwa upya',
+  'feedback.reviewed': 'Maoni yake yalisomwa',
+  'feedback.acted': 'Maoni yake yalifanyiwa kazi',
   'subscription.paid': 'Malipo ya ada yalirekodiwa',
   'subscription.voided': 'Malipo ya ada yalibatilishwa',
 };
@@ -60,6 +62,21 @@ export const SUPPORT_CATEGORIES = {
   APP: 'App haifanyi kazi vizuri',
   ACCOUNT: 'Akaunti yangu',
   OTHER: 'Mengineyo',
+};
+
+export const FEEDBACK_TOPICS = {
+  GENERAL: 'Kwa ujumla',
+  APP: 'App ya NAYA',
+  PRICES: 'Bei',
+  DRIVERS: 'Madereva / abiria',
+  SAFETY: 'Usalama',
+  IDEA: 'Wazo jipya',
+};
+
+export const FEEDBACK_STATUS = {
+  NEW: { label: 'Mapya', tone: 'warn' },
+  REVIEWED: { label: 'Yamesomwa', tone: 'muted' },
+  ACTED: { label: 'Yamefanyiwa kazi', tone: 'ok' },
 };
 
 export const SUPPORT_STATUS = {

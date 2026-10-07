@@ -848,3 +848,44 @@ input, select, textarea { font-size: 17px; padding: 13px 14px; border-radius: va
 .pw-details[open] summary::after { transform: rotate(90deg); }
 .pw-details summary h2 { margin: 0; }
 .pw-form input { width: 100%; }
+
+/* ---------------------------------------------------------------- Phase 11.1: Toa maoni */
+.feedback-card h2 { margin-bottom: 4px; }
+.feedback-form { margin-top: 12px; }
+.feedback-form select, .feedback-form textarea { width: 100%; }
+.star-pick { border: 0; padding: 0; margin: 0 0 6px; }
+.star-pick legend { font-weight: 700; margin-bottom: 4px; }
+.star-row { display: inline-flex; gap: 2px; vertical-align: middle; }
+.star-row input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.star-row label { margin: 0; font-size: 34px; line-height: 1; padding: 4px 3px; color: rgba(16, 32, 26, 0.18); cursor: pointer; transition: color 0.12s, transform 0.12s; }
+.star-row input:focus-visible + label { outline: 3px solid var(--gold); outline-offset: 2px; border-radius: 6px; }
+.star-row:has(#fb-star-1:checked) label:nth-of-type(-n+1),
+.star-row:has(#fb-star-2:checked) label:nth-of-type(-n+2),
+.star-row:has(#fb-star-3:checked) label:nth-of-type(-n+3),
+.star-row:has(#fb-star-4:checked) label:nth-of-type(-n+4),
+.star-row:has(#fb-star-5:checked) label:nth-of-type(-n+5) { color: #E8A317; }
+.star-row input:checked + label { transform: scale(1.12); }
+#fb-rating-word { margin-left: 8px; }
+.stars { color: #E8A317; letter-spacing: 1px; }
+.stars-off { color: rgba(16, 32, 26, 0.18); }
+.fb-mine-title { font-size: 15px; margin: 18px 0 4px; }
+.fb-mine { list-style: none; padding: 0; margin: 0; }
+.fb-mine li { padding: 12px 0; }
+.fb-mine li + li { border-top: 1px solid rgba(16, 32, 26, 0.08); }
+.fb-mine-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.fb-mine p { margin: 6px 0 4px; overflow-wrap: anywhere; }
+.fb-office { background: var(--g100); color: var(--g800); border-radius: 12px; padding: 10px 12px; margin-top: 8px !important; }
+
+/* ---------------------------------------------------------------- Phase 11.2: Masharti */
+.terms-check { display: flex; align-items: flex-start; gap: 12px; margin: 14px 0 12px; font-size: 15px; line-height: 1.45; color: var(--muted, #5C6A62); cursor: pointer; }
+.terms-check span { font-weight: 400; }
+.terms-check input { flex: none; width: 24px; height: 24px; margin: 1px 0 0; accent-color: var(--g700, #0A6E47); cursor: pointer; }
+.terms-check a { color: var(--g700, #0A6E47); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
+.terms-gate { position: fixed; inset: 0; z-index: 55; display: grid; place-items: center; padding: 16px; background: rgba(6, 40, 26, 0.72); overflow-y: auto; }
+.terms-gate-card { width: 100%; max-width: 420px; background: #fff; border-radius: 22px; padding: 24px 20px 20px; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25); }
+.terms-gate-card h2 { margin: 12px 0 6px; font-size: 22px; }
+.terms-gate-card p { margin: 0 0 12px; }
+.terms-gate-links, .terms-links { list-style: none; padding: 0; margin: 0 0 4px; }
+.terms-gate-links li + li, .terms-links li + li { border-top: 1px solid rgba(16, 32, 26, 0.08); }
+.terms-gate-links a, .terms-links a { display: flex; justify-content: space-between; align-items: center; padding: 12px 2px; font-weight: 700; color: var(--g800, #06502F); text-decoration: none; }
+.terms-gate-links a::after, .terms-links a::after { content: "›"; font-size: 22px; line-height: 1; color: var(--muted, #5C6A62); }

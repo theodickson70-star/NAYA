@@ -7,6 +7,7 @@ import { setupStatus } from '../services/places.js';
 import { rideStats } from '../services/rides.js';
 import { openSosCount } from '../services/safety.js';
 import { openSupportCount } from '../services/support.js';
+import { newFeedbackCount } from '../services/feedback.js';
 import { fcmStats } from '../services/fcm.js';
 import { smsEnabled, smsOverview } from '../services/sms.js';
 import { subscriptionStats } from '../services/subscriptions.js';
@@ -44,6 +45,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       subscriptions,
       sosOpen,
       supportOpen: await openSupportCount(),
+      feedbackNew: await newFeedbackCount(),
       sms: { enabled: smsEnabled() },
       app: await fcmStats(),
       system: { database: database === 'ok' ? 'ok' : 'error', version: VERSION, phase: PHASE },

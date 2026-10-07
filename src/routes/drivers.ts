@@ -1,6 +1,7 @@
 // /api/drivers/me — mtumiaji aliye kwenye mode ya Dereva: chombo, nyaraka, kutuma kwa uthibitisho.
 // Akaunti ni ile ile ya abiria (hakuna usajili wa pili); ombi la udereva linafunguliwa kupitia /api/account/mode.
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import { requireRole } from '../middleware/auth.js';
 import {
   getDriverProfile,
@@ -49,5 +50,10 @@ export async function driverRoutes(app: FastifyInstance): Promise<void> {
       .send(file.content);
   });
 
-  app.post('/api/drivers/me/submit', driverOnly, async (request) => ok(await submitForReview(request.currentUser.id)));
+  app.post('/api/drivers/me/submit', driverOnly, async (request) => {
+    z.object({
+      acceptDriverTerms: z.literal(true, { error: 'Weka alama kukubali Masharti ya Dereva kwanza' }),
+    }).parse(request.body ?? {});
+    return ok(await submitForReview(request.currentUser.id));
+  });
 }

@@ -17,7 +17,9 @@ Mfumo wa bodaboda na bajaji. Unajengwa phase moja baada ya nyingine; kila phase 
 | 10 | App ya Android (APK): kengele ya ombi ya sekunde 30 hata app ikiwa imefungwa (Firebase), inajengwa na GitHub Actions | ✅ |
 | 10.1 | Bei maalum kati ya maeneo (ofisi inaandika bei za njia; km kwa nyingine) | ✅ |
 | 10.2 | Dereva anaweza kwenda online popote (anapokea maombi ya wateja walio ndani ya km 10 tu) | ✅ |
-| 11 | Ofisi kuu: wateja, msaada (malalamiko), ramani live, kuingilia safari, matangazo, ripoti + CSV, utafutaji mmoja | ✅ sasa |
+| 11 | Ofisi kuu: wateja, msaada (malalamiko), ramani live, kuingilia safari, matangazo, ripoti + CSV, utafutaji mmoja | ✅ |
+| 11.1 | Maoni: abiria na madereva wanatoa nyota + maoni kwenye Akaunti; ofisi inayafanyia kazi na mtoaji anajulishwa | ✅ |
+| 11.2 | Masharti ya huduma (abiria + dereva) na sera ya faragha; kukubali wakati wa kujisajili, kutuma ombi la udereva, na kwa watumiaji wa zamani | ✅ sasa |
 | 12 | Malipo kwa simu (M-Pesa, Airtel, Mixx/Tigo, HaloPesa) | |
 | 13 | Msaidizi wa AI (Claude) unaotumia data halisi | |
 
@@ -206,6 +208,21 @@ mabadiliko ya NAYA yanayopushiwa Railway yanaonekana kwenye app papo hapo — **
   kwa NAYA Google inaweza kuomba maelezo au kuizima — kengele ya sekunde 30 bado inalia, ila haitajitokeza juu ya skrini iliyofungwa.
 - Bila keystore, APK ni ya "debug" (inafaa kwa kusambaza moja kwa moja). GitHub inahifadhi ufunguo wake ili update isakinike juu
   ya ya zamani; ikitokea simu ikakataa ("App not installed"), futa NAYA ya zamani kisha usakinishe mpya.
+
+## Masharti na faragha (Phase 11.2)
+
+- Maandishi yote yako **`frontend/masharti/index.html`** (ukurasa wa umma: `/masharti/`). Sehemu: Kwa wote, Abiria, Dereva, Faragha.
+- **Kujisajili:** kisanduku "Nakubali Masharti ya Huduma na Sera ya Faragha" ni lazima (server inakataa bila `acceptTerms: true`).
+- **Ombi la udereva:** kisanduku cha Masharti ya Dereva kabla ya "Tuma kwa uthibitisho" (`acceptDriverTerms: true`).
+- **Watumiaji wa zamani:** wakifungua app wanaona dirisha la "Nakubali, endelea" mara moja.
+- **Kubadilisha masharti:** hariri ukurasa, kisha ongeza `TERMS_VERSION` / `DRIVER_TERMS_VERSION` kwenye `src/services/terms.ts` — wote wataombwa kukubali toleo jipya.
+- Ofisi → Wateja → wasifu unaonyesha tarehe aliyokubali. Migration `013_masharti.sql` inaongeza safu tupu tu.
+
+## Maoni (Phase 11.1)
+
+- **App (abiria na dereva):** Akaunti → **Toa maoni** — nyota 1–5, mada (bei, madereva, app, usalama, wazo…) na maelezo. Chini yake anaona "Maoni yako" na hali yake (Mapya / Yamesomwa / Yamefanyiwa kazi) pamoja na **Hatua ya ofisi**.
+- **Ofisi:** menyu **Maoni** — kichupo *Maoni ya app* (wastani wa nyota, vichujio, "Nimesoma" / "Imefanyiwa kazi" + maelezo yanayomfikia mtoaji kama arifa) na kichupo *Maoni ya safari* (nyota za chini na maneno ya abiria kuhusu madereva, siku 30).
+- Kikomo: maoni 5 kwa mtumiaji kwa siku. Migration `012_maoni.sql` inaongeza table mpya tu.
 
 ## Ofisi kuu (Phase 11)
 

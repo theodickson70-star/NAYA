@@ -15,6 +15,7 @@
   <link rel="preload" as="image" href="/shared/img/naya-hero.webp" type="image/webp">
   <link rel="stylesheet" href="/shared/naya.css">
   <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="/masharti/masharti.css">
   <script src="boot.js"></script>
 </head>
 <body>
@@ -151,6 +152,10 @@
           <span class="field-main"><span class="field-label">Tengeneza password</span>
           <input id="reg-password" type="password" autocomplete="new-password" placeholder="Angalau herufi 8" required></span>
           <button class="field-eye" type="button" data-eye="reg-password" aria-label="Onyesha password"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        </label>
+        <label class="terms-check" for="reg-terms">
+          <input type="checkbox" id="reg-terms">
+          <span>Kwa kujisajili, unakubali <a href="/masharti/#jumla" data-terms="jumla">Masharti ya Huduma</a> na <a href="/masharti/#faragha" data-terms="faragha">Sera ya Faragha</a> ya NAYA, na kwamba una miaka 18 au zaidi.</span>
         </label>
         <p class="alert alert-danger" id="register-error" role="alert" hidden></p>
         <button class="btn btn-primary btn-block btn-arrow" type="submit">Jisajili</button>
