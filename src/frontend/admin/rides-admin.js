@@ -1,0 +1,245 @@
+// Ofisi: safari zinazoendelea na zote, historia ya kila safari, na kughairi safari iliyokwama.
+import { escapeHtml as esc } from '/shared/api.js';
+import { formatDate, formatPhone, formatTsh, VEHICLE_TYPES } from '/shared/labels.js';
+
+const $ = (id) => document.getElementById(id);
+let ctx = null; // { api, onAuthError }
+let scope = 'active';
+let refreshTimer = null;
+
+export const RIDE_STATUS = {
+  SEARCHING: ['warn', 'Inatafuta dereva'],
+  ACCEPTED: ['ok', 'Dereva anakuja'],
+  ARRIVED: ['ok', 'Dereva amefika'],
+  IN_PROGRESS: ['ok', 'Safarini'],
+  COMPLETED: ['muted', 'Imekamilika'],
+  CANCELLED: ['bad', 'Imeghairiwa'],
+  NO_DRIVER: ['bad', 'Hakuna dereva'],
+};
+const badge = (status) => `<span class="badge badge-${RIDE_STATUS[status][0]}">${RIDE_STATUS[status][1]}</span>`;
+const BY = { PASSENGER: 'abiria', DRIVER: 'dereva', ADMIN: 'ofisi', SYSTEM: 'mfumo' };
+
+export function setup(context) {
+  ctx = context;
+  document.querySelector('#page-rides .filters').addEventListener('click', (event) => {
+    const chip = event.target.closest('[data-scope]');
+    if (!chip) return;
+    scope = chip.dataset.scope;
+    for (const c of document.querySelectorAll('#page-rides [data-scope]')) c.setAttribute('aria-pressed', String(c === chip));
+    loadRides();
+  });
+}
+
+export function stop() {
+  clearInterval(refreshTimer);
+  refreshTimer = null;
+}
+
+function fail(err, boxId) {
+  if (ctx.onAuthError(err)) return;
+  $(boxId).textContent = err.message;
+  $(boxId).hidden = false;
+}
+
+export async function loadRides() {
+  stop();
+  $('rides-error').hidden = true;
+  await drawList();
+  refreshTimer = setInterval(() => {
+    if (!$('page-rides').hidden && document.visibilityState === 'visible') drawList();
+  }, 10_000);
+}
+
+/** Kwa matukio ya papo hapo: sasisha orodha bila kuanzisha upya kipima-muda. */
+export const refreshList = () => drawList();
+
+async function drawList() {
+  try {
+    const rides = await ctx.api.get(`/api/admin/rides?scope=${scope}`);
+    $('ride-list').innerHTML =
+      rides.length === 0
+        ? `<p class="empty">${scope === 'active' ? 'Hakuna safari inayoendelea sasa hivi.' : 'Bado hakuna safari.'}</p>`
+        : rides
+            .map(
+              (r) => `<a class="ride-row" href="#/safari/${esc(r.id)}">
+                <span class="col-time"><strong>${esc(formatDate(r.requestedAt, true))}</strong><br><span class="driver-sub">${esc(VEHICLE_TYPES[r.vehicleType])} · ${formatTsh(r.fare)}</span></span>
+                <span class="ride-route"><strong>${esc(r.pickupName)} → ${esc(r.destinationName)}</strong><span class="driver-sub">km ${r.distanceKm}</span></span>
+                <span class="col-people driver-sub">Abiria: ${esc(r.passengerName)}<br>Dereva: ${r.driverName ? `${esc(r.driverName)} (${esc(r.plateNumber ?? '')})` : '—'}</span>
+                <span>${badge(r.status)}</span>
+              </a>`,
+            )
+            .join('');
+  } catch (err) {
+    fail(err, 'rides-error');
+  }
+}
+
+export async function loadRide(id) {
+  stop();
+  $('ride-error').hidden = true;
+  $('ride-detail').innerHTML = '<p class="muted">Inapakia…</p>';
+  try {
+    render(await ctx.api.get(`/api/admin/rides/${encodeURIComponent(id)}`));
+  } catch (err) {
+    $('ride-detail').innerHTML = '';
+    fail(err, 'ride-error');
+  }
+}
+
+function render(r) {
+  const active = ['SEARCHING', 'ACCEPTED', 'ARRIVED', 'IN_PROGRESS'].includes(r.status);
+  $('ride-detail').innerHTML = `
+    <div class="detail-head">
+      <div>
+        <h1>${esc(r.pickup.name)} → ${esc(r.destination.name)}</h1>
+        <p class="muted">${esc(VEHICLE_TYPES[r.vehicleType])} · km ${r.distanceKm} · ${formatTsh(r.fare)} taslimu · Imeagizwa ${esc(formatDate(r.requestedAt, true))}</p>
+      </div>
+      ${badge(r.status)}
+    </div>
+    ${r.cancelledBy ? `<p class="alert alert-warn">Imeghairiwa na ${BY[r.cancelledBy] ?? r.cancelledBy}${r.cancelReason ? `: ${esc(r.cancelReason)}` : ''}</p>` : ''}
+    ${(r.sos ?? []).some((x) => x.status === 'OPEN') ? '<p class="alert alert-danger"><strong>Dharura iko wazi kwenye safari hii.</strong> <a href="#/dharura">Ishughulikie</a></p>' : ''}
+    ${
+      r.pinAttempts >= 5
+        ? '<p class="alert alert-warn"><strong>PIN imekosewa mara 5</strong> — dereva hawezi kuanza safari. Wapigie wote wawili; ghairi safari ikibidi.</p>'
+        : r.pinAttempts > 0
+          ? `<p class="muted small">PIN imekosewa mara ${r.pinAttempts}.</p>`
+          : ''
+    }
+    ${r.shared ? '<p class="muted small">Abiria ameshiriki safari hii na ndugu/rafiki.</p>' : ''}
+    <div class="people">
+      <div class="panel-box"><h2>Abiria</h2>${
+        r.passenger ? `<p><a href="#/wateja/${esc(r.passenger.id)}"><strong>${esc(r.passenger.name)}</strong></a><br><a href="tel:+${esc(r.passenger.phone)}">${esc(formatPhone(r.passenger.phone))}</a></p>` : '—'
+      }${r.ratingForPassenger ? `<p class="muted">Nyota kutoka kwa dereva: ${'★'.repeat(r.ratingForPassenger)}</p>` : ''}</div>
+      <div class="panel-box"><h2>Dereva</h2>${
+        r.driver
+          ? `<p><a href="#/wateja/${esc(r.driver.id)}"><strong>${esc(r.driver.name)}</strong></a> · ${esc(r.driver.plateNumber)}<br><a href="tel:+${esc(r.driver.phone)}">${esc(formatPhone(r.driver.phone))}</a></p>`
+          : '<p class="muted">Bado hakuna dereva.</p>'
+      }${r.ratingForDriver ? `<p class="muted">Nyota kutoka kwa abiria: ${'★'.repeat(r.ratingForDriver)}</p>` : ''}</div>
+    </div>
+    <section class="panel">
+      <h2>Mwenendo wa safari</h2>
+      <ol class="timeline">${r.timeline
+        .map(
+          (t) => `<li><strong>${RIDE_STATUS[t.to][1]}</strong> <span class="muted">· ${esc(formatDate(t.at, true))}${t.actorName ? ` · ${esc(t.actorName)}` : ''}</span>${
+            t.note ? `<br><span class="muted">${esc(t.note)}</span>` : ''
+          }</li>`,
+        )
+        .join('')}</ol>
+    </section>
+    ${
+      (r.sos ?? []).length
+        ? `<section class="panel"><h2>Dharura</h2><ul class="history">${r.sos
+            .map(
+              (x) => `<li><span><strong>${x.role === 'PASSENGER' ? 'Abiria' : 'Dereva'}: ${esc(x.name)}</strong> · ${x.status === 'OPEN' ? 'Wazi' : 'Imeshughulikiwa'}</span><span class="muted">${esc(
+                formatDate(x.createdAt, true),
+              )}</span>${x.note ? `<span class="note">${esc(x.note)}</span>` : ''}</li>`,
+            )
+            .join('')}</ul></section>`
+        : ''
+    }
+    <section class="panel">
+      <h2>Maombi kwa madereva</h2>
+      ${
+        r.offers.length === 0
+          ? '<p class="muted">Hakuna dereva aliyepewa ombi.</p>'
+          : `<ul class="history">${r.offers
+              .map(
+                (o) => `<li><span><strong>${esc(o.driverName)}</strong> · km ${o.distanceKm ?? '–'} kutoka kwa abiria</span><span class="muted">${
+                  { PENDING: 'Linasubiri', ACCEPTED: 'Amekubali', DECLINED: 'Amekataa', EXPIRED: 'Muda umeisha' }[o.status]
+                } · ${esc(formatDate(o.offeredAt, true))}</span></li>`,
+              )
+              .join('')}</ul>`
+      }
+    </section>
+    ${
+      r.status === 'SEARCHING'
+        ? `<section class="intervene" aria-labelledby="iv-title">
+            <h2 id="iv-title">Mpe dereva maalum</h2>
+            <p class="muted">Safari hii bado inatafuta dereva. Chagua dereva aliye online — simu yake italia kama ombi la kawaida (dakika 3 kukubali).</p>
+            <div id="cand-list" class="cand-list"><p class="muted">Inatafuta madereva…</p></div>
+            <p class="alert alert-danger" id="cand-error" role="alert" hidden></p>
+          </section>`
+        : ''
+    }
+    ${
+      r.status === 'IN_PROGRESS'
+        ? `<form class="intervene" id="ride-complete-form">
+            <h2>Maliza safari iliyokwama</h2>
+            <p class="muted">Tumia kama abiria amefika lakini dereva amesahau kubonyeza "Maliza" (mpigie kwanza kuhakikisha).</p>
+            <label for="ride-complete-note">Maelezo (si lazima)</label>
+            <input id="ride-complete-note" maxlength="300" placeholder="Mf. Dereva alithibitisha kwa simu">
+            <p class="alert alert-danger" id="ride-complete-error" role="alert" hidden></p>
+            <div class="actions"><button class="btn btn-primary" type="submit">Maliza safari</button></div>
+          </form>`
+        : ''
+    }
+    ${
+      active
+        ? `<form class="decision" id="ride-cancel-form">
+            <h2>Ghairi safari hii</h2>
+            <p class="muted">Tumia tu safari ikiwa imekwama (mf. abiria au dereva hapatikani kwa simu).</p>
+            <label for="ride-cancel-reason">Sababu</label>
+            <textarea id="ride-cancel-reason" maxlength="300"></textarea>
+            <p class="alert alert-danger" id="ride-cancel-error" role="alert" hidden></p>
+            <div class="actions"><button class="btn btn-danger" type="submit">Ghairi safari</button></div>
+          </form>`
+        : ''
+    }`;
+  if (r.status === 'SEARCHING') loadCandidates(r.id);
+  $('ride-complete-form')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const button = event.currentTarget.querySelector('button');
+    button.disabled = true;
+    try {
+      render(await ctx.api.post(`/api/admin/rides/${r.id}/complete`, { note: $('ride-complete-note').value }));
+    } catch (err) {
+      fail(err, 'ride-complete-error');
+      button.disabled = false;
+    }
+  });
+  $('ride-cancel-form')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const button = event.currentTarget.querySelector('button');
+    button.disabled = true;
+    try {
+      render(await ctx.api.post(`/api/admin/rides/${r.id}/cancel`, { reason: $('ride-cancel-reason').value }));
+    } catch (err) {
+      fail(err, 'ride-cancel-error');
+      button.disabled = false;
+    }
+  });
+}
+
+async function loadCandidates(rideId) {
+  const box = $('cand-list');
+  try {
+    const list = await ctx.api.get(`/api/admin/rides/${rideId}/candidates`);
+    if (!$('cand-list')) return;
+    box.innerHTML = list.length
+      ? list
+          .map(
+            (c) => `<div class="cand">
+              <span><strong>${esc(c.name)}</strong> · ${esc(c.plateNumber ?? '')}<small>km ${c.km} kutoka kwa abiria${c.stale ? ' · hajaonekana dakika 2+' : ''}${c.busy ? ' · ana ombi jingine' : ''}</small></span>
+              <a class="btn btn-ghost btn-small" href="#/wateja/${esc(c.id)}">Wasifu</a>
+              <button class="btn btn-primary btn-small" type="button" data-offer="${esc(c.id)}" ${c.busy ? 'disabled' : ''}>Mtumie ombi</button>
+            </div>`,
+          )
+          .join('')
+      : '<p class="muted">Hakuna dereva wa chombo hiki aliye online sasa. Wapigie madereva waende online, au tuma tangazo.</p>';
+    box.onclick = async (event) => {
+      const button = event.target.closest('[data-offer]');
+      if (!button) return;
+      button.disabled = true;
+      $('cand-error').hidden = true;
+      try {
+        render(await ctx.api.post(`/api/admin/rides/${rideId}/offer`, { driverId: button.dataset.offer }));
+      } catch (err) {
+        fail(err, 'cand-error');
+        button.disabled = false;
+      }
+    };
+  } catch (err) {
+    box.innerHTML = '';
+    fail(err, 'cand-error');
+  }
+}
