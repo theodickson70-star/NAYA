@@ -802,7 +802,7 @@ input, select, textarea { font-size: 17px; padding: 13px 14px; border-radius: va
 .bajaji-marker svg { stroke: var(--white); }
 .leaflet-marker-icon.moto-marker { transition: transform 1.2s var(--ease-out); }
 
-/* Muda wa ombi la dereva (dakika 3): "2:59" */
+/* Muda wa ombi la dereva (dakika 1): "0:59" */
 .offer-timer { width: 66px; height: 66px; font-size: 17px; }
 .offer-timer::before { inset: 6px; }
 

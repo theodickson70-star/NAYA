@@ -155,7 +155,7 @@ function render(r) {
       r.status === 'SEARCHING'
         ? `<section class="intervene" aria-labelledby="iv-title">
             <h2 id="iv-title">Mpe dereva maalum</h2>
-            <p class="muted">Safari hii bado inatafuta dereva. Chagua dereva aliye online — simu yake italia kama ombi la kawaida (dakika 3 kukubali).</p>
+            <p class="muted">Safari hii bado inatafuta dereva. Chagua dereva aliye online — simu yake italia kama ombi la kawaida (dakika 1 kukubali).</p>
             <div id="cand-list" class="cand-list"><p class="muted">Inatafuta madereva…</p></div>
             <p class="alert alert-danger" id="cand-error" role="alert" hidden></p>
           </section>`

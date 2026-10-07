@@ -81,7 +81,7 @@ Dereva akighairi baada ya kukubali → safari inarudi SEARCHING (dereva mwingine
 ```
 
 - **Kumpata dereva:** server inaendesha dispatch kila sekunde 3 (`src/server.ts`). Ombi linaenda kwa dereva aliyethibitishwa, aliye online,
-  mwenye chombo sahihi, aliye karibu zaidi (ndani ya km 10). Ana **dakika 3** kukubali (app inamkumbusha kwa kengele kila sekunde 20); akikataa, anayefuata anapewa papo hapo. Bila dereva kwa dakika 10 → NO_DRIVER.
+  mwenye chombo sahihi, aliye karibu zaidi (ndani ya km 10). Ana **dakika 1** kukubali (app inamkumbusha kwa kengele kila sekunde 20); akikataa, anayefuata anapewa papo hapo. Bila dereva kwa dakika 10 → NO_DRIVER.
 - **Usalama wa data:** unique indexes zinazuia dereva au abiria kuwa na safari mbili zinazoendelea; dereva ana ombi moja tu linalosubiri;
   kukubali kunafanyika chini ya row lock (madereva wawili hawawezi kupata safari moja).
 - **Nauli** inahesabiwa na server wakati wa kuagiza (haitoki kwenye app). Malipo kwa sasa ni taslimu.

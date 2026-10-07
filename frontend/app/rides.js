@@ -426,7 +426,7 @@ function renderDriverDashboard() {
     </section>
   </div>`;
 
-  if (s.offer && !s.ride) startOfferCountdown(s.offer.secondsLeft, s.offer.totalSeconds || 180);
+  if (s.offer && !s.ride) startOfferCountdown(s.offer.secondsLeft, s.offer.totalSeconds || 60);
 }
 
 function onlineHtml(s) {
@@ -495,7 +495,7 @@ function subscriptionBlockHtml(sub) {
 function offerHtml(offer) {
   const r = offer.ride;
   return `<section class="offer" role="alertdialog" aria-labelledby="offer-title">
-    <div class="offer-top"><h1 id="offer-title">Ombi jipya la safari</h1><span class="offer-timer" id="offer-seconds" style="--p:${offer.secondsLeft / (offer.totalSeconds || 180)}">${clock(offer.secondsLeft)}</span></div>
+    <div class="offer-top"><h1 id="offer-title">Ombi jipya la safari</h1><span class="offer-timer" id="offer-seconds" style="--p:${offer.secondsLeft / (offer.totalSeconds || 60)}">${clock(offer.secondsLeft)}</span></div>
     <p class="offer-fare">${formatTsh(r.fare)}</p>
     <p class="muted">${esc(VEHICLE_TYPES[r.vehicleType])} · safari ya km ${r.distanceKm} · abiria yuko km ${offer.distanceToPickupKm} kutoka kwako</p>
     ${routeSummary(r).replace(/<p class="ride-meta">[\s\S]*<\/p>/, '')}
@@ -543,7 +543,7 @@ function startOfferCountdown(seconds, total) {
     const el = $('offer-seconds');
     if (el) el.textContent = clock(left);
     ring(left);
-    // Ombi linadumu dakika 3: kumbusha dereva kila sekunde 20 (kengele + mtetemo) mpaka akubali au akatae.
+    // Ombi linadumu dakika 1: kumbusha dereva kila sekunde 20 (kengele + mtetemo) mpaka akubali au akatae.
     if (left > 0 && (seconds - left) % 20 === 0) {
       navigator.vibrate?.([300, 150, 300]);
       chime();
