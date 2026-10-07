@@ -35,6 +35,15 @@ const URAMBO_FARES = {
   BAJAJI: { baseFare: 1000, perKm: 500, minimumFare: 2000, roundingStep: 500, roadFactor: 1.3 },
 };
 
+// Eneo lililo mbali zaidi ya hapa na mji wa Urambo huenda liliwekwa vibaya (mf. "GPS" ya kompyuta inayokisia kwa mtandao).
+const FAR_FROM_URAMBO_KM = 30;
+function kmFromUrambo(lat, lng) {
+  const rad = (d) => (d * Math.PI) / 180;
+  const [lat0, lng0] = URAMBO_CENTER;
+  const h = Math.sin(rad(lat - lat0) / 2) ** 2 + Math.cos(rad(lat0)) * Math.cos(rad(lat)) * Math.sin(rad(lng - lng0) / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
 let ctx = null; // { api, onAuthError }
 export function setup(context) {
   ctx = context;
@@ -151,13 +160,21 @@ function renderLocationList() {
     }</p>`;
     return;
   }
-  list.innerHTML = locations
-    .map(
-      (l) => `<div class="location-row${l.isActive ? '' : ' inactive'}">
+  const far = locations.filter((l) => l.isActive && kmFromUrambo(l.lat, l.lng) > FAR_FROM_URAMBO_KM);
+  const warning = far.length
+    ? `<p class="alert alert-danger" role="alert"><strong>${far.length === 1 ? 'Eneo 1 liko' : `Maeneo ${far.length} yako`} mbali na Urambo</strong> — huenda ${far.length === 1 ? 'liliwekwa' : 'yaliwekwa'} mahali pasipo sahihi
+        (mf. kwa "GPS" ya kompyuta, ambayo inakisia mahali kwa mtandao). Madereva na wateja wataona umbali usio sahihi.
+        Bonyeza <strong>Badilisha</strong>, kisha bonyeza ramani mahali sahihi ndani ya Urambo, uhifadhi.</p>`
+    : '';
+  list.innerHTML = warning + locations
+    .map((l) => {
+      const km = kmFromUrambo(l.lat, l.lng);
+      return `<div class="location-row${l.isActive ? '' : ' inactive'}${km > FAR_FROM_URAMBO_KM ? ' far' : ''}">
         <span>
           <button type="button" class="link name" data-edit="${l.id}">${esc(l.name)}</button><br>
           <span class="muted small">${esc(LOCATION_CATEGORIES[l.category] ?? l.category)}${l.area ? ` · ${esc(l.area)}` : ''}</span>
           ${l.isActive ? '' : ' <span class="badge badge-muted">Limezimwa</span>'}
+          ${km > FAR_FROM_URAMBO_KM ? ` <span class="badge badge-bad">km ${Math.round(km)} kutoka Urambo — rekebisha mahali</span>` : ''}
         </span>
         <span class="row-actions">
           <button type="button" class="btn btn-ghost btn-small" data-edit="${l.id}">Badilisha</button>
@@ -165,8 +182,8 @@ function renderLocationList() {
             l.isActive ? 'Zima' : 'Washa'
           }</button>
         </span>
-      </div>`,
-    )
+      </div>`;
+    })
     .join('');
 }
 
@@ -194,9 +211,14 @@ function useGps() {
     (pos) => {
       button.disabled = false;
       const { latitude, longitude, accuracy } = pos.coords;
+      const m = Math.round(accuracy);
+      // Kompyuta nyingi hazina GPS: browser inakisia mahali kwa mtandao (inaweza kukosea kwa mamia ya km). Usiweke mahali kama hayo.
+      if (m > 150) {
+        hint.textContent = `Kifaa hiki hakina GPS sahihi (usahihi ±${m >= 1000 ? `km ${Math.round(m / 1000)}` : `${m} m`}). Bonyeza ramani mahali sahihi, au tumia simu ukiwa pale.`;
+        return;
+      }
       setPoint(latitude, longitude);
       map?.setView([latitude, longitude], 17);
-      const m = Math.round(accuracy);
       hint.textContent =
         m <= 30
           ? `Mahali pamepatikana (usahihi ±${m} m). Hakikisha jina, kisha hifadhi.`
@@ -248,6 +270,8 @@ function bindLocationForm() {
       $('location-error').hidden = false;
       return;
     }
+    const km = kmFromUrambo(lat, lng);
+    if (km > FAR_FROM_URAMBO_KM && !confirm(`Mahali hapa ni km ${Math.round(km)} kutoka Urambo. Una uhakika ni sahihi?`)) return;
     const body = { name: $('loc-name').value, category: $('loc-category').value, area: $('loc-area').value, lat, lng };
     const button = $('location-save');
     button.disabled = true;

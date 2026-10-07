@@ -297,3 +297,4 @@
 .route-table input { width: 100%; max-width: 160px; margin: 0; }
 .route-table tr.changed td { background: #FFF8DF; }
 .fares-subtitle { margin-top: 32px; }
+.location-row.far { background: var(--danger-bg, #FDECEC); border-radius: 12px; }
