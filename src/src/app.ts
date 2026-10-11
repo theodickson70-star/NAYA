@@ -20,6 +20,7 @@ import { ofisiRoutes } from './routes/ofisi.js';
 import { placeRoutes } from './routes/places.js';
 import { pushRoutes } from './routes/push.js';
 import { rideRoutes } from './routes/rides.js';
+import { pakuaRoutes } from './routes/pakua.js';
 import { safetyRoutes } from './routes/safety.js';
 import { subscriptionRoutes } from './routes/subscriptions.js';
 import { streamRoutes } from './routes/stream.js';
@@ -94,6 +95,7 @@ export async function buildApp(options: { logger?: boolean } = {}): Promise<Fast
   await app.register(subscriptionRoutes);
   await app.register(ofisiRoutes);
   await app.register(safetyRoutes);
+  await app.register(pakuaRoutes);
 
   // Kurasa za NAYA: /app/ (app moja ya abiria na dereva) na /admin/ (ofisi).
   await app.register(fastifyStatic, { root: FRONTEND_DIR, prefix: '/', index: ['index.html'] });
@@ -103,7 +105,8 @@ export async function buildApp(options: { logger?: boolean } = {}): Promise<Fast
   app.get('/safari', async (_request, reply) => reply.redirect('/safari/'));
   app.get('/masharti', async (_request, reply) => reply.redirect('/masharti/'));
   // Mwanzo na anwani ya zamani ya app ya dereva → app moja ya NAYA.
-  app.get('/', async (_request, reply) => reply.redirect('/app/'));
+  // Link kuu ya NAYA: ukurasa wa kupakua app (Android → APK; iPhone na kompyuta → maelekezo).
+  app.get('/', async (_request, reply) => reply.redirect('/pakua/'));
   app.get('/dereva', async (_request, reply) => reply.redirect('/app/'));
   app.get('/dereva/', async (_request, reply) => reply.redirect('/app/'));
 

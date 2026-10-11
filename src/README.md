@@ -20,9 +20,10 @@ Mfumo wa bodaboda na bajaji. Unajengwa phase moja baada ya nyingine; kila phase 
 | 11 | Ofisi kuu: wateja, msaada (malalamiko), ramani live, kuingilia safari, matangazo, ripoti + CSV, utafutaji mmoja | ✅ |
 | 11.1 | Maoni: abiria na madereva wanatoa nyota + maoni kwenye Akaunti; ofisi inayafanyia kazi na mtoaji anajulishwa | ✅ |
 | 11.2 | Masharti ya huduma (abiria + dereva) na sera ya faragha; kukubali wakati wa kujisajili, kutuma ombi la udereva, na kwa watumiaji wa zamani | ✅ |
-| 12 | Lugha mbili: Kiswahili na English (app ya abiria/dereva, makosa ya server, arifa, SMS, masharti) | ✅ sasa |
-| 13 | Malipo kwa simu (M-Pesa, Airtel, Mixx/Tigo, HaloPesa) | |
-| 14 | Msaidizi wa AI (Claude) unaotumia data halisi | |
+| 12 | Lugha mbili: Kiswahili na English (app ya abiria/dereva, makosa ya server, arifa, SMS, masharti) | ✅ |
+| 13 | Ukurasa wa kupakua app (APK): link kuu → /pakua/, Android inashauriwa kupakua, iPhone → Add to Home Screen, idadi ya waliopakua ofisini | ✅ sasa |
+| 14 | Malipo kwa simu (M-Pesa, Airtel, Mixx/Tigo, HaloPesa) | |
+| 15 | Msaidizi wa AI (Claude) unaotumia data halisi | |
 
 ## Muundo
 
@@ -209,6 +210,14 @@ mabadiliko ya NAYA yanayopushiwa Railway yanaonekana kwenye app papo hapo — **
   kwa NAYA Google inaweza kuomba maelezo au kuizima — kengele ya sekunde 30 bado inalia, ila haitajitokeza juu ya skrini iliyofungwa.
 - Bila keystore, APK ni ya "debug" (inafaa kwa kusambaza moja kwa moja). GitHub inahifadhi ufunguo wake ili update isakinike juu
   ya ya zamani; ikitokea simu ikakataa ("App not installed"), futa NAYA ya zamani kisha usakinishe mpya.
+
+## Kupakua app (Phase 13)
+
+- **Link kuu ya NAYA (`/`) → `/pakua/`**: ukurasa wa kupakua. Android → kitufe "Pakua app ya NAYA" (+ hatua 4 za kusakinisha na maelezo ya onyo la Play Protect). iPhone → "Add to Home Screen". Kompyuta → QR code (`/pakua/qr.svg`).
+- **`/pakua/apk`** inahesabu upakuaji (aina ya simu na muda tu) kisha inapeleka kwenye APK ya toleo jipya zaidi: `ANDROID_APK_URL` ikiwekwa, vinginevyo GitHub Releases `latest/download/NAYA.apk` (repo ni public).
+- **Android kwenye browser ikifungua `/app/`**: inashauriwa kupakua kwanza. "Tumia NAYA kwenye browser badala yake" (`/app/?web=1`) inamruhusu kuendelea; hatuulizi tena kwa siku 7. Ndani ya APK hakuna ushauri huu.
+- Ofisi → Muhtasari: "APK: X zimepakuliwa · Y wanaitumia". Migration `015_pakua.sql` (table mpya tu).
+- Ndani ya APK (Capacitor, au WebView ya Android yenye "; wv)" kwenye user agent) ukurasa wa kupakua haumwonyeshwi mtu kamwe.
 
 ## Lugha mbili (Phase 12)
 
