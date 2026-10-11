@@ -73,7 +73,8 @@ export async function userDetail(id: string) {
   const user = await one<Record<string, unknown>>(
     db,
     `SELECT u.id, u.full_name AS "fullName", u.phone, u.status, u.suspended_reason AS "suspendedReason", u.active_mode AS "activeMode",
-            u.phone_verified_at AS "phoneVerifiedAt", u.created_at AS "createdAt", u.last_login_at AS "lastLoginAt", u.role, u.terms_accepted_at AS "termsAcceptedAt", u.terms_version AS "termsVersion"
+            u.phone_verified_at AS "phoneVerifiedAt", u.created_at AS "createdAt", u.last_login_at AS "lastLoginAt", u.role, u.terms_accepted_at AS "termsAcceptedAt", u.terms_version AS "termsVersion",
+            (u.photo_file_id IS NOT NULL) AS "hasPhoto", u.photo_updated_at AS "photoUpdatedAt", u.emergency_name AS "emergencyName", u.emergency_phone AS "emergencyPhone"
        FROM naya.users u WHERE u.id = $1`,
     [id],
   );

@@ -12,6 +12,7 @@ import { publish } from '../realtime/hub.js';
 import { badRequest, conflict, forbidden, isUniqueViolation, notFound } from '../utils/http.js';
 import { writeAudit } from './audit.js';
 import { readDocument } from './drivers.js';
+import { passengerCard } from './profile.js';
 import { straightLineKm } from './fare-engine.js';
 import { notify, notifyAdmins } from './notify.js';
 import { estimateTrip, findLocation, nearestServicePoint, SERVICE_RADIUS_KM } from './places.js';
@@ -412,10 +413,11 @@ async function passengerView(client: Db, r: RideRow) {
 
 async function driverView(client: Db, r: RideRow) {
   const passenger = await one<{ full_name: string; phone: string }>(client, 'SELECT full_name, phone FROM naya.users WHERE id = $1', [r.passenger_id]);
+  const card = passenger ? await passengerCard(r.passenger_id) : null;
   return {
     ...baseView(r),
     ratingForPassenger: r.rating_for_passenger,
-    passenger: passenger && { name: passenger.full_name, phone: passenger.phone },
+    passenger: passenger && { name: passenger.full_name, phone: passenger.phone, hasPhoto: card?.hasPhoto ?? false, rating: card?.rating ?? null, trips: card?.trips ?? 0 },
     pinRequired: r.status === 'ARRIVED' && r.start_pin !== null,
     pinAttemptsLeft: Math.max(0, PIN_MAX_ATTEMPTS - r.pin_attempts),
     sosOpen: r.driver_id && WITH_DRIVER.includes(r.status) ? await openSosFor(client, r.driver_id, r.id) : false,
@@ -772,6 +774,8 @@ export async function driverState(driverId: string) {
       totalSeconds: offerRow.total_seconds || OFFER_SECONDS,
       distanceToPickupKm: offerRow.distance_km,
       ride: { ...baseView(ride) },
+      // Abiria ni nani: jina la kwanza, picha (kama ameweka) na nyota — namba ya simu inaonekana baada ya kukubali tu
+      passenger: await passengerCard(ride.passenger_id),
     };
   }
 

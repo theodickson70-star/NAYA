@@ -20,6 +20,7 @@ import * as rides from './rides.js';
 import * as support from './support.js';
 import * as feedback from './feedback.js';
 import * as wallet from './wallet.js';
+import * as akaunti from './akaunti.js';
 import * as appUpdate from './update.js';
 import * as terms from './terms.js';
 import { initI18n, langSwitchHtml, onLangChange } from '/shared/i18n.js';
@@ -30,7 +31,7 @@ const api = createApi('naya_app_token');
 const $ = (id) => document.getElementById(id);
 const views = ['view-loading', 'view-intro', 'view-auth', 'view-verify', 'view-role', 'view-offline', 'view-app'];
 const MAX_BYTES = 3 * 1024 * 1024;
-const VERSION = '0.14.3';
+const VERSION = '0.15.0';
 
 let account = null; // { user, activeMode, driverStatus, canDrive }
 let driver = null; // wasifu wa udereva (mode ya Dereva)
@@ -441,8 +442,9 @@ function startRealtime() {
             // Jibu la ofisi limefika ukiwa kwenye Maoni: sasisha orodha tu (usifute unachoandika).
             feedback.loadList();
           } else if (tab === 'account' && location.hash === '#/akaunti') {
-            if (wallet.isEditing()) support.loadCardList();
-            else renderAccount();
+            renderAccount();
+          } else if (location.hash === '#/akaunti/msaada') {
+            support.loadCardList();
           }
         } catch (err) {
           handleError(err);
@@ -507,8 +509,9 @@ function route() {
   $('mode-chip').textContent = driverMode ? 'Dereva' : 'Abiria';
   document.querySelector('meta[name="theme-color"]').content = driverMode ? '#043A22' : '#06502F';
   window.scrollTo(0, 0);
-  const supportPath = location.hash.match(/^#\/akaunti\/msaada(?:\/([0-9a-f-]{36}))?/);
-  if (supportPath) return supportPath[1] ? support.renderTicket(supportPath[1]) : support.renderNew();
+  if (location.hash.startsWith('#/akaunti/msaada/mpya')) return support.renderNew();
+  const ticket = location.hash.match(/^#\/akaunti\/msaada\/([0-9a-f-]{36})/);
+  if (ticket) return support.renderTicket(ticket[1]);
   if (tab === 'account') return renderAccount();
   if (tab === 'feedback') return feedback.renderPage(new URLSearchParams(location.hash.split('?')[1] ?? ''));
   if (driverMode) return loadDriver();
@@ -901,24 +904,31 @@ $('app-content').addEventListener('submit', async (event) => {
   }
 });
 
+/** Akaunti: menyu kuu (#/akaunti) na kurasa zake (#/akaunti/<sehemu>). */
 function renderAccount() {
-  const { user, activeMode, driverStatus } = account;
+  const section = (location.hash.split('?')[0].split('/')[2] ?? '').trim();
+  if (section === 'wasifu') return akaunti.renderProfile();
+  if (section === 'ofa') return akaunti.renderOffers();
+  if (section === 'shughuli') return akaunti.renderActivity();
+  if (section === 'usalama') return akaunti.renderSafety();
+  if (section === 'msaada') {
+    akaunti.renderSupport();
+    setSupportDot();
+    return;
+  }
+  if (section === 'mipangilio') return renderSettings();
+  if (section === 'ada') return renderSubscriptionPage();
+  if (section === 'malipo-ya-ofa') return renderWalletPage();
+  renderHub();
+}
+
+const acctBack = (title) => `<a class="back" href="#/akaunti">‹ Akaunti</a><h1 class="acct-title">${esc(title)}</h1>`;
+
+function modeCardHtml() {
+  const { activeMode, driverStatus } = account;
   const driverMode = activeMode === 'DRIVER';
-  const initials = user.fullName.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('');
   const target = driverMode ? 'PASSENGER' : 'DRIVER';
-  $('app-content').innerHTML = `
-    <h1>Akaunti</h1>
-    <section class="card profile">
-      <span class="avatar" aria-hidden="true">${esc(initials)}</span>
-      <span><strong>${esc(user.fullName)}</strong><span class="muted">${esc(formatPhone(user.phone))}</span></span>
-    </section>
-
-    <section class="card lang-card" aria-labelledby="lang-title">
-      <h2 id="lang-title" translate="no">Lugha / Language</h2>
-      ${langSwitchHtml()}
-    </section>
-
-    <section class="card" aria-labelledby="mode-title">
+  return `<section class="card" aria-labelledby="mode-title">
       <h2 id="mode-title">Badili mode</h2>
       <div class="mode-row">
         <span><span class="muted">Mode ya sasa</span><br><span class="mode-now">${driverMode ? 'Dereva' : 'Abiria'}</span></span>
@@ -933,18 +943,32 @@ function renderAccount() {
           ? 'Utafungua ombi la udereva kwa akaunti hii hii — hakuna akaunti mpya.'
           : 'Ni akaunti ile ile; unaweza kubadili wakati wowote.'
       }</p>
+    </section>`;
+}
+
+function renderHub() {
+  akaunti.renderHub({ modeCardHtml: modeCardHtml(), version: VERSION });
+  setSupportDot();
+  // Ofa za mteja (kwa maelezo ya mstari wa "Ofa") — zikiwa za zamani, zilete kisha chora upya
+  if (account.activeMode !== 'DRIVER' && (!passengerOffers || Date.now() - passengerOffers.at > 60_000)) {
+    api
+      .get('/api/offers?full=1')
+      .then((r) => {
+        passengerOffers = { at: Date.now(), list: r.offers ?? [], notice: r.notice ?? null };
+        if (tab === 'account' && location.hash === '#/akaunti') akaunti.renderHub({ modeCardHtml: modeCardHtml(), version: VERSION });
+      })
+      .catch(() => {});
+  }
+}
+
+function renderSettings() {
+  const { driverStatus, activeMode } = account;
+  const driverMode = activeMode === 'DRIVER';
+  $('app-content').innerHTML = `${acctBack('Mipangilio')}
+    <section class="card lang-card" aria-labelledby="lang-title">
+      <h2 id="lang-title" translate="no">Lugha / Language</h2>
+      ${langSwitchHtml()}
     </section>
-
-    ${
-      driverStatus === 'APPROVED' || driverStatus === 'SUSPENDED'
-        ? `<section class="card" aria-labelledby="sub-title">
-            <h2 id="sub-title">Ada ya mwezi</h2>
-            <div id="sub-body"><p class="muted">Inaangalia…</p></div>
-          </section>`
-        : ''
-    }
-
-    ${driverStatus === 'APPROVED' || driverStatus === 'SUSPENDED' ? wallet.cardHtml() : ''}
 
     <section class="card" aria-labelledby="notify-title">
       <h2 id="notify-title">Arifa</h2>
@@ -952,7 +976,7 @@ function renderAccount() {
       <p class="alert alert-danger" id="push-error" role="alert" hidden></p>
       <div id="push-action"></div>
       <div id="ring-box" hidden></div>
-      <ul class="notes" id="note-list"></ul>
+      <a class="link-btn" href="#/akaunti/shughuli">Angalia arifa zako</a>
     </section>
 
     ${
@@ -965,12 +989,13 @@ function renderAccount() {
         : ''
     }
 
-    ${support.cardHtml(account.supportUnread)}
-
-    <a class="card fb-account-link" href="#/maoni">
-      <span><strong>Toa maoni</strong><span class="muted">Ofisi ya NAYA inasoma kila ujumbe na kukujibu.</span></span>
-      <span aria-hidden="true">›</span>
-    </a>
+    <section class="card sound-card" aria-labelledby="sound-title">
+      <div class="sound-row">
+        <span><h2 id="sound-title">Sauti ya kufungua NAYA</h2><span class="muted">Sauti fupi logo inapojitengeneza app ikifunguka.</span></span>
+        <label class="switch"><input type="checkbox" id="sound-toggle"${soundEnabled() ? ' checked' : ''}><span class="sr-only">Washa sauti ya kufungua</span><i aria-hidden="true"></i></label>
+      </div>
+      <button class="link-btn" type="button" id="sound-test">Sikiliza sauti</button>
+    </section>
 
     <section class="card" aria-labelledby="pw-title">
       <details class="pw-details">
@@ -987,14 +1012,6 @@ function renderAccount() {
       </details>
     </section>
 
-    <section class="card sound-card" aria-labelledby="sound-title">
-      <div class="sound-row">
-        <span><h2 id="sound-title">Sauti ya kufungua NAYA</h2><span class="muted">Sauti fupi logo inapojitengeneza app ikifunguka.</span></span>
-        <label class="switch"><input type="checkbox" id="sound-toggle"${soundEnabled() ? ' checked' : ''}><span class="sr-only">Washa sauti ya kufungua</span><i aria-hidden="true"></i></label>
-      </div>
-      <button class="link-btn" type="button" id="sound-test">Sikiliza sauti</button>
-    </section>
-
     <section class="card terms-card" aria-labelledby="terms-title">
       <h2 id="terms-title">Masharti na faragha</h2>
       <ul class="terms-links">
@@ -1003,14 +1020,22 @@ function renderAccount() {
         <li><a href="/masharti/#faragha" data-terms="faragha">Sera ya Faragha</a></li>
       </ul>
     </section>
-
-    <button class="btn btn-ghost btn-out" type="button" data-action="logout">Toka</button>
     <p class="version">NAYA ${VERSION} · TWENDE PAMOJA</p>`;
   loadNotificationSection();
-  support.loadCardList();
-  setSupportDot();
-  if ($('sub-body')) loadSubscriptionSection();
-  if ($('wallet-body')) wallet.load();
+}
+
+function renderSubscriptionPage() {
+  $('app-content').innerHTML = `${acctBack('Ada ya mwezi')}
+    <section class="card" aria-labelledby="sub-title">
+      <h2 id="sub-title" class="sr-only">Ada ya mwezi</h2>
+      <div id="sub-body"><p class="muted">Inaangalia…</p></div>
+    </section>`;
+  loadSubscriptionSection();
+}
+
+function renderWalletPage() {
+  $('app-content').innerHTML = `${acctBack('Malipo ya ofa')}${wallet.cardHtml()}`;
+  wallet.load();
 }
 
 const SUB_STATE = {
@@ -1101,23 +1126,6 @@ async function loadNotificationSection() {
           : '<button class="btn btn-ghost btn-block" type="button" data-action="push-off">Zima arifa kwenye kifaa hiki</button>'
         : '';
   if (native && state === 'on' && account?.driverStatus) loadRingBox();
-  try {
-    const notes = await api.get('/api/notifications');
-    if (!$('note-list')) return;
-    $('note-list').innerHTML = notes.length
-      ? notes
-          .slice(0, 10)
-          .map(
-            (n) => `<li class="${n.readAt ? '' : 'unread'}"><strong>${esc(n.title)}</strong>${n.body ? `<br><span>${esc(n.body)}</span>` : ''}<br><span class="muted">${esc(
-              formatDate(n.createdAt, true),
-            )}</span></li>`,
-          )
-          .join('')
-      : '<li class="muted">Bado huna arifa.</li>';
-    if (notes.some((n) => !n.readAt)) api.post('/api/notifications/read').catch(() => {});
-  } catch (err) {
-    handleError(err);
-  }
 }
 
 // ---------- Mode ya Dereva ----------
@@ -1519,6 +1527,7 @@ function signOutLocally() {
   realtime?.close();
   realtime = null;
   rides.reset();
+  akaunti.reset();
   tripHistory = null;
   passengerOffers = null;
   account = null;
@@ -1546,6 +1555,22 @@ feedback.init({
   },
 });
 wallet.init({ api, handleError, toast });
+akaunti.init({
+  api,
+  handleError,
+  toast,
+  account: () => account,
+  setAccount: (a) => {
+    account = a;
+    setSupportDot();
+  },
+  offers: () => passengerOffers,
+  setOffers: (r) => {
+    passengerOffers = { at: Date.now(), list: r.offers ?? [], notice: r.notice ?? null };
+  },
+  supportCardHtml: (unread) => support.cardHtml(unread),
+  loadSupportList: () => support.loadCardList(),
+});
 appUpdate.init({ api });
 rides.init({
   api,
@@ -1554,6 +1579,7 @@ rides.init({
   toast,
   handleError,
   firstName: () => firstName(),
+  emergency: () => account?.emergency ?? null,
   isPassengerHome: onPassengerHome,
   isDriverHome: () => account?.activeMode === 'DRIVER' && tab === 'home' && driver?.driver.status === 'APPROVED',
   onPassengerRideClosed: () => {

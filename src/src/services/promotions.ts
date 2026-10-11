@@ -823,6 +823,18 @@ export async function previewSavedPromotion(id: string) {
  * Hatumwambii "si mteja mpya" — ofa hiyo haikuwa kwake tangu mwanzo.
  */
 export async function offersWithNotice(userId: string) {
+  const s = await one<{ rides: number; amount: number }>(
+    db,
+    `SELECT count(*)::int AS rides, coalesce(sum(promo_discount), 0)::int AS amount
+       FROM naya.rides WHERE passenger_id = $1 AND status = 'COMPLETED' AND promo_discount > 0`,
+    [userId],
+  );
+  const saved = { rides: s?.rides ?? 0, amount: s?.amount ?? 0 };
+  const r = await offersNotice(userId);
+  return { ...r, saved };
+}
+
+async function offersNotice(userId: string) {
   const list = await offersForPassenger(userId);
   if (list.length) return { offers: list, notice: null };
   const promos = await activePromotions();

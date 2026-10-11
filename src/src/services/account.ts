@@ -32,6 +32,8 @@ export async function getAccount(user: UserRow) {
     feedbackUnread: await unreadFeedbackCount(user.id),
     /** Masharti: amekubali toleo la sasa? (wa zamani wanaombwa kukubali kwenye app) */
     terms: await termsState(db, user.id),
+    /** Mtu wa dharura (Akaunti → Usalama) — kitufe cha kumpigia kinaonekana kwenye "Dharura" safarini. */
+    emergency: user.emergency_phone ? { name: user.emergency_name ?? '', phone: user.emergency_phone } : null,
   };
 }
 

@@ -102,14 +102,26 @@ export async function loadUser(id) {
 
 export const currentUserId = () => current?.user.id ?? null;
 
+function loadUserPhoto(u) {
+  if (!u.hasPhoto) return;
+  ctx.api
+    .blob(`/api/admin/users/${u.id}/photo?v=${encodeURIComponent(u.photoUpdatedAt ?? '')}`)
+    .then((blob) => {
+      const el = $('user-photo');
+      if (el) el.innerHTML = `<img src="${URL.createObjectURL(blob)}" alt="">`;
+    })
+    .catch(() => {});
+}
+
 function render(data) {
+  setTimeout(() => loadUserPhoto(data.user), 0);
   current = data;
   const { user: u, driver: d, stats: st, rides, tickets, sos, notes, history, devices } = data;
   const suspended = u.status === 'SUSPENDED';
   const isDriver = d && ['APPROVED', 'SUSPENDED'].includes(d.status);
   $('user-detail').innerHTML = `
     <div class="profile-head">
-      <span class="profile-avatar" aria-hidden="true">${esc(initials(u.fullName))}</span>
+      <span class="profile-avatar" id="user-photo" aria-hidden="true">${esc(initials(u.fullName))}</span>
       <div>
         <h1>${esc(u.fullName)}</h1>
         <p class="muted"><a href="tel:+${esc(u.phone)}">${esc(formatPhone(u.phone))}</a> · Alijiunga ${esc(formatDate(u.createdAt))}${
@@ -123,6 +135,7 @@ function render(data) {
           ${d?.online ? tag('ok', 'Online sasa') : ''}
           ${devices?.androidApp ? tag('ok', 'Ana app ya Android') : ''}
         </div>
+        ${u.emergencyPhone ? `<p class="small">Mtu wa dharura: <strong>${esc(u.emergencyName || '–')}</strong> · <a href="tel:+${esc(u.emergencyPhone)}">${esc(formatPhone(u.emergencyPhone))}</a></p>` : ''}
       </div>
       <div class="profile-actions">
         <a class="btn btn-primary btn-small" href="tel:+${esc(u.phone)}">Piga simu</a>

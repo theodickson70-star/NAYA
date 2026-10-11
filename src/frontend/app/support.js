@@ -1,5 +1,5 @@
 // Msaada kwenye app: abiria au dereva anaripoti tatizo, anaona majibu ya ofisi na kuendelea na mazungumzo.
-// Njia: #/akaunti/msaada (ombi jipya) na #/akaunti/msaada/<id> (mazungumzo).
+// Njia: #/akaunti/msaada/mpya (ombi jipya) na #/akaunti/msaada/<id> (mazungumzo). #/akaunti/msaada = ukurasa wa Msaada (akaunti.js).
 import { escapeHtml as esc } from '/shared/api.js';
 import { formatDate, formatTsh, SUPPORT_CATEGORIES, SUPPORT_STATUS } from '/shared/labels.js';
 
@@ -17,12 +17,12 @@ export function init(context) {
   $('app-content').addEventListener('submit', onSubmit);
 }
 
-/** Ndani ya ukurasa wa Akaunti: kadi ya Msaada (orodha inapakiwa baadaye). */
+/** Ndani ya ukurasa wa Msaada: kadi ya matatizo uliyoripoti (orodha inapakiwa baadaye). */
 export function cardHtml(unread) {
   return `<section class="card support-card" aria-labelledby="support-title">
     <div class="support-head">
-      <h2 id="support-title">Msaada${unread ? ` <span class="pill-dot">${unread} jipya</span>` : ''}</h2>
-      <a class="btn btn-primary btn-small" href="#/akaunti/msaada">Ripoti tatizo</a>
+      <h2 id="support-title">Matatizo uliyoripoti${unread ? ` <span class="pill-dot">${unread} jipya</span>` : ''}</h2>
+      <a class="btn btn-primary btn-small" href="#/akaunti/msaada/mpya">Ripoti tatizo</a>
     </div>
     <p class="muted">Tatizo la safari, nauli, umesahau kitu, au lolote — ofisi ya NAYA inakujibu hapa na kwenye simu yako.</p>
     <ul class="support-list" id="support-list"><li class="muted">Inapakia…</li></ul>
@@ -53,7 +53,7 @@ export async function renderNew() {
   openId = null;
   const cats = ctx.isDriver() ? DRIVER_CATS : PASSENGER_CATS;
   $('app-content').innerHTML = `
-    <a class="back" href="#/akaunti">‹ Akaunti</a>
+    <a class="back" href="#/akaunti/msaada">‹ Msaada</a>
     <h1>Ripoti tatizo</h1>
     <p class="muted">Eleza kilichotokea. Ofisi ya NAYA itakujibu haraka iwezekanavyo.</p>
     <form class="card support-form" id="support-form" novalidate>
@@ -94,7 +94,7 @@ export async function renderTicket(id) {
     if (openId !== id) return;
     const typing = $('support-reply')?.value ?? '';
     $('app-content').innerHTML = `
-      <a class="back" href="#/akaunti">‹ Akaunti</a>
+      <a class="back" href="#/akaunti/msaada">‹ Msaada</a>
       <div class="ticket-top"><h1>${esc(SUPPORT_CATEGORIES[t.category] ?? 'Msaada')}</h1>${tag(t.status)}</div>
       <p class="muted">Ombi la ${esc(formatDate(t.createdAt, true))}</p>
       <div class="thread" id="ticket-thread">

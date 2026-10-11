@@ -306,6 +306,10 @@ function safetyHtml({ share, sosOpen }) {
         <button class="btn btn-danger btn-block btn-big" type="button" data-ride="sos-send"${sosSending ? ' disabled' : ''}>${
           sosSending ? 'Inatuma…' : 'Tuma dharura kwa ofisi ya NAYA'
         }</button>
+        ${(() => {
+          const e = ctx.emergency?.();
+          return e ? `<a class="btn btn-ghost btn-block" href="tel:+${esc(e.phone)}">${ICON.phone} Mpigie ${esc(e.name || 'mtu wako wa dharura')} · ${esc(formatPhone(e.phone))}</a>` : '';
+        })()}
         <a class="btn btn-ghost btn-block" href="tel:112">${ICON.phone} Piga Polisi · 112</a>
         <button class="btn btn-ghost btn-block btn-plain" type="button" data-ride="sos-close">Rudi</button>
       </section>`
@@ -361,6 +365,27 @@ function driverCardHtml(ride) {
     }
   </section>`;
 }
+
+/** Dereva: picha ya abiria (aliyepewa ombi / wa safari yake). */
+function loadPassengerPhoto(rideId) {
+  const key = `p:${rideId}`;
+  const place = (url) => {
+    const el = $('pax-photo');
+    if (el) el.innerHTML = `<img src="${url}" alt="">`;
+  };
+  if (photos.has(key)) return place(photos.get(key));
+  ctx.api
+    .blob(`/api/driver/rides/${rideId}/passenger-photo`)
+    .then((blob) => {
+      const url = URL.createObjectURL(blob);
+      photos.set(key, url);
+      place(url);
+    })
+    .catch(() => {});
+}
+
+const paxInitials = (name) => esc((name ?? '?').split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase());
+const paxMeta = (p) => (p?.rating ? `★ ${p.rating.average} · safari ${p.trips}` : p?.trips ? `Safari ${p.trips} na NAYA` : 'Abiria mpya');
 
 function loadDriverPhoto(rideId) {
   const place = (url) => {
@@ -519,6 +544,8 @@ function renderDriverDashboard() {
   </div>`;
 
   if (s.offer && !s.ride) startOfferCountdown(s.offer.secondsLeft, s.offer.totalSeconds || 60);
+  if (s.ride?.passenger?.hasPhoto) loadPassengerPhoto(s.ride.id);
+  else if (!s.ride && s.offer?.passenger?.hasPhoto) loadPassengerPhoto(s.offer.ride.id);
   fillBackgroundHint();
 }
 
@@ -590,6 +617,12 @@ function offerHtml(offer) {
   const r = offer.ride;
   return `<section class="offer" role="alertdialog" aria-labelledby="offer-title">
     <div class="offer-top"><h1 id="offer-title">Ombi jipya la safari</h1><span class="offer-timer" id="offer-seconds" style="--p:${offer.secondsLeft / (offer.totalSeconds || 60)}">${clock(offer.secondsLeft)}</span></div>
+    ${
+      offer.passenger
+        ? `<div class="offer-pax"><span class="driver-photo pax-photo" id="pax-photo">${paxInitials(offer.passenger.firstName)}</span>
+            <span><strong>${esc(offer.passenger.firstName)}</strong><span class="muted">${esc(paxMeta(offer.passenger))}</span></span></div>`
+        : ''
+    }
     <p class="offer-fare">${formatTsh(r.fare)}</p>
     ${r.promo ? `<p class="offer-promo"><strong>Safari ya ofa</strong> Abiria anakulipa ${formatTsh(r.passengerPays)} taslimu · NAYA inakutumia ${formatTsh(r.promo.discount)}</p>` : ''}
     <p class="muted">${esc(VEHICLE_TYPES[r.vehicleType])} · safari ya km ${r.distanceKm} · abiria yuko km ${offer.distanceToPickupKm} kutoka kwako</p>
@@ -713,8 +746,8 @@ function driverRideHtml(ride) {
   return `${ride.sosOpen ? sosSentHtml() : ''}<section class="ride-head ride-coming"><h1>${esc(step.title)}</h1><p>${esc(step.sub)}</p></section>
     <section class="card">
       <div class="driver-top">
-        <span class="driver-photo">${esc((p?.name ?? '?').split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase())}</span>
-        <span class="driver-who"><strong>${esc(p?.name ?? 'Abiria')}</strong><span class="muted">Abiria · ${formatTsh(ride.passengerPays ?? ride.fare)} taslimu</span></span>
+        <span class="driver-photo pax-photo" id="pax-photo">${paxInitials(p?.name)}</span>
+        <span class="driver-who"><strong>${esc(p?.name ?? 'Abiria')}</strong><span class="muted">${esc(paxMeta(p))}</span><span class="muted">Abiria · ${formatTsh(ride.passengerPays ?? ride.fare)} taslimu</span></span>
       </div>
       <div class="actions two">
         ${p ? `<a class="btn btn-ghost call" href="${tel(p.phone)}">${ICON.phone} Piga simu</a>` : ''}

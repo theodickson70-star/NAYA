@@ -722,3 +722,6 @@ a.kpi:hover { border-color: var(--naya-green); }
 .ofa-reasons li .badge { flex: none; margin-top: 1px; }
 .ofa-reasons a { color: var(--ink); }
 @media (max-width: 560px) { .ofa-check-form .ofa-fields { grid-template-columns: 1fr; } }
+
+.profile-avatar { overflow: hidden; }
+.profile-avatar img { width: 100%; height: 100%; object-fit: cover; }

@@ -115,6 +115,30 @@ Alama za kutiliwa shaka (`rides.flags`), zinaonekana kwa ofisi kwenye safari, Ri
 DRIVER, PASSENGER, AUTO au ADMIN. Migration `021_safari_rahisi.sql` inaongeza safu tu (haifuti data); safari zinazoendelea zisizo
 za ofa zinaondolewa PIN ili zisikwame.
 
+## Akaunti mpya (0.15.0)
+
+App → **Akaunti** sasa ni menyu (kama Bolt/Uber), si orodha ndefu ya kadi:
+
+| Sehemu | Njia | Kina nini |
+|---|---|---|
+| Wasifu | `#/akaunti/wasifu` | Picha (mraba 640px JPEG, inapunguzwa kwenye simu), jina, simu, takwimu (safari, nyota, alichookoa kwa ofa) |
+| Ofa | `#/akaunti/ofa` | Ofa zinazomfaa, alichookoa, jinsi ofa zinavyofanya kazi (haionekani kwenye mode ya Dereva) |
+| Shughuli | `#/akaunti/shughuli` | Safari zake (na za udereva kama ni dereva) + arifa |
+| Usalama | `#/akaunti/usalama` | Mtu wa dharura, vipengele vya usalama safarini, namba 112 na Msaada wa NAYA |
+| Msaada | `#/akaunti/msaada` | Simu / WhatsApp +255 628 986 770, barua pepe, ripoti tatizo (`#/akaunti/msaada/mpya`), maswali ya haraka, toa maoni |
+| Mipangilio | `#/akaunti/mipangilio` | Lugha, arifa, sauti, password, APK, masharti |
+| Udereva | `#/akaunti/ada`, `#/akaunti/malipo-ya-ofa` | Kwa madereva walioidhinishwa tu |
+
+- **Picha ya mteja inaenda kwa dereva:** dereva aliyepewa ombi anaona jina la kwanza, picha na nyota za abiria
+  (`offer.passenger`), na wakati wa safari (`ride.passenger.hasPhoto`). Picha: `GET /api/driver/rides/:id/passenger-photo` —
+  dereva wa safari au aliye na ombi linalosubiri tu; wengine 404. Namba ya simu ya abiria bado inaonekana baada ya kukubali tu.
+- API: `GET/PUT /api/account/profile`, `PUT /api/account/photo` (body = picha), `POST /api/account/photo/delete`,
+  `GET /api/account/photo`, `PUT /api/account/emergency`, `POST /api/account/emergency/delete`, `GET /api/admin/users/:id/photo`.
+- Dereva anayehakikiwa / aliyeidhinishwa hawezi kubadilisha jina mwenyewe (limethibitishwa na nyaraka).
+- **Mtu wa dharura** anaonekana kwenye "Dharura" safarini (kitufe cha kumpigia), kwa ofisi kwenye Dharura na kwenye wasifu wa mtumiaji.
+- Mawasiliano ya Msaada yako kwenye `frontend/shared/contact.js`.
+- Migration `022_akaunti.sql` inaongeza safu tu (`photo_file_id`, `photo_updated_at`, `emergency_name`, `emergency_phone`).
+
 ## Realtime na arifa (Phase 7)
 
 - **Papo hapo:** app na ofisi zinafungua `GET /api/stream` (Server-Sent Events). Tiketi ya kuingia (`POST /api/stream/ticket`) inadumu sekunde 60
