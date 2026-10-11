@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="naya_green">#0A6E47</color>
+    <color name="colorPrimary">#06502F</color>
+    <color name="colorPrimaryDark">#06502F</color>
+    <color name="colorAccent">#F2B705</color>
+</resources>

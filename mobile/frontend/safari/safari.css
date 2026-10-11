@@ -1,0 +1,11 @@
+/* Ukurasa wa umma wa safari iliyoshirikiwa (hutumia mtindo wa app: naya.css + app.css). */
+body { padding-bottom: 24px; }
+.share-tag { font-size: 14px; font-weight: 700; color: var(--white); opacity: 0.9; }
+.share-page { max-width: 560px; margin: 0 auto; }
+.share-page .ride-map { height: 300px; }
+.share-driver { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 19px; }
+.share-route { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.share-route p { margin: 0; }
+.share-updated { margin-top: 12px; font-size: 14px; text-align: center; }
+.share-help { margin: 14px 0 0; font-size: 14px; color: var(--muted); text-align: center; }
+.share-help a { color: var(--danger); font-weight: 700; }

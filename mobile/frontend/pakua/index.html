@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="sw">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#06502F">
+  <meta name="description" content="Pakua app ya NAYA: agiza bodaboda au bajaji Urambo kwa sekunde chache. Madereva: pokea maombi ya safari hata simu ikiwa imefungwa.">
+  <meta property="og:title" content="Pakua app ya NAYA">
+  <meta property="og:description" content="Agiza bodaboda au bajaji Urambo kwa sekunde chache. Unaona nauli kabla ya kupanda.">
+  <meta property="og:image" content="/shared/brand/naya-512.png">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/shared/brand/naya-apple-180.png">
+  <title>Pakua NAYA</title>
+  <link rel="preload" href="/shared/fonts/bricolage-grotesque.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/shared/fonts/atkinson-hyperlegible-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/shared/fonts.css">
+  <link rel="stylesheet" href="/shared/naya.css">
+  <link rel="stylesheet" href="/pakua/pakua.css">
+  <script src="/pakua/boot.js"></script>
+</head>
+<body>
+  <header class="pk-bar">
+    <a class="pk-brand" href="/pakua/">
+      <img src="/shared/brand/naya-icon-light.svg" alt="" width="40" height="40">
+      <img src="/shared/brand/naya-wordmark-white.svg" alt="NAYA" width="88" height="25">
+    </a>
+    <div class="lang-switch pk-lang" role="group" aria-label="Lugha / Language" translate="no"><button type="button" data-lang="sw" aria-pressed="true" lang="sw">Kiswahili</button><button type="button" data-lang="en" aria-pressed="false" lang="en">English</button></div>
+  </header>
+
+  <main>
+    <section class="pk-hero" aria-labelledby="pk-title">
+      <div class="pk-rings" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div class="pk-hero-text">
+        <h1 id="pk-title">Bodaboda yako,<br>kwenye simu yako.</h1>
+        <p class="pk-lead">Pakua app ya NAYA uagize bodaboda au bajaji popote Urambo. Unaona nauli kabla ya kupanda.</p>
+
+        <!-- Android: kitufe kikuu -->
+        <div class="pk-cta" data-for="android">
+          <a class="pk-download" id="pk-download" href="/pakua/apk" download>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19.5h14"/></svg>
+            <span>Pakua app ya NAYA</span>
+          </a>
+          <p class="pk-meta"><span id="pk-size">Bure</span> · Android 7.0 au zaidi</p>
+          <p class="pk-started" id="pk-started" role="status" hidden>Upakuaji umeanza. Ukimaliza, fungua faili <strong translate="no">NAYA.apk</strong> — fuata hatua hapo chini.</p>
+        </div>
+
+        <!-- iPhone -->
+        <div class="pk-cta pk-card" data-for="ios">
+          <h2>Una iPhone?</h2>
+          <p>App ya kupakua ni ya simu za Android. Kwenye iPhone, tumia NAYA kwenye Safari na uiweke kwenye skrini yako kama app:</p>
+          <ol class="pk-mini">
+            <li>Bonyeza <strong>Fungua NAYA</strong> hapa chini.</li>
+            <li>Bonyeza kitufe cha <strong>Share</strong> (mraba wenye mshale wa juu).</li>
+            <li>Chagua <strong>Add to Home Screen</strong>.</li>
+          </ol>
+          <a class="pk-download" href="/app/?web=1"><span>Fungua NAYA</span></a>
+        </div>
+
+        <!-- Kompyuta -->
+        <div class="pk-cta pk-card pk-qr-card" data-for="desktop">
+          <img src="/pakua/qr.svg" alt="QR code ya ukurasa wa kupakua NAYA" width="168" height="168">
+          <div>
+            <h2>Changanua kwa simu yako</h2>
+            <p>Fungua kamera ya simu yako ya Android, elekeza kwenye QR code hii, kisha pakua app ya NAYA.</p>
+          </div>
+        </div>
+
+        <a class="pk-web" href="/app/?web=1">Tumia NAYA kwenye browser badala yake</a>
+      </div>
+
+      <div class="pk-phone" aria-hidden="true">
+        <img src="/pakua/skrini.webp" alt="" width="390" height="844">
+      </div>
+    </section>
+
+    <section class="pk-section" aria-labelledby="pk-steps-title" data-for="android">
+      <h2 id="pk-steps-title">Jinsi ya kusakinisha</h2>
+      <p class="pk-note">Ni dakika moja tu. Maneno kwenye simu yako yanaweza kutofautiana kidogo kulingana na aina ya simu.</p>
+      <ol class="pk-steps">
+        <li>
+          <h3>Pakua</h3>
+          <p>Bonyeza <strong>Pakua app ya NAYA</strong>. Faili <span translate="no">NAYA.apk</span> litapakuliwa kwenye simu yako.</p>
+        </li>
+        <li>
+          <h3>Fungua faili</h3>
+          <p>Bonyeza arifa ya upakuaji ikiisha, au fungua <strong>Downloads</strong> na ubonyeze <span translate="no">NAYA.apk</span>.</p>
+        </li>
+        <li>
+          <h3>Ruhusu kusakinisha</h3>
+          <p>Simu ikiuliza, bonyeza <strong>Settings / Mipangilio</strong>, washa <strong>Ruhusu kutoka chanzo hiki</strong> (Allow from this source), kisha rudi nyuma.</p>
+        </li>
+        <li>
+          <h3>Sakinisha na ufungue</h3>
+          <p>Bonyeza <strong>Install / Sakinisha</strong>, kisha <strong>Open / Fungua</strong>. Jisajili kwa namba yako ya simu — tayari kuagiza!</p>
+        </li>
+      </ol>
+      <div class="pk-warn">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v6c0 5 3.4 8.3 8 9 4.6-.7 8-4 8-9V6l-8-3z"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg>
+        <p><strong>Ukiona onyo la "Play Protect" au "app isiyojulikana":</strong> ni kwa sababu NAYA bado haiko Play Store. Bonyeza <strong>Maelezo zaidi (More details)</strong> → <strong>Sakinisha hata hivyo (Install anyway)</strong>. Pakua NAYA kutoka ukurasa huu tu.</p>
+      </div>
+    </section>
+
+    <section class="pk-section" aria-labelledby="pk-why-title">
+      <h2 id="pk-why-title">Kwa nini app?</h2>
+      <ul class="pk-why">
+        <li>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+          <h3>Arifa papo hapo</h3>
+          <p>Unajua dereva akipatikana na akifika, hata ukiwa unatumia app nyingine.</p>
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="17" r="3.5"/><circle cx="18.5" cy="17" r="3.5"/><path d="M5.5 17 9 9h5l4.5 8"/><path d="M14 9h4"/></svg>
+          <h3>Kwa madereva: kengele ya maombi</h3>
+          <p>Simu inalia ombi la safari likiingia, hata app ikiwa imefungwa au skrini imezimwa.</p>
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg>
+          <h3>Haraka na rahisi</h3>
+          <p>NAYA inafunguka moja kwa moja kutoka skrini ya simu yako, na inajisasisha yenyewe.</p>
+        </li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="pk-foot">
+    <a href="/masharti/#jumla">Masharti ya Huduma</a>
+    <a href="/masharti/#faragha">Sera ya Faragha</a>
+    <span translate="no">NAYA · TWENDE PAMOJA</span>
+  </footer>
+
+  <script src="/pakua/pakua.js" type="module"></script>
+</body>
+</html>
