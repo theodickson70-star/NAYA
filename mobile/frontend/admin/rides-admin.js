@@ -145,7 +145,7 @@ function render(r) {
           : `<ul class="history">${r.offers
               .map(
                 (o) => `<li><span><strong>${esc(o.driverName)}</strong> · km ${o.distanceKm ?? '–'} kutoka kwa abiria</span><span class="muted">${
-                  { PENDING: 'Linasubiri', ACCEPTED: 'Amekubali', DECLINED: 'Amekataa', EXPIRED: 'Muda umeisha' }[o.status]
+                  { PENDING: 'Linasubiri', ACCEPTED: 'Amekubali', DECLINED: 'Amekataa', EXPIRED: 'Muda umeisha', TAKEN: 'Mwingine amewahi', CANCELLED: 'Limeghairiwa' }[o.status]
                 } · ${esc(formatDate(o.offeredAt, true))}</span></li>`,
               )
               .join('')}</ul>`
@@ -155,7 +155,7 @@ function render(r) {
       r.status === 'SEARCHING'
         ? `<section class="intervene" aria-labelledby="iv-title">
             <h2 id="iv-title">Mpe dereva maalum</h2>
-            <p class="muted">Safari hii bado inatafuta dereva. Chagua dereva aliye online — simu yake italia kama ombi la kawaida (dakika 1 kukubali).</p>
+            <p class="muted">Safari hii bado inatafuta dereva. Chagua dereva aliye online — simu yake italia kama ombi la kawaida (sekunde 30 kukubali).</p>
             <div id="cand-list" class="cand-list"><p class="muted">Inatafuta madereva…</p></div>
             <p class="alert alert-danger" id="cand-error" role="alert" hidden></p>
           </section>`

@@ -55,6 +55,29 @@ export async function authenticate(request: FastifyRequest, _reply: FastifyReply
     await db.query('UPDATE naya.users SET language = $2 WHERE id = $1', [user.id, lang]);
     user.language = lang;
   }
+  // APK au link? (kwa ripoti za ofisi) — tunaandika tu ikibadilika au baada ya dakika 10, si kila ombi.
+  if (user.role === 'USER') await rememberClient(user, request.headers['x-naya-client']);
+}
+
+async function rememberClient(user: UserRow, header: unknown) {
+  const raw = String(header ?? '');
+  const client = raw === 'apk' || raw.startsWith('android-') ? 'apk' : raw === 'web' ? 'web' : null;
+  if (!client) return;
+  const seen = user.app_seen_at ? new Date(user.app_seen_at).getTime() : 0;
+  if (client === user.app_client && Date.now() - seen < 10 * 60_000) return;
+  try {
+    await db.query(
+      `UPDATE naya.users SET app_client = $2::varchar, app_seen_at = now(),
+              apk_since = CASE WHEN $3::boolean THEN coalesce(apk_since, now()) ELSE apk_since END
+        WHERE id = $1`,
+      [user.id, client, client === 'apk'],
+    );
+    user.app_client = client;
+    user.app_seen_at = new Date();
+  } catch (error) {
+    // si muhimu kwa ombi lenyewe
+    console.error(`[auth] app_client: ${(error as Error).message}`);
+  }
 }
 
 /** Lazima awe ameingia NA awe na moja ya roles hizi. */

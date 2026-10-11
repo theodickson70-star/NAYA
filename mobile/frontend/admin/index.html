@@ -422,8 +422,19 @@
 
     <!-- Ripoti -->
     <main id="page-reports" class="page page-wide" hidden>
-      <div class="page-head">
-        <h1>Ripoti</h1>
+      <h1>Ripoti</h1>
+      <nav class="rp-tabs" id="rp-tabs" aria-label="Aina ya ripoti">
+        <a href="#/ripoti" data-rp="">Muhtasari</a>
+        <a href="#/ripoti/madereva" data-rp="madereva">Madereva</a>
+        <a href="#/ripoti/wateja" data-rp="wateja">Wateja</a>
+        <a href="#/ripoti/app" data-rp="app">APK na link</a>
+        <a href="#/ripoti/maombi" data-rp="maombi">Maombi ya safari</a>
+        <a href="#/ripoti/online" data-rp="online">Online sasa</a>
+      </nav>
+      <div id="rp-view" hidden></div>
+      <div id="rp-summary">
+      <div class="page-head rp-sub-head">
+        <p class="muted">Mwenendo wa safari, mapato na maeneo kwa kipindi ulichochagua.</p>
         <div class="filters" id="report-range" role="group" aria-label="Kipindi">
           <button type="button" class="chip" data-days="7" aria-pressed="false">Siku 7</button>
           <button type="button" class="chip" data-days="30" aria-pressed="true">Siku 30</button>
@@ -458,6 +469,7 @@
         <div><h2>Pakua safari (Excel / CSV)</h2><p class="muted small">Safari zote za kipindi ulichochagua, pamoja na abiria, dereva, nauli na hali.</p></div>
         <button class="btn btn-primary" type="button" id="report-csv">Pakua CSV</button>
       </section>
+      </div>
     </main>
 
     <!-- Matangazo -->

@@ -433,7 +433,7 @@ async function fillBackgroundHint() {
     if (!info.driverService) {
       box.innerHTML = `<div class="alert alert-warn bg-hint" role="note"><strong>Pakua toleo jipya la NAYA</strong>
         <span>Toleo jipya linapokea maombi ya safari hata skrini ya simu ikiwa imezimwa.</span>
-        <a class="btn btn-primary btn-small" href="/pakua/apk">Pakua toleo jipya</a></div>`;
+        <a class="btn btn-primary btn-small" href="/pakua/apk?sasisha=1">Pakua toleo jipya</a></div>`;
     } else if (info.batteryUnrestricted === false) {
       box.innerHTML = `<div class="alert alert-warn bg-hint" role="note"><strong>Ruhusu NAYA ifanye kazi skrini ikizimwa</strong>
         <span>Simu yako inaweza kuzuia NAYA ili kuokoa chaji, ukakosa maombi. Bonyeza Ruhusu, kisha chagua Ruhusu / Allow.</span>
@@ -589,8 +589,8 @@ function startOfferCountdown(seconds, total) {
     const el = $('offer-seconds');
     if (el) el.textContent = clock(left);
     ring(left);
-    // Ombi linadumu dakika 1: kumbusha dereva kila sekunde 20 (kengele + mtetemo) mpaka akubali au akatae.
-    if (left > 0 && (seconds - left) % 20 === 0) {
+    // Ombi linadumu sekunde 20–30: kumbusha dereva kila sekunde 10 (kengele + mtetemo) mpaka akubali au akatae.
+    if (left > 0 && (seconds - left) % 10 === 0) {
       navigator.vibrate?.([300, 150, 300]);
       chime();
     }
@@ -683,6 +683,10 @@ async function refreshDriver() {
     const before = driverData?.offer?.id;
     driverData = await ctx.api.get('/api/driver/state');
     if (driverData.offer && driverData.offer.id !== before) lastKey = '';
+    // Ombi limeondoka kabla hajajibu: mwambie kwa nini.
+    if (before && !driverData.offer && driverData.lastOffer?.id === before) {
+      ctx.toast(driverData.lastOffer.status === 'TAKEN' ? 'Dereva mwingine amewahi kukubali ombi hili' : 'Abiria ameghairi ombi');
+    }
     renderDriverDashboard();
   } catch (err) {
     ctx.handleError(err);

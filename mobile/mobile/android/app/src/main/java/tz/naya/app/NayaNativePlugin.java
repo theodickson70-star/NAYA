@@ -57,7 +57,19 @@ public class NayaNativePlugin extends Plugin {
         r.put("token", NayaAlerts.savedToken(c));
         r.put("driverService", true);
         r.put("batteryUnrestricted", batteryUnrestricted(c));
+        r.put("updater", true);
+        r.put("versionCode", NayaUpdater.currentVersionCode(c));
+        r.put("canInstall", NayaUpdater.canInstall(c));
         return r;
+    }
+
+    @Override
+    public void load() {
+        try {
+            NayaUpdater.cleanup(getContext());
+        } catch (Exception ignored) {
+            // si muhimu
+        }
     }
 
     @PluginMethod
@@ -203,5 +215,44 @@ public class NayaNativePlugin extends Plugin {
             }
         }
         call.resolve(info());
+    }
+
+    // ------------------------------------------------------------------ "Sasisha" ndani ya app
+
+    /** { url } → inaanza kupakua APK mpya; ikimaliza dirisha la "Install" linafunguka. Fuatilia kwa updateStatus. */
+    @PluginMethod
+    public void installUpdate(PluginCall call) {
+        String url = call.getString("url");
+        if (url == null || !url.startsWith("https://")) {
+            call.reject("url ya https inahitajika", "BAD_ARGS");
+            return;
+        }
+        Context c = getContext();
+        JSObject r = new JSObject();
+        if (!NayaUpdater.canInstall(c)) {
+            NayaUpdater.openInstallPermission(c);
+            r.put("needsPermission", true);
+            call.resolve(r);
+            return;
+        }
+        if (NayaUpdater.READY.equals(NayaUpdater.state()) && NayaUpdater.reopen(c)) {
+            r.put("state", NayaUpdater.READY);
+            call.resolve(r);
+            return;
+        }
+        NayaUpdater.start(c.getApplicationContext(), url);
+        r.put("state", NayaUpdater.state());
+        call.resolve(r);
+    }
+
+    /** { state: idle|downloading|ready|error, percent, error } */
+    @PluginMethod
+    public void updateStatus(PluginCall call) {
+        JSObject r = new JSObject();
+        r.put("state", NayaUpdater.state());
+        r.put("percent", NayaUpdater.percent());
+        r.put("error", NayaUpdater.error());
+        r.put("canInstall", NayaUpdater.canInstall(getContext()));
+        call.resolve(r);
     }
 }

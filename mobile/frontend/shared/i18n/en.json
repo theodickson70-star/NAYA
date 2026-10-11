@@ -696,7 +696,27 @@
   "Ruhusu NAYA ifanye kazi skrini ikizimwa": "Allow NAYA to work when the screen is off",
   "Simu yako inaweza kuzuia NAYA ili kuokoa chaji, ukakosa maombi. Bonyeza Ruhusu, kisha chagua Ruhusu / Allow.": "Your phone may stop NAYA to save battery, and you would miss requests. Tap Allow, then choose Allow.",
   "Umewekwa offline": "You were set offline",
-  "Hukujibu maombi 2 ya safari mfululizo. Ukiwa tayari kupokea safari, fungua NAYA na ubonyeze NENDA ONLINE.": "You did not answer 2 ride requests in a row. When you are ready to receive rides, open NAYA and tap GO ONLINE."
+  "Hukujibu maombi 2 ya safari mfululizo. Ukiwa tayari kupokea safari, fungua NAYA na ubonyeze NENDA ONLINE.": "You did not answer 2 ride requests in a row. When you are ready to receive rides, open NAYA and tap GO ONLINE.",
+  "Toleo jipya la NAYA": "New version of NAYA",
+  "Sasisha": "Update",
+  "Baadaye": "Later",
+  "Sakinisha": "Install",
+  "Pakua toleo jipya, kisha bonyeza Install. Baada ya hapo masasisho yatakuja ndani ya app.": "Download the new version, then tap Install. After that, updates will come inside the app.",
+  "Ruhusu NAYA kusakinisha toleo jipya: washa \"Ruhusu kutoka chanzo hiki\" / \"Allow from this source\", kisha rudi hapa ubonyeze Sasisha.": "Allow NAYA to install the new version: turn on \"Allow from this source\", then come back here and tap Update.",
+  "Bonyeza Install kwenye dirisha la Android. Kama umelifunga, bonyeza Sakinisha.": "Tap Install in the Android window. If you closed it, tap Install here.",
+  "Upakuaji umeshindwa": "Download failed",
+  "Hakuna mtandao. Washa data kisha jaribu tena.": "No internet. Turn on data and try again.",
+  "Upakuaji haukukamilika. Jaribu tena.": "The download did not finish. Try again.",
+  "Faili lililopakuliwa si la NAYA": "The downloaded file is not NAYA",
+  "Tayari una toleo jipya zaidi": "You already have the newest version",
+  "Hakuna nafasi kwenye simu": "Not enough space on the phone",
+  "Lina maboresho mapya. Sasisha ukiwa huna safari inayoendelea.": "It has new improvements. Update when you have no ride in progress.",
+  "Dereva mwingine amewahi kukubali ombi hili": "Another driver accepted this request first",
+  "Abiria ameghairi ombi": "The passenger cancelled the request",
+  "Dereva mwingine amewahi kukubali safari hii.": "Another driver accepted this ride first.",
+  "Safari hii imeghairiwa.": "This ride has been cancelled.",
+  "Mwingine amewahi": "Taken by another",
+  "Limeghairiwa": "Cancelled"
  },
  "patterns": [
   [
@@ -1174,6 +1194,18 @@
   [
    "km {} ·",
    "{} km ·"
+  ],
+  [
+   "Lina maboresho mapya. Sasisha ukiwa huna safari inayoendelea{}.",
+   "It has new improvements. Update when you have no ride in progress{}."
+  ],
+  [
+   "Inapakua toleo jipya… {}%",
+   "Downloading the new version… {}%"
+  ],
+  [
+   "Upakuaji umeshindwa ({})",
+   "Download failed ({})"
   ]
  ]
 }

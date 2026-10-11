@@ -2,6 +2,7 @@
 import { escapeHtml as esc } from '/shared/api.js';
 import { formatTsh } from '/shared/labels.js';
 import { barChart, shortDay } from './charts.js';
+import * as ripoti from './ripoti-admin.js';
 
 const $ = (id) => document.getElementById(id);
 let ctx = null;
@@ -10,6 +11,7 @@ const compactTsh = (n) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1).replac
 
 export function setup(context) {
   ctx = context;
+  ripoti.setup(context);
   $('report-range').addEventListener('click', (event) => {
     const chip = event.target.closest('[data-days]');
     if (!chip) return;
@@ -19,6 +21,26 @@ export function setup(context) {
   });
   $('report-csv').addEventListener('click', downloadCsv);
 }
+
+const TABS = ['madereva', 'wateja', 'app', 'maombi', 'online'];
+
+/** #/ripoti → muhtasari; #/ripoti/<aina> → ripoti kamili ya aina hiyo. */
+export function open(name) {
+  const tab = TABS.includes(name) ? name : '';
+  for (const a of $('rp-tabs').querySelectorAll('[data-rp]')) {
+    if (a.dataset.rp === tab) {
+      a.setAttribute('aria-current', 'page');
+      a.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+    else a.removeAttribute('aria-current');
+  }
+  $('rp-summary').hidden = tab !== '';
+  $('rp-view').hidden = tab === '';
+  if (tab) ripoti.show(tab);
+  else load();
+}
+
+export const stop = () => ripoti.stop();
 
 export async function load() {
   $('reports-error').hidden = true;

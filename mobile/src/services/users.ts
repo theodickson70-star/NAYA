@@ -19,6 +19,10 @@ export interface UserRow {
   phone_verified_at: Date | null;
   last_login_at: Date | null;
   created_at: Date;
+  /** APK au link (browser) — mara ya mwisho (migration 018). */
+  app_client?: 'apk' | 'web' | null;
+  app_seen_at?: Date | null;
+  apk_since?: Date | null;
 }
 
 /** Mtumiaji kama anavyoonekana nje ya server — kamwe bila password_hash wala token_version. */

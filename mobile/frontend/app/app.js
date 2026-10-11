@@ -19,6 +19,7 @@ import { nearbyMap } from '/shared/map.js';
 import * as rides from './rides.js';
 import * as support from './support.js';
 import * as feedback from './feedback.js';
+import * as appUpdate from './update.js';
 import * as terms from './terms.js';
 import { initI18n, langSwitchHtml, onLangChange } from '/shared/i18n.js';
 import { finishSplash, previewSound, setSoundEnabled, soundEnabled, splashActive, splashReady } from './splash.js';
@@ -28,7 +29,7 @@ const api = createApi('naya_app_token');
 const $ = (id) => document.getElementById(id);
 const views = ['view-loading', 'view-intro', 'view-auth', 'view-verify', 'view-role', 'view-offline', 'view-app'];
 const MAX_BYTES = 3 * 1024 * 1024;
-const VERSION = '0.13.2';
+const VERSION = '0.13.4';
 
 let account = null; // { user, activeMode, driverStatus, canDrive }
 let driver = null; // wasifu wa udereva (mode ya Dereva)
@@ -1473,6 +1474,7 @@ $('retry-button').addEventListener('click', start);
 
 support.init({ api, handleError, toast, isDriver: () => account?.activeMode === 'DRIVER' });
 feedback.init({ api, handleError, toast });
+appUpdate.init({ api });
 rides.init({
   api,
   pushState: () => pushState(api),

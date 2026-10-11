@@ -211,6 +211,29 @@ mabadiliko ya NAYA yanayopushiwa Railway yanaonekana kwenye app papo hapo — **
 - Bila keystore, APK ni ya "debug" (inafaa kwa kusambaza moja kwa moja). GitHub inahifadhi ufunguo wake ili update isakinike juu
   ya ya zamani; ikitokea simu ikakataa ("App not installed"), futa NAYA ya zamani kisha usakinishe mpya.
 
+## Ripoti kamili za ofisi (0.13.4)
+
+Ofisi → **Ripoti** ina vichupo 6. Kila kimoja kina namba za muhtasari, vichujio, kutafuta, orodha nzima (safu 100 kwa mara, "Onyesha zaidi") na **Pakua Excel (CSV)** ya orodha nzima:
+
+| Kichupo | Inaonyesha |
+|---|---|
+| Muhtasari | Chati za zamani: safari kila siku, mapato, saa, maeneo, madereva bora |
+| Madereva | Madereva tu (chaguo-msingi: waliothibitishwa): chombo, plate, ada, online, safari, nyota, maombi aliyopewa/alikubali/alikataa/hakujibu, APK au link |
+| Wateja | Waliojisajili kama wateja tu (bila usajili wa dereva): maombi, yaliyofanikiwa, aliyoghairi, alicholipa, ombi la mwisho |
+| APK na link | Wateja na madereva wanaotumia APK dhidi ya link, upakuaji wa APK kila siku, na orodha ya kila kundi |
+| Maombi ya safari | Kila ombi: lilifanikiwa au la, nani alilipokea, na **kila dereva aliyepewa** alifanya nini (alikubali / alikataa / hakujibu / mwingine amewahi); pamoja na jedwali la kila dereva |
+| Online sasa | Madereva walio online: tayari kupokea ombi / ana ombi / safarini / hajaonekana / ada imeisha. Inasasishwa kila sekunde 15 |
+
+- API: `GET /api/admin/ripoti/{madereva|wateja|app|maombi|online}` na `.csv` (ofisi tu).
+- **APK au link:** app inatuma kichwa `x-naya-client: apk|web`. Migration `018_ripoti.sql` inaongeza `users.app_client`, `app_seen_at`, `apk_since` (columns mpya tu). Waliokwisha sajili simu ya APK (Firebase) wanahesabiwa APK mara moja; wengine wanaonekana "Haijulikani" mpaka wafungue NAYA tena.
+
+## Kumpata dereva haraka: mawimbi (0.13.3)
+
+- **Wimbi la 1:** ombi linaenda kwa dereva aliye karibu zaidi peke yake kwa sekunde 20 (`FIRST_OFFER_SECONDS`).
+- **Wimbi la 2 na kuendelea:** akikataa au asipojibu, madereva 3 wanaofuata (`WAVE_SIZE`) wanapata ombi **kwa pamoja** kwa sekunde 30 (`OFFER_SECONDS`). Anayebonyeza "Kubali" kwanza anapata safari; wengine ombi linaondoka na wanaambiwa "Dereva mwingine amewahi kukubali ombi hili".
+- Bado hakuna? Wimbi jingine la madereva 3 wanaofuata, mpaka dakika 10 (`SEARCH_TIMEOUT_SECONDS`).
+- Migration `017_mawimbi.sql`: hali mpya za ombi `TAKEN` (mwingine amewahi) na `CANCELLED` (abiria/ofisi imeghairi). Hazihesabiwi kama "hakujibu", kwa hiyo dereva hawekwi offline kwa sababu yake. Hakuna data inayofutwa.
+
 ## Maombi skrini ikiwa imezimwa (0.13.2)
 
 - APK mpya ina huduma ya chinichini (`NayaDriverService`): dereva akiwa online inatuma mahali kila sekunde 30 hata skrini ikiwa imezimwa, na inaonyesha arifa ya kudumu "NAYA: Uko online". Inasimama dereva akienda offline, akihamia upande wa abiria au akitoka.
@@ -218,6 +241,13 @@ mabadiliko ya NAYA yanayopushiwa Railway yanaonekana kwenye app papo hapo — **
 - Dereva asiyejibu maombi 2 mfululizo anawekwa offline na kuarifiwa, ili wateja wasisubiri bure.
 - Kwenye kadi ya online: ujumbe wa "Pakua toleo jipya" (APK ya zamani) au "Ruhusu NAYA ifanye kazi skrini ikizimwa" (betri).
 - Migration `016_dereva_chinichini.sql` inaongeza column `drivers.online_since` tu — hakuna data inayofutwa.
+
+### Kitufe cha "Sasisha" ndani ya app (0.13.2)
+
+- App inauliza `GET /api/app/latest` (toleo la karibuni linasomwa kutoka GitHub Releases, tag `android-1.0.N`; au `ANDROID_LATEST_VERSION_CODE`).
+- Kama APK ya simu ni ya zamani, kadi "Toleo jipya la NAYA" inaonekana juu. **Sasisha** → app inapakua APK (asilimia inaonekana), inakagua ni ya `tz.naya.app` na toleo jipya zaidi, kisha Android inafungua dirisha la **Install**. Mara ya kwanza Android inaomba ruhusa "Allow from this source".
+- APK za zamani (kabla ya 0.13.2) zinaonyeshwa "Pakua toleo jipya" → `/pakua/apk?sasisha=1` (kwenye browser). Masasisho hayahesabiwi kama upakuaji mpya.
+- **Ufunguo wa kusaini:** APK mpya inasakinika juu ya ya zamani tu kama imesainiwa kwa ufunguo ule ule. `android-key.yml` inafungua cache ya ufunguo kila siku 3 ili GitHub isiifute.
 
 ## Kupakua app (Phase 13)
 

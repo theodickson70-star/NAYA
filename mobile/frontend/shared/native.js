@@ -106,3 +106,17 @@ export const openNotificationSettings = () => call('openNotificationSettings');
 export const openFullScreenSettings = () => call('openFullScreenSettings');
 export const testRing = (seconds = 8) => call('testRing', { seconds });
 export const stopRinging = () => call('stopRinging');
+
+/**
+ * "Sasisha" ndani ya app. APK mpya (updater: true) inapakua na kufungua dirisha la "Install" yenyewe;
+ * APK za zamani zinaonyeshwa link ya kupakua kwenye browser.
+ */
+export const installUpdate = (url) => call('installUpdate', { url });
+export const updateStatus = () => call('updateStatus');
+
+/** Namba ya toleo la APK iliyosakinishwa: versionCode (APK mpya) au "1.0.N" → N (APK za zamani). */
+export function installedVersionCode(info) {
+  if (Number.isFinite(info?.versionCode) && info.versionCode > 0) return info.versionCode;
+  const m = /^1\.0\.(\d+)$/.exec(String(info?.appVersion ?? ''));
+  return m ? Number(m[1]) : null;
+}

@@ -155,6 +155,7 @@ function route() {
   closeMenu();
   ridesAdmin.stop();
   liveAdmin.stop();
+  reportsAdmin.stop();
   driverOnPage = null;
   for (const p of pages) $(p).hidden = p !== page;
   const navFor = {
@@ -182,7 +183,7 @@ function route() {
   if (page === 'page-user') usersAdmin.loadUser(parts[1]);
   if (page === 'page-support') supportAdmin.loadList(params);
   if (page === 'page-ticket') supportAdmin.loadTicket(parts[1]);
-  if (page === 'page-reports') reportsAdmin.load();
+  if (page === 'page-reports') reportsAdmin.open(parts[1] ?? '', params);
   if (page === 'page-broadcast') broadcastAdmin.load();
   if (page === 'page-feedback') feedbackAdmin.load();
 }

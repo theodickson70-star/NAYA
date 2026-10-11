@@ -3,6 +3,7 @@
 //   GET /pakua/apk     → tunahesabu kupakua, kisha tunampeleka kwenye APK ya toleo jipya zaidi
 //   GET /pakua/qr.svg  → QR code ya ukurasa huu (kwa wanaofungua kwenye kompyuta)
 //   GET /api/pakua     → ukubwa wa APK na kima cha chini cha Android (kwa kitufe)
+//   GET /api/app/latest → toleo jipya zaidi la APK (kwa kitufe cha "Sasisha" ndani ya app)
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import QRCode from 'qrcode';
 import { env } from '../config/env.js';
@@ -34,6 +35,30 @@ async function apkSize(): Promise<number | null> {
   return sizeCache.bytes;
 }
 
+const GITHUB_REPO = 'theodickson70-star/NAYA';
+let latestCache: { at: number; code: number | null } = { at: 0, code: null };
+
+/** Namba ya toleo (versionCode) ya APK ya karibuni: tag "android-1.0.N" kwenye GitHub Releases → N. Inahifadhiwa dakika 10. */
+export async function latestVersionCode(): Promise<number | null> {
+  if (env.androidLatestVersionCode) return env.androidLatestVersionCode;
+  if (Date.now() - latestCache.at < 10 * 60_000) return latestCache.code;
+  latestCache = { at: Date.now(), code: latestCache.code };
+  try {
+    const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
+      headers: { accept: 'application/vnd.github+json', 'user-agent': 'naya-server' },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (res.ok) {
+      const tag = String(((await res.json()) as { tag_name?: string }).tag_name ?? '');
+      const m = /^android-1\.0\.(\d+)$/.exec(tag);
+      if (m) latestCache.code = Number(m[1]);
+    }
+  } catch {
+    // GitHub haifikiki sasa hivi — tunatumia jibu la mwisho tulilokuwa nalo
+  }
+  return latestCache.code;
+}
+
 export async function downloadStats() {
   const row = await one<{ today: number; week: number; total: number }>(
     db,
@@ -53,9 +78,26 @@ export async function pakuaRoutes(app: FastifyInstance): Promise<void> {
     return ok({ apk: '/pakua/apk', sizeMb: bytes ? Math.round((bytes / 1048576) * 10) / 10 : null, minAndroid: '7.0' });
   });
 
+  app.get('/api/app/latest', async (_request, reply) => {
+    const versionCode = await latestVersionCode();
+    const bytes = await apkSize();
+    reply.header('cache-control', 'no-store');
+    return ok({
+      versionCode,
+      versionName: versionCode ? `1.0.${versionCode}` : null,
+      // APK ya karibuni moja kwa moja kutoka GitHub (https) — app inaipakua yenyewe, bila kikomo cha /pakua/apk.
+      apk: apkUrl(),
+      // Kwa APK za zamani zisizo na kitufe cha Sasisha: link inafunguka kwenye browser.
+      page: '/pakua/apk?sasisha=1',
+      sizeMb: bytes ? Math.round((bytes / 1048576) * 10) / 10 : null,
+    });
+  });
+
   app.get('/pakua/apk', { config: { rateLimit: { max: 30, timeWindow: '10 minutes' } } }, async (request, reply) => {
+    // "Sasisha" ndani ya app si mtumiaji mpya — hatuhesabu.
+    const isUpdate = (request.query as Record<string, unknown>)?.sasisha !== undefined;
     try {
-      await db.query('INSERT INTO naya.app_downloads (platform) VALUES ($1)', [platformOf(request)]);
+      if (!isUpdate) await db.query('INSERT INTO naya.app_downloads (platform) VALUES ($1)', [platformOf(request)]);
     } catch (error) {
       request.log.warn({ err: error }, 'kuhesabu upakuaji kumeshindwa');
     }
