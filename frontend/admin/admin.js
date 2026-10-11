@@ -301,6 +301,8 @@ async function loadOverview() {
     $('stat-sub-expired').textContent = n(data.subscriptions.expiredDrivers);
     $('stat-sos').textContent = n(data.sosOpen);
     $('stat-support').textContent = n(data.supportOpen);
+    $('stat-apk').textContent = n(data.apkDownloads?.total ?? 0);
+    $('stat-apk-users').textContent = n(data.app?.users ?? 0);
     safetyAdmin.setOpenCount(data.sosOpen);
     setNavCounts(data);
     renderQueue(data);

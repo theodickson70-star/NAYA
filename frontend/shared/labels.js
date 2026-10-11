@@ -89,7 +89,8 @@ export function formatDate(value, withTime = false) {
   if (!value) return '–';
   const options = { day: 'numeric', month: 'short', year: 'numeric' };
   if (withTime) Object.assign(options, { hour: '2-digit', minute: '2-digit' });
-  return new Date(value).toLocaleString('sw-TZ', options);
+  const locale = typeof document !== 'undefined' && document.documentElement.lang === 'en' ? 'en-GB' : 'sw-TZ';
+  return new Date(value).toLocaleString(locale, options);
 }
 
 /** 255712345678 → 0712 345 678 */

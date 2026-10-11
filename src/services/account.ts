@@ -24,7 +24,7 @@ export async function getAccount(user: UserRow) {
     verificationRequired: smsEnabled() && !user.phone_verified_at,
     smsEnabled: smsEnabled(),
     /** Link ya kupakua app ya Android (APK) — kwa madereva wanaotaka kengele ya maombi. */
-    androidApkUrl: env.androidApkUrl ?? null,
+    androidApkUrl: '/pakua/',
     /** Majibu ya ofisi (Msaada) ambayo mtumiaji bado hajasoma. */
     supportUnread: await unreadSupportCount(user.id),
     /** Masharti: amekubali toleo la sasa? (wa zamani wanaombwa kukubali kwenye app) */

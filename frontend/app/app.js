@@ -19,14 +19,17 @@ import { nearbyMap } from '/shared/map.js';
 import * as rides from './rides.js';
 import * as support from './support.js';
 import * as feedback from './feedback.js';
+import * as appUpdate from './update.js';
 import * as terms from './terms.js';
+import { initI18n, langSwitchHtml, onLangChange } from '/shared/i18n.js';
 import { finishSplash, previewSound, setSoundEnabled, soundEnabled, splashActive, splashReady } from './splash.js';
 
+initI18n();
 const api = createApi('naya_app_token');
 const $ = (id) => document.getElementById(id);
 const views = ['view-loading', 'view-intro', 'view-auth', 'view-verify', 'view-role', 'view-offline', 'view-app'];
 const MAX_BYTES = 3 * 1024 * 1024;
-const VERSION = '0.11.3';
+const VERSION = '0.13.2';
 
 let account = null; // { user, activeMode, driverStatus, canDrive }
 let driver = null; // wasifu wa udereva (mode ya Dereva)
@@ -365,6 +368,11 @@ function askTermsIfNeeded() {
   });
 }
 
+// Lugha ikibadilika: chora upya ukurasa ulio wazi (tarehe na maandishi ya lugha mpya).
+onLangChange(() => {
+  if (account && !$('view-app').hidden) route();
+});
+
 function showRoleChoice() {
   show('view-role');
   $('role-form').reset();
@@ -396,7 +404,10 @@ $('role-form').addEventListener('submit', async (event) => {
 async function switchMode(mode, { goHome } = {}) {
   account = await api.put('/api/account/mode', { mode });
   rides.stopPolling();
-  if (mode === 'PASSENGER') rides.stopGps();
+  if (mode === 'PASSENGER') {
+    rides.stopGps();
+    rides.stopBackground();
+  }
   driver = null;
   editingVehicle = false;
   show('view-app');
@@ -844,6 +855,11 @@ function renderAccount() {
     <section class="card profile">
       <span class="avatar" aria-hidden="true">${esc(initials)}</span>
       <span><strong>${esc(user.fullName)}</strong><span class="muted">${esc(formatPhone(user.phone))}</span></span>
+    </section>
+
+    <section class="card lang-card" aria-labelledby="lang-title">
+      <h2 id="lang-title" translate="no">Lugha / Language</h2>
+      ${langSwitchHtml()}
     </section>
 
     <section class="card" aria-labelledby="mode-title">
@@ -1458,6 +1474,7 @@ $('retry-button').addEventListener('click', start);
 
 support.init({ api, handleError, toast, isDriver: () => account?.activeMode === 'DRIVER' });
 feedback.init({ api, handleError, toast });
+appUpdate.init({ api });
 rides.init({
   api,
   pushState: () => pushState(api),

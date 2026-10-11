@@ -26,7 +26,15 @@ export const OFFER_SECONDS = 60; // dakika 1: muda wa dereva kukubali ombi (akik
 export const SEARCH_TIMEOUT_SECONDS = 600; // dakika 10 bila dereva → NO_DRIVER (madereva ~10 wanaweza kujaribiwa, dakika 1 kila mmoja)
 export const NEARBY_LIMIT = 3; // "NAYA karibu nawe": madereva wangapi wa kila chombo abiria anawaona
 export const MAX_PICKUP_KM = 10; // dereva awe ndani ya umbali huu kutoka kwa abiria
-export const DRIVER_STALE_SECONDS = 120; // dereva asiyeonekana kwa muda huu hapewi maombi
+export const DRIVER_STALE_SECONDS = 120; // dereva wa browser asiyeonekana kwa muda huu hapewi maombi
+/**
+ * Dereva mwenye app ya NAYA (APK, Firebase): skrini ikizimwa Android inasimamisha ukurasa, lakini kengele (FCM)
+ * bado inamwamsha. Kwa hiyo anabaki kwenye orodha ya maombi kwa muda huu tangu alipoonekana mara ya mwisho.
+ * (APK mpya inatuma mahali alipo chinichini kila sekunde 30 — mahali pake panabaki sahihi.)
+ */
+export const APP_DRIVER_STALE_SECONDS = 30 * 60;
+/** Dereva akikosa kujibu maombi haya mfululizo (simu imezimika / hayupo), anawekwa offline — wateja wasisubiri bure. */
+export const MISSED_OFFERS_OFFLINE = 2;
 export const PIN_MAX_ATTEMPTS = 5; // PIN ya safari ikikosewa mara hizi, dereva hawezi kuanza safari (wasiliana na ofisi)
 const CITY_SPEED_KMH = 22; // makadirio ya mwendo mjini (bodaboda/bajaji) kwa muda wa kufika
 const ROAD_FACTOR = 1.3;
@@ -80,6 +88,12 @@ async function history(client: Db, rideId: string, from: RideStatus | null, to: 
 }
 
 // Umbali (km) kwa SQL — kwa kuchagua dereva aliye karibu zaidi.
+/** Dereva "anaonekana": ndani ya sekunde ${staleParam} (browser), au dakika 30 kama ana app ya NAYA yenye kengele. */
+const FRESH_SQL = (alias: string, staleParam: string) =>
+  `(${alias}.last_seen_at > now() - make_interval(secs => ${staleParam}::float8)
+    OR (${alias}.last_seen_at > now() - make_interval(secs => ${APP_DRIVER_STALE_SECONDS}::float8)
+        AND EXISTS (SELECT 1 FROM naya.fcm_tokens t WHERE t.user_id = ${alias}.user_id AND t.failures < 5)))`;
+
 const DISTANCE_SQL = (latCol: string, lngCol: string, latParam: string, lngParam: string) => `
   (6371.0088 * 2 * asin(sqrt(
      power(sin(radians((${latCol})::float8 - ${latParam}::float8) / 2), 2) +
@@ -96,8 +110,36 @@ export async function dispatchPending(): Promise<void> {
      RETURNING driver_id, ride_id`,
   );
   for (const o of expired) await notify({ userId: o.driver_id, event: 'offer', rideId: o.ride_id });
+  if (expired.length) await offlineDriversWhoMissOffers([...new Set(expired.map((o) => o.driver_id))]);
   const rides = await many<{ id: string }>(db, `SELECT id FROM naya.rides WHERE status = 'SEARCHING' ORDER BY requested_at LIMIT 50`);
   for (const ride of rides) await dispatchRide(ride.id);
+}
+
+/** Madereva waliokosa kujibu maombi MISSED_OFFERS_OFFLINE mfululizo tangu waende online → offline, na wanajulishwa. */
+async function offlineDriversWhoMissOffers(driverIds: string[]) {
+  const off = await many<{ user_id: string }>(
+    db,
+    `UPDATE naya.drivers d SET is_online = false, updated_at = now()
+      WHERE d.user_id = ANY($1::uuid[]) AND d.is_online
+        AND NOT EXISTS (SELECT 1 FROM naya.rides r WHERE r.driver_id = d.user_id AND r.status IN ('ACCEPTED', 'ARRIVED', 'IN_PROGRESS'))
+        AND (SELECT count(*) FROM (
+              SELECT o.status FROM naya.ride_offers o
+               WHERE o.driver_id = d.user_id AND o.offered_at >= coalesce(d.online_since, '-infinity'::timestamptz)
+               ORDER BY o.offered_at DESC LIMIT $2) last
+             WHERE last.status = 'EXPIRED') = $2
+      RETURNING d.user_id`,
+    [driverIds, MISSED_OFFERS_OFFLINE],
+  );
+  for (const d of off) {
+    await notify({
+      userId: d.user_id,
+      event: 'driver',
+      kind: 'auto_offline',
+      title: 'Umewekwa offline',
+      body: 'Hukujibu maombi 2 ya safari mfululizo. Ukiwa tayari kupokea safari, fungua NAYA na ubonyeze NENDA ONLINE.',
+    });
+  }
+  if (off.length) await notifyAdmins();
 }
 
 /** Kwa safari moja: kama hakuna ombi linalosubiri, mpe dereva aliye karibu zaidi; muda ukiisha → NO_DRIVER. */
@@ -124,7 +166,7 @@ export async function dispatchRide(rideId: string): Promise<void> {
       `SELECT d.user_id, ${DISTANCE_SQL('d.last_lat', 'd.last_lng', '$2', '$3')} AS km
          FROM naya.drivers d JOIN naya.users u ON u.id = d.user_id
         WHERE d.status = 'APPROVED' AND d.is_online AND u.status = 'ACTIVE' AND d.vehicle_type = $4
-          AND d.last_lat IS NOT NULL AND d.last_seen_at > now() - make_interval(secs => $5::float8)
+          AND d.last_lat IS NOT NULL AND ${FRESH_SQL('d', '$5')}
           AND d.user_id <> $6
           AND ${SUBSCRIPTION_OK_SQL('d', '$7')}
           AND NOT EXISTS (SELECT 1 FROM naya.rides r WHERE r.driver_id = d.user_id AND r.status IN ('ACCEPTED', 'ARRIVED', 'IN_PROGRESS'))
@@ -301,7 +343,7 @@ export async function nearbyDrivers(userId: string, point: { lat: number; lng: n
        SELECT d.vehicle_type, d.last_lat AS lat, d.last_lng AS lng, ${DISTANCE_SQL('d.last_lat', 'd.last_lng', '$1', '$2')} AS km
          FROM naya.drivers d JOIN naya.users u ON u.id = d.user_id
         WHERE d.status = 'APPROVED' AND d.is_online AND u.status = 'ACTIVE' AND d.vehicle_type IS NOT NULL
-          AND d.last_lat IS NOT NULL AND d.last_seen_at > now() - make_interval(secs => $3::float8)
+          AND d.last_lat IS NOT NULL AND ${FRESH_SQL('d', '$3')}
           AND d.user_id <> $4
           AND ${SUBSCRIPTION_OK_SQL('d', '$5')}
           AND NOT EXISTS (SELECT 1 FROM naya.rides r WHERE r.driver_id = d.user_id AND r.status IN ('ACCEPTED', 'ARRIVED', 'IN_PROGRESS'))
@@ -515,7 +557,8 @@ export async function setOnline(
       throw badRequest('Tunahitaji mahali ulipo: washa GPS au chagua eneo ulilopo.');
     }
     await client.query(
-      `UPDATE naya.drivers SET is_online = true, last_lat = $2, last_lng = $3, last_seen_at = now(), updated_at = now() WHERE user_id = $1`,
+      `UPDATE naya.drivers SET is_online = true, online_since = CASE WHEN is_online THEN online_since ELSE now() END,
+              last_lat = $2, last_lng = $3, last_seen_at = now(), updated_at = now() WHERE user_id = $1`,
       [driverId, point.lat, point.lng],
     );
     await client.query(`UPDATE naya.users SET active_mode = 'DRIVER' WHERE id = $1`, [driverId]);
@@ -989,7 +1032,7 @@ export async function candidatesForRide(rideId: string) {
   return many(
     db,
     `SELECT d.user_id AS id, u.full_name AS name, d.plate_number AS "plateNumber", ${DISTANCE_SQL('d.last_lat', 'd.last_lng', '$2', '$3')}::float8 AS km,
-            d.last_seen_at < now() - make_interval(secs => $5::float8) AS stale,
+            NOT ${FRESH_SQL('d', '$5')} AS stale,
             EXISTS (SELECT 1 FROM naya.ride_offers o WHERE o.driver_id = d.user_id AND o.status = 'PENDING') AS busy
        FROM naya.drivers d JOIN naya.users u ON u.id = d.user_id
       WHERE d.status = 'APPROVED' AND d.is_online AND u.status = 'ACTIVE' AND d.vehicle_type = $4 AND d.last_lat IS NOT NULL

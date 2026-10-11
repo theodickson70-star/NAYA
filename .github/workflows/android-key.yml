@@ -1,0 +1,36 @@
+# NAYA — kulinda ufunguo wa kusaini APK (debug.keystore) usifutwe na GitHub.
+#
+# Kwa nini: APK mpya inasakinika juu ya ya zamani (na kitufe cha "Sasisha" kinafanya kazi) TU kama zimesainiwa kwa
+# ufunguo ule ule. Workflow ya "NAYA Android (APK)" inahifadhi ufunguo huo kwenye cache ya GitHub, na GitHub inafuta
+# cache isiyotumika kwa siku 7. Kazi hii ndogo inaifungua cache kila siku 3 ili isifutwe (haijengi chochote).
+#
+# Njia ya kudumu zaidi baadaye: weka secret NAYA_KEYSTORE_BASE64 (tazama android.yml).
+name: NAYA Android (linda ufunguo)
+
+on:
+  schedule:
+    - cron: '17 3 */3 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  keep-key:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fungua cache ya ufunguo
+        id: key
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: naya-debug-keystore-v1
+
+      - name: Hali
+        run: |
+          if [ "${{ steps.key.outputs.cache-hit }}" = "true" ]; then
+            echo "Ufunguo wa kusaini APK upo — masasisho yataendelea kusakinika juu ya toleo la zamani."
+          else
+            echo "::warning::Ufunguo wa kusaini APK haupo kwenye cache. APK itakayofuata itahitaji watumiaji kuondoa (uninstall) NAYA ya zamani kwanza."
+          fi

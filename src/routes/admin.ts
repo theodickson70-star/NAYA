@@ -1,4 +1,5 @@
 // /api/admin — admin na super admin tu.
+import { downloadStats } from './pakua.js';
 import type { FastifyInstance } from 'fastify';
 import { checkDatabase, db } from '../db/pool.js';
 import { ADMIN_ROLES, requireRole } from '../middleware/auth.js';
@@ -48,6 +49,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       feedbackNew: await newFeedbackCount(),
       sms: { enabled: smsEnabled() },
       app: await fcmStats(),
+      apkDownloads: await downloadStats(),
       system: { database: database === 'ok' ? 'ok' : 'error', version: VERSION, phase: PHASE },
     });
   });

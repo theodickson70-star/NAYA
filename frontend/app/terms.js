@@ -1,17 +1,20 @@
 // Masharti ya NAYA ndani ya app: (1) kusoma masharti bila kuacha ukurasa (link yoyote yenye data-terms),
 // (2) watumiaji wa zamani / toleo jipya: dirisha la "Nakubali" kabla ya kuendelea.
 // Maandishi yenyewe yako /masharti/index.html (ukurasa mmoja kwa wote — app, tovuti, ofisi).
+import { getLang } from '/shared/i18n.js';
+
 const $ = (id) => document.getElementById(id);
-let docHtml = null;
+const docHtml = {};
 let lastFocus = null;
 
 async function loadDoc() {
-  if (docHtml) return docHtml;
-  const res = await fetch('/masharti/', { cache: 'no-cache' });
+  const lang = getLang();
+  if (docHtml[lang]) return docHtml[lang];
+  const res = await fetch(lang === 'en' ? '/masharti/en.html' : '/masharti/', { cache: 'no-cache' });
   if (!res.ok) throw new Error('Masharti hayakupatikana. Jaribu tena.');
   const page = new DOMParser().parseFromString(await res.text(), 'text/html');
-  docHtml = page.getElementById('masharti-doc').innerHTML;
-  return docHtml;
+  docHtml[lang] = page.getElementById('masharti-doc').innerHTML;
+  return docHtml[lang];
 }
 
 /** Fungua masharti kwenye dirisha la juu (section: jumla | abiria | dereva | faragha). */
@@ -34,6 +37,8 @@ export async function openTerms(section = 'jumla') {
   const doc = sheet.querySelector('.terms-doc');
   try {
     doc.innerHTML = await loadDoc();
+    doc.setAttribute('translate', 'no'); // tayari iko kwa lugha sahihi
+    doc.lang = getLang();
     // Link za ndani (#abiria …) zisogeze ndani ya dirisha tu, zisibadilishe route ya app.
     for (const a of doc.querySelectorAll('.terms-nav a')) a.dataset.termsJump = a.getAttribute('href').slice(1);
     jump(section);

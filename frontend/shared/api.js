@@ -28,6 +28,8 @@ export function createApi(storageKey) {
 
   async function send(method, path, { json, file } = {}) {
     const headers = token ? { authorization: `Bearer ${token}` } : {};
+    // Lugha ya mtumiaji: server inarudisha makosa (na kutuma arifa/SMS) kwa lugha hii.
+    headers['x-naya-lang'] = document.documentElement.lang === 'en' ? 'en' : 'sw';
     let body;
     if (file) {
       headers['content-type'] = file.type;

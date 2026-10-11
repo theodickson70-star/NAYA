@@ -1,6 +1,8 @@
 // Skrini za safari: abiria (kutafuta → dereva anakuja → safari → nyota) na dereva (online → ombi → safari → mapato).
 // Hali mpya inafika papo hapo kupitia realtime (SSE). Polling inabaki kama kinga tu: kila sekunde 4 realtime
 // ikiwa imekatika, au kila sekunde 20 ikiwa imeunganishwa (pia ni "mapigo ya moyo" ya dereva aliye online).
+import { isNativeApp, nativeInfo, requestBatteryUnrestricted, startDriverService, stopDriverService } from '/shared/native.js';
+import { t } from '/shared/i18n.js';
 import { escapeHtml as esc } from '/shared/api.js';
 import { formatDate, formatPhone, formatTsh, VEHICLE_TYPES } from '/shared/labels.js';
 import { rideMap } from '/shared/map.js';
@@ -70,6 +72,8 @@ const pollDue = () => !realtimeUp || Date.now() - lastFetch >= 20_000;
 export function reset() {
   stopPolling();
   stopGps();
+  stopDriverService();
+  serviceOn = false;
   passengerRide = null;
   driverData = null;
   lastKey = '';
@@ -404,7 +408,47 @@ function driverKey(s) {
   ].join('|');
 }
 
+// ---- APK: dereva online → huduma ya Android inatuma mahali alipo hata skrini ikizimwa (maombi yanaendelea kufika).
+let serviceOn = false;
+/** Dereva amehamia upande wa abiria: server imemweka offline, simamisha huduma ya chinichini. */
+export function stopBackground() {
+  serviceOn = false;
+  stopDriverService().catch(() => {});
+}
+function syncDriverService() {
+  const want = !!driverData?.online;
+  if (want === serviceOn || !isNativeApp()) return;
+  serviceOn = want;
+  if (want) startDriverService(ctx.api.token).catch(() => (serviceOn = false));
+  else stopDriverService();
+}
+
+/** Kwenye skrini ya "Uko online": mshauri dereva aruhusu NAYA kufanya kazi skrini ikizimwa (betri) au apakue APK mpya. */
+async function fillBackgroundHint() {
+  const box = $('bg-hint');
+  if (!box || !isNativeApp()) return;
+  try {
+    const info = await nativeInfo();
+    if (!$('bg-hint')) return;
+    if (!info.driverService) {
+      box.innerHTML = `<div class="alert alert-warn bg-hint" role="note"><strong>Pakua toleo jipya la NAYA</strong>
+        <span>Toleo jipya linapokea maombi ya safari hata skrini ya simu ikiwa imezimwa.</span>
+        <a class="btn btn-primary btn-small" href="/pakua/apk?sasisha=1">Pakua toleo jipya</a></div>`;
+    } else if (info.batteryUnrestricted === false) {
+      box.innerHTML = `<div class="alert alert-warn bg-hint" role="note"><strong>Ruhusu NAYA ifanye kazi skrini ikizimwa</strong>
+        <span>Simu yako inaweza kuzuia NAYA ili kuokoa chaji, ukakosa maombi. Bonyeza Ruhusu, kisha chagua Ruhusu / Allow.</span>
+        <button class="btn btn-primary btn-small" type="button" data-ride="battery">Ruhusu</button></div>`;
+    } else box.innerHTML = '';
+  } catch {
+    box.innerHTML = '';
+  }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') fillBackgroundHint();
+});
+
 function renderDriverDashboard() {
+  syncDriverService();
   if (!ctx.isDriverHome()) return;
   const s = driverData;
   const key = driverKey(s);
@@ -427,6 +471,7 @@ function renderDriverDashboard() {
   </div>`;
 
   if (s.offer && !s.ride) startOfferCountdown(s.offer.secondsLeft, s.offer.totalSeconds || 60);
+  fillBackgroundHint();
 }
 
 function onlineHtml(s) {
@@ -461,6 +506,7 @@ function onlineHtml(s) {
         : ''
     }
     ${pushPrompt('Washa arifa ili usikose ombi hata ukifunga app.')}
+    <div id="bg-hint"></div>
     <button class="btn btn-ghost btn-block" type="button" data-ride="go-offline">Nenda offline</button>
     ${subscriptionNoteHtml(sub)}
   </section>`;
@@ -765,11 +811,11 @@ async function onClick(event) {
       const { path } = await ctx.api.post(`/api/rides/${passengerRide.id}/share`);
       const url = `${location.origin}${path}`;
       const d = passengerRide.driver;
-      const text = `Fuatilia safari yangu ya NAYA${d ? ` (${d.name}, ${d.plateNumber})` : ''}:`;
+      const text = t(`Fuatilia safari yangu ya NAYA${d ? ` (${d.name}, ${d.plateNumber})` : ''}:`);
       let shared = false;
       if (navigator.share) {
         try {
-          await navigator.share({ title: 'Safari yangu ya NAYA', text, url });
+          await navigator.share({ title: t('Safari yangu ya NAYA'), text, url });
           shared = true;
         } catch {
           // mtumiaji ameghairi au haiwezekani — onyesha link
@@ -845,6 +891,10 @@ async function onClick(event) {
     }
     lastKey = '';
     return passengerRide && ctx.isPassengerHome() ? renderPassengerRide(passengerRide) : renderDriverDashboard();
+  }
+  if (action === 'battery') {
+    await requestBatteryUnrestricted().catch(() => {});
+    return fillBackgroundHint();
   }
   if (action === 'go-online') {
     // Kubonyeza huku kunafungua sauti ya kengele ya maombi (browsers zinahitaji mtumiaji aguse kwanza).

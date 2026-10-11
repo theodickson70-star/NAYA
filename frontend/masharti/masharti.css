@@ -29,3 +29,4 @@
 .terms-sheet .terms-nav { top: 0; }
 .terms-sheet .terms-part { scroll-margin-top: 60px; }
 .terms-sheet button.terms-back { border: 0; font: inherit; font-weight: 700; cursor: pointer; }
+.terms-bar-links { display: inline-flex; gap: 8px; }

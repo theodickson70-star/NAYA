@@ -889,3 +889,38 @@ input, select, textarea { font-size: 17px; padding: 13px 14px; border-radius: va
 .terms-gate-links li + li, .terms-links li + li { border-top: 1px solid rgba(16, 32, 26, 0.08); }
 .terms-gate-links a, .terms-links a { display: flex; justify-content: space-between; align-items: center; padding: 12px 2px; font-weight: 700; color: var(--g800, #06502F); text-decoration: none; }
 .terms-gate-links a::after, .terms-links a::after { content: "›"; font-size: 22px; line-height: 1; color: var(--muted, #5C6A62); }
+
+/* ---------------------------------------------------------------- Phase 12: Lugha (Kiswahili | English) */
+.i18n-pending body { visibility: hidden; }
+.lang-switch { display: inline-flex; padding: 3px; gap: 2px; border-radius: 999px; background: var(--g100); border: 1px solid rgba(16, 32, 26, 0.08); }
+.lang-switch button { font: inherit; font-weight: 700; font-size: 14px; border: 0; border-radius: 999px; padding: 7px 14px; min-height: 36px; background: transparent; color: var(--g800); cursor: pointer; }
+.lang-switch button[aria-pressed="true"] { background: var(--g700); color: #fff; }
+.lang-switch button:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.lang-glass { background: rgba(2, 36, 21, 0.38); border-color: rgba(255, 255, 255, 0.25); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+.lang-glass button { color: #fff; font-size: 13px; padding: 5px 12px; min-height: 32px; }
+.lang-glass button[aria-pressed="true"] { background: #fff; color: var(--g800); }
+.lang-intro { position: absolute; top: calc(12px + var(--safe-t)); left: 16px; z-index: 3; }
+.lang-auth { position: absolute; top: calc(12px + var(--safe-t, 0px)); left: 16px; z-index: 3; }
+.lang-card .lang-switch { margin-top: 10px; }
+
+/* "Sasisha" — toleo jipya la APK */
+.app-update {
+  position: fixed; left: 12px; right: 12px; top: calc(10px + var(--safe-t)); z-index: 58;
+  max-width: 536px; margin: 0 auto; padding: 14px 14px 14px 16px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+  background: var(--g800); color: var(--white); border-radius: 20px;
+  box-shadow: 0 16px 36px rgba(6, 40, 26, 0.32);
+  animation: update-in 0.45s var(--ease-spring) both;
+}
+.app-update[hidden] { display: none; }
+@keyframes update-in { from { opacity: 0; transform: translateY(-16px); } }
+.app-update-text { flex: 1 1 220px; min-width: 0; display: grid; gap: 3px; }
+.app-update-text strong { font-family: var(--font-display); font-size: 17px; }
+.app-update-text span { font-size: 14.5px; line-height: 1.35; color: #DDEFE5; }
+.app-update-actions { display: flex; gap: 8px; flex: none; }
+.app-update .app-update-go { background: var(--gold); border-color: var(--gold); color: #06301C; font-weight: 800; }
+.app-update .app-update-later { background: transparent; border-color: rgba(255, 255, 255, 0.35); color: var(--white); }
+.app-update .btn:focus-visible { outline: 3px solid var(--white); outline-offset: 2px; }
+.app-update-bar { height: 8px; margin-top: 6px; border-radius: 99px; background: rgba(255, 255, 255, 0.18); overflow: hidden; }
+.app-update-bar i { display: block; height: 100%; background: var(--gold); border-radius: inherit; transition: width 0.5s; }
+@media (prefers-reduced-motion: reduce) { .app-update { animation: none; } .app-update-bar i { transition: none; } }

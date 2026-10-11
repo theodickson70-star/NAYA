@@ -19,9 +19,11 @@ Mfumo wa bodaboda na bajaji. Unajengwa phase moja baada ya nyingine; kila phase 
 | 10.2 | Dereva anaweza kwenda online popote (anapokea maombi ya wateja walio ndani ya km 10 tu) | ✅ |
 | 11 | Ofisi kuu: wateja, msaada (malalamiko), ramani live, kuingilia safari, matangazo, ripoti + CSV, utafutaji mmoja | ✅ |
 | 11.1 | Maoni: abiria na madereva wanatoa nyota + maoni kwenye Akaunti; ofisi inayafanyia kazi na mtoaji anajulishwa | ✅ |
-| 11.2 | Masharti ya huduma (abiria + dereva) na sera ya faragha; kukubali wakati wa kujisajili, kutuma ombi la udereva, na kwa watumiaji wa zamani | ✅ sasa |
-| 12 | Malipo kwa simu (M-Pesa, Airtel, Mixx/Tigo, HaloPesa) | |
-| 13 | Msaidizi wa AI (Claude) unaotumia data halisi | |
+| 11.2 | Masharti ya huduma (abiria + dereva) na sera ya faragha; kukubali wakati wa kujisajili, kutuma ombi la udereva, na kwa watumiaji wa zamani | ✅ |
+| 12 | Lugha mbili: Kiswahili na English (app ya abiria/dereva, makosa ya server, arifa, SMS, masharti) | ✅ |
+| 13 | Ukurasa wa kupakua app (APK): link kuu → /pakua/, Android inashauriwa kupakua, iPhone → Add to Home Screen, idadi ya waliopakua ofisini | ✅ sasa |
+| 14 | Malipo kwa simu (M-Pesa, Airtel, Mixx/Tigo, HaloPesa) | |
+| 15 | Msaidizi wa AI (Claude) unaotumia data halisi | |
 
 ## Muundo
 
@@ -208,6 +210,37 @@ mabadiliko ya NAYA yanayopushiwa Railway yanaonekana kwenye app papo hapo — **
   kwa NAYA Google inaweza kuomba maelezo au kuizima — kengele ya sekunde 30 bado inalia, ila haitajitokeza juu ya skrini iliyofungwa.
 - Bila keystore, APK ni ya "debug" (inafaa kwa kusambaza moja kwa moja). GitHub inahifadhi ufunguo wake ili update isakinike juu
   ya ya zamani; ikitokea simu ikakataa ("App not installed"), futa NAYA ya zamani kisha usakinishe mpya.
+
+## Maombi skrini ikiwa imezimwa (0.13.2)
+
+- APK mpya ina huduma ya chinichini (`NayaDriverService`): dereva akiwa online inatuma mahali kila sekunde 30 hata skrini ikiwa imezimwa, na inaonyesha arifa ya kudumu "NAYA: Uko online". Inasimama dereva akienda offline, akihamia upande wa abiria au akitoka.
+- Server: dereva mwenye APK (token ya Firebase) anaendelea kupewa maombi mpaka dakika 30 bila ping; wa kivinjari bado ni sekunde 120 (`DRIVER_STALE_SECONDS`).
+- Dereva asiyejibu maombi 2 mfululizo anawekwa offline na kuarifiwa, ili wateja wasisubiri bure.
+- Kwenye kadi ya online: ujumbe wa "Pakua toleo jipya" (APK ya zamani) au "Ruhusu NAYA ifanye kazi skrini ikizimwa" (betri).
+- Migration `016_dereva_chinichini.sql` inaongeza column `drivers.online_since` tu — hakuna data inayofutwa.
+
+### Kitufe cha "Sasisha" ndani ya app (0.13.2)
+
+- App inauliza `GET /api/app/latest` (toleo la karibuni linasomwa kutoka GitHub Releases, tag `android-1.0.N`; au `ANDROID_LATEST_VERSION_CODE`).
+- Kama APK ya simu ni ya zamani, kadi "Toleo jipya la NAYA" inaonekana juu. **Sasisha** → app inapakua APK (asilimia inaonekana), inakagua ni ya `tz.naya.app` na toleo jipya zaidi, kisha Android inafungua dirisha la **Install**. Mara ya kwanza Android inaomba ruhusa "Allow from this source".
+- APK za zamani (kabla ya 0.13.2) zinaonyeshwa "Pakua toleo jipya" → `/pakua/apk?sasisha=1` (kwenye browser). Masasisho hayahesabiwi kama upakuaji mpya.
+- **Ufunguo wa kusaini:** APK mpya inasakinika juu ya ya zamani tu kama imesainiwa kwa ufunguo ule ule. `android-key.yml` inafungua cache ya ufunguo kila siku 3 ili GitHub isiifute.
+
+## Kupakua app (Phase 13)
+
+- **Link kuu ya NAYA (`/`) → `/pakua/`**: ukurasa wa kupakua. Android → kitufe "Pakua app ya NAYA" (+ hatua 4 za kusakinisha na maelezo ya onyo la Play Protect). iPhone → "Add to Home Screen". Kompyuta → QR code (`/pakua/qr.svg`).
+- **`/pakua/apk`** inahesabu upakuaji (aina ya simu na muda tu) kisha inapeleka kwenye APK ya toleo jipya zaidi: `ANDROID_APK_URL` ikiwekwa, vinginevyo GitHub Releases `latest/download/NAYA.apk` (repo ni public).
+- **Android kwenye browser ikifungua `/app/`**: inashauriwa kupakua kwanza. "Tumia NAYA kwenye browser badala yake" (`/app/?web=1`) inamruhusu kuendelea; hatuulizi tena kwa siku 7. Ndani ya APK hakuna ushauri huu.
+- Ofisi → Muhtasari: "APK: X zimepakuliwa · Y wanaitumia". Migration `015_pakua.sql` (table mpya tu).
+- Ndani ya APK (Capacitor, au WebView ya Android yenye "; wv)" kwenye user agent) ukurasa wa kupakua haumwonyeshwi mtu kamwe.
+
+## Lugha mbili (Phase 12)
+
+- Mtumiaji anachagua **Kiswahili | English** kwenye skrini ya kwanza, ya kujisajili, au Akaunti → Lugha / Language. Chaguo linabaki kwenye simu.
+- Maandishi ya app yameandikwa kwa Kiswahili; kamusi moja **`frontend/shared/i18n/en.json`** inayatafsiri (app) na server inaitumia kwa makosa, arifa (push/FCM) na SMS kwa lugha ya mtumiaji (`users.language`, migration `014_lugha.sql`).
+- Masharti: `frontend/masharti/index.html` (Kiswahili) na `frontend/masharti/en.html` (English).
+- **Ukiongeza maandishi mapya kwenye app**, ongeza tafsiri yake kwenye `en.json` (`exact`: maandishi kamili; `patterns`: yenye `{}` kwa sehemu zinazobadilika). Bila tafsiri, maandishi yanaonekana kwa Kiswahili.
+- Ofisi (admin) inabaki kwa Kiswahili. Majina ya maeneo, ujumbe wa ofisi na matangazo vinaonekana kama vilivyoandikwa.
 
 ## Masharti na faragha (Phase 11.2)
 
