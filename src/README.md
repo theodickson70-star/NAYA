@@ -264,6 +264,22 @@ Malipo kwa madereva (Ofisi → Ofa → **Malipo kwa madereva**):
 - Ofisi inatuma pesa kwanza, kisha **inaandika malipo** pamoja na namba ya muamala (kiasi hakizidi deni; muamala mmoja hautumiki mara mbili). Dereva anapata arifa + SMS. Malipo yaliyokosewa yanafutwa kwa sababu.
 - Migration `019_ofa.sql`: tables `promotions`, `driver_payout_accounts`, `promo_payouts` na columns za ofa kwenye `rides` — hakuna data inayofutwa.
 
+
+### Uwazi wa ofa (0.14.3)
+
+- **Chunguza mteja** (Ofisi → Ofa → Chunguza mteja, `GET /api/admin/promotions/check?phone=&fare=&vehicle=`): namba ya simu →
+  "Anaona ofa" au "Haoni ofa" na sababu moja wazi (ni dereva, si mteja mpya, ameshatumia safari zake, nauli nje ya kiwango,
+  chombo kingine, ofa imesimamishwa / haijaanza / imeisha, bajeti imeisha), kila ofa na sababu yake, na safari zake 5 za karibuni
+  (ikiwemo "ofa iliondolewa" madereva walio karibu walipokuwa wamemaliza nafasi zao).
+- **Hakiki kabla ya kuwasha** (`POST /api/admin/promotions/preview`, `GET /api/admin/promotions/:id/preview`): wateja wangapi
+  wanaweza kuipata sasa, safari ngapi za siku 30 zingeipata, na maonyo (tarehe ya baadaye, chombo kimoja, nauli ya chini/juu
+  inayozuia safari nyingi, bajeti, nafasi za madereva, ofa nyingine inayoendelea). Inaonekana kwenye fomu unapoandika, na
+  "Washa ofa" sasa inaonyesha haya kwanza kabla ya kuthibitisha.
+- **Mteja anaambiwa:** `GET /api/offers?full=1` inarudisha `{ offers, notice }` — akaunti ya dereva inaambiwa "Ofa za NAYA ni kwa
+  wateja tu", aliyetumia safari zote anaambiwa. Bei ya chombo kisichopata ofa inaonyesha sababu (`promoNote`, mf. "ni kwa Bodaboda tu").
+  `GET /api/offers` bila `full` bado inarudisha orodha (app za zamani).
+- Ofa ikiondolewa wakati wa kuagiza (madereva walio karibu wamemaliza nafasi zao), mteja sasa anapata arifa papo hapo.
+
 ## Ripoti kamili za ofisi (0.13.4)
 
 Ofisi → **Ripoti** ina vichupo 6. Kila kimoja kina namba za muhtasari, vichujio, kutafuta, orodha nzima (safu 100 kwa mara, "Onyesha zaidi") na **Pakua Excel (CSV)** ya orodha nzima:

@@ -791,9 +791,31 @@
     "Hii ni safari ya ofa: muulize abiria PIN yake na uianze kwenye NAYA ili NAYA ikulipe sehemu yake.": "This is an offer ride: ask the passenger for their PIN and start it in NAYA so NAYA pays you its part.",
     "Bado sijafika": "Not yet",
     "wa NAYA: kofia mbili, bei ya app tu, kuanza na kumaliza safari kwenye app, na ada ya mwezi.": "of NAYA: two helmets, app price only, starting and ending trips in the app, and the monthly fee.",
-    "Ramani ya moja kwa moja, muda wa kufika, na kushiriki safari na ndugu kwa usalama wako.": "Live map, arrival time, and trip sharing with family for your safety."
+    "Ramani ya moja kwa moja, muda wa kufika, na kushiriki safari na ndugu kwa usalama wako.": "Live map, arrival time, and trip sharing with family for your safety.",
+    "Ofa za NAYA ni kwa wateja tu. Akaunti hii imesajiliwa kama dereva, kwa hiyo haipati ofa.": "NAYA offers are for passengers only. This account is registered as a driver, so it does not get offers.",
+    "Umeshatumia safari zako zote za ofa. Asante kwa kusafiri na NAYA!": "You have used all your offer rides. Thank you for riding with NAYA!"
   },
   "patterns": [
+    [
+      "Ofa “{}” imejaa. Endelea kufuatilia NAYA kwa ofa mpya.",
+      "The “{}” offer is fully used. Keep an eye on NAYA for new offers."
+    ],
+    [
+      "Ofa “{}” ni kwa nauli kuanzia {}",
+      "The “{}” offer is for fares from {}"
+    ],
+    [
+      "Ofa “{}” ni kwa nauli hadi {}",
+      "The “{}” offer is for fares up to {}"
+    ],
+    [
+      "Ofa “{}” ni kwa {} tu",
+      "The “{}” offer is for {} only"
+    ],
+    [
+      "Madereva walio karibu wamefikia kikomo cha safari za ofa. Tunakutafutia dereva kwa nauli ya kawaida {}. Unaweza kughairi bila gharama.",
+      "Nearby drivers have reached their offer ride limit. We are finding you a driver at the normal fare {}. You can cancel at no cost."
+    ],
     [
       "Mahali pa kumchukua: {}. Ukifika karibu, NAYA itaweka \"Nimefika\" yenyewe.",
       "Pickup point: {}. When you get close, NAYA will mark \"I have arrived\" by itself."

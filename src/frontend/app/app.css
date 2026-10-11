@@ -1006,3 +1006,7 @@ input, select, textarea { font-size: 17px; padding: 13px 14px; border-radius: va
 .fb-account-link strong { display: block; font-size: 18px; }
 .fb-account-link .muted { font-size: 15px; }
 .fb-account-link > span:last-child { font-size: 28px; color: var(--g700); }
+
+/* Ofa zipo lakini hazimfai mteja huyu / safari hii */
+.promo-notice { margin: 14px 0 0; padding: 11px 14px; border-radius: var(--radius-md); border: 1px dashed var(--line); background: var(--white); color: var(--muted); font-size: 14.5px; line-height: 1.4; }
+.fare-promo-tag.is-note { font-weight: 600; color: var(--muted); background: var(--bg); border: 1px dashed var(--line); }

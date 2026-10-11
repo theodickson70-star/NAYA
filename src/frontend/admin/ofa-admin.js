@@ -2,6 +2,7 @@
 //   #/ofa                    orodha ya ofa
 //   #/ofa/mpya               kuunda ofa
 //   #/ofa/<id>               ofa moja: kanuni, takwimu, safari zake, kubadilisha
+//   #/ofa/chunguza           kwa nini mteja fulani anaona / haoni ofa (namba ya simu)
 //   #/ofa/malipo             madereva wanaodaiwa na NAYA
 //   #/ofa/malipo/<driverId>  dereva mmoja: deni, namba za kutuma pesa, kuandika malipo, historia
 import { escapeHtml as esc } from '/shared/api.js';
@@ -11,6 +12,8 @@ let ctx = null;
 let host = null;
 let payState = { owed: true, q: '' };
 let searchTimer = null;
+let previewTimer = null;
+let checkState = { phone: '', fare: 3000, vehicle: 'BODABODA' };
 
 const n = (v) => Number(v ?? 0).toLocaleString('en-US');
 const STATUS = { ACTIVE: ['Inaendelea', 'ok'], PAUSED: ['Imesimamishwa', 'warn'], ENDED: ['Imeisha', 'muted'] };
@@ -46,11 +49,13 @@ const current = (v) => v === view && !document.getElementById('page-offers').hid
 export function open(parts) {
   view += 1;
   clearTimeout(searchTimer);
+  clearTimeout(previewTimer);
   const [, a, b] = parts;
   host.innerHTML = '<p class="muted rp-loading">Inapakia…</p>';
   if (a === 'malipo' && b) return loadPayoutDriver(b);
   if (a === 'malipo') return loadPayouts();
   if (a === 'mpya') return renderForm(null);
+  if (a === 'chunguza') return renderCheck();
   if (a) return loadOffer(a);
   return loadList();
 }
@@ -58,6 +63,7 @@ export function open(parts) {
 const tabs = (current) => `<h1>Ofa za wateja</h1>
   <nav class="rp-tabs" aria-label="Ofa">
     <a href="#/ofa"${current === 'list' ? ' aria-current="page"' : ''}>Ofa</a>
+    <a href="#/ofa/chunguza"${current === 'check' ? ' aria-current="page"' : ''}>Chunguza mteja</a>
     <a href="#/ofa/malipo"${current === 'pay' ? ' aria-current="page"' : ''}>Malipo kwa madereva</a>
   </nav>`;
 
@@ -139,7 +145,7 @@ async function loadList() {
         <div class="rp-stat"><span>Imeshalipwa madereva</span><strong>${formatTsh(totals.paid)}</strong></div>
         <a class="rp-stat rp-stat-link${totals.owed > 0 ? ' rp-stat-bad' : ''}" href="#/ofa/malipo"><span>Deni kwa madereva</span><strong>${formatTsh(totals.owed)}</strong><small>Fungua malipo</small></a>
       </section>
-      <div class="rp-toolbar"><span></span><a class="btn btn-primary" href="#/ofa/mpya">Unda ofa mpya</a></div>
+      <div class="rp-toolbar"><a class="btn btn-ghost" href="#/ofa/chunguza">Mteja haoni ofa? Chunguza</a><a class="btn btn-primary" href="#/ofa/mpya">Unda ofa mpya</a></div>
       <div class="ofa-list">${promotions.length ? promotions.map(card).join('') : '<p class="empty">Bado hakuna ofa. Bonyeza "Unda ofa mpya".</p>'}</div>`;
   } catch (err) {
     host.innerHTML = tabs('list');
@@ -266,6 +272,7 @@ function renderForm(p) {
           <h3>Itakavyofanya kazi</h3>
           <p id="of-rules" class="ofa-rules"></p>
           <ul class="ofa-example" id="of-example"></ul>
+          <div id="of-check" class="ofa-check" aria-live="polite"></div>
           <p class="muted small">Ofa mpya inaanza ikiwa imesimamishwa. Ukimaliza kuikagua, bonyeza <strong>Washa ofa</strong>.</p>
         </aside>
       </div>
@@ -309,6 +316,111 @@ function updatePreview() {
   const v = formValue();
   document.getElementById('of-rules').textContent = rulesText(v);
   document.getElementById('of-example').innerHTML = example(v);
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(() => loadFormCheck(v), 400);
+}
+
+// ------------------------------------------------------------------ hakiki ya server: wateja wangapi + maonyo
+
+function checkHtml(r) {
+  const warn = r.warnings.filter((w) => w.level === 'warn');
+  const info = r.warnings.filter((w) => w.level === 'info');
+  return `<p class="ofa-reach${r.eligible ? '' : ' is-zero'}"><strong>${n(r.eligible)}</strong> <span>kati ya wateja ${n(r.customers)} wanaweza kuipata sasa hivi</span></p>
+    ${r.recent.trips ? `<p class="muted small">Safari za siku 30 zilizopita: ${n(r.recent.qualifying)} kati ya ${n(r.recent.trips)} zingepata ofa hii.</p>` : ''}
+    ${warn.length ? `<ul class="ofa-warnings">${warn.map((w) => `<li class="is-warn">${esc(w.text)}</li>`).join('')}</ul>` : ''}
+    ${info.length ? `<ul class="ofa-warnings">${info.map((w) => `<li>${esc(w.text)}</li>`).join('')}</ul>` : ''}`;
+}
+
+async function loadFormCheck(v) {
+  const box = document.getElementById('of-check');
+  if (!box || !v.discountPercent) return;
+  const form = document.getElementById('ofa-form');
+  const mine = view;
+  try {
+    const { name, title, description, ...input } = v;
+    const r = await ctx.api.post('/api/admin/promotions/preview', { ...input, ...(form?.dataset.id ? { id: form.dataset.id } : {}) });
+    if (mine !== view || !document.getElementById('of-check')) return;
+    box.innerHTML = checkHtml(r);
+  } catch {
+    // Fomu bado haijakamilika (mf. asilimia tupu) — kimya; makosa halisi yanaonekana ukihifadhi.
+    if (document.getElementById('of-check')) box.innerHTML = '';
+  }
+}
+
+// ------------------------------------------------------------------ chunguza mteja
+
+function renderCheck() {
+  host.innerHTML = `${tabs('check')}
+    <p class="rp-lead">Andika namba ya simu ya mteja. NAYA itakuambia kama anaona ofa, na kama haoni, ni kwa sababu gani.</p>
+    <form class="panel ofa-check-form" id="check-form" novalidate>
+      <div class="ofa-fields">
+        <div><label for="ck-phone">Namba ya simu ya mteja</label><input id="ck-phone" inputmode="tel" autocomplete="off" placeholder="0712 345 678" value="${esc(checkState.phone)}"></div>
+        <div><label for="ck-fare">Nauli ya safari (TSh)</label><input id="ck-fare" type="number" min="100" step="100" value="${esc(checkState.fare)}"></div>
+        <div><label for="ck-vehicle">Chombo</label><select id="ck-vehicle">
+          <option value="BODABODA"${checkState.vehicle === 'BODABODA' ? ' selected' : ''}>Bodaboda</option>
+          <option value="BAJAJI"${checkState.vehicle === 'BAJAJI' ? ' selected' : ''}>Bajaji</option></select></div>
+      </div>
+      <p class="alert alert-danger" id="ck-error" role="alert" hidden></p>
+      <div class="actions"><button class="btn btn-primary" type="submit">Chunguza</button></div>
+    </form>
+    <div id="ck-result" aria-live="polite"></div>`;
+  if (checkState.phone) runCheck();
+  else document.getElementById('ck-phone').focus();
+}
+
+const RIDE_TONE = (s) => (s === 'COMPLETED' ? 'ok' : ['CANCELLED', 'NO_DRIVER'].includes(s) ? 'muted' : 'warn');
+const OFFER_TONE = { ok: 'ok', paused: 'muted', not_started: 'warn', expired: 'muted', ended: 'muted' };
+
+async function runCheck() {
+  const mine = view;
+  const box = document.getElementById('ck-result');
+  const err = document.getElementById('ck-error');
+  err.hidden = true;
+  box.innerHTML = '<p class="muted">Inachunguza…</p>';
+  try {
+    const qs = new URLSearchParams({ phone: checkState.phone, fare: String(checkState.fare), vehicle: checkState.vehicle });
+    const r = await ctx.api.get(`/api/admin/promotions/check?${qs}`);
+    if (mine !== view) return;
+    const u = r.user;
+    const who = [
+      u.driverStatus ? `<span class="badge badge-warn">Dereva (${esc({ APPROVED: 'amethibitishwa', PENDING: 'anasubiri', SUSPENDED: 'amesimamishwa', REJECTED: 'alikataliwa' }[u.driverStatus] ?? u.driverStatus)})</span>` : '<span class="badge badge-ok">Mteja</span>',
+      u.suspended ? '<span class="badge badge-bad">Amesimamishwa</span>' : '',
+      u.phoneVerified ? '' : '<span class="badge badge-warn">Namba haijathibitishwa</span>',
+    ].join(' ');
+    box.innerHTML = `
+      <section class="ofa-verdict ${r.verdict.ok ? 'is-ok' : 'is-no'}" role="status">
+        <p class="ofa-verdict-who"><a href="#/wateja/${esc(u.id)}"><strong>${esc(u.name)}</strong></a> · ${esc(formatPhone(u.phone))} · safari ${n(u.completedRides)} zilizokamilika ${who}</p>
+        <h2>${r.verdict.ok ? 'Anaona ofa' : 'Haoni ofa'}</h2>
+        <p>${esc(r.verdict.text)}</p>
+        ${r.notes.map((t) => `<p class="small"><strong>Pia:</strong> ${esc(t)}</p>`).join('')}
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>Kila ofa</h2><span class="muted">Safari ya ${formatTsh(r.fare)} · ${r.vehicleType === 'BAJAJI' ? 'Bajaji' : 'Bodaboda'}</span></div>
+        ${r.offers.length
+          ? `<ul class="ofa-reasons">${r.offers
+              .map((o) => `<li><span class="badge badge-${o.ok ? 'ok' : OFFER_TONE[o.code] ?? 'warn'}">${o.ok ? 'Inamfaa' : 'Haimfai'}</span>
+                <div><a href="#/ofa/${esc(o.id)}"><strong>${esc(o.name)}</strong></a><span class="rp-sub">${esc(o.text)}</span></div></li>`)
+              .join('')}</ul>`
+          : '<p class="empty">Bado hakuna ofa. <a href="#/ofa/mpya">Unda ofa mpya</a></p>'}
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>Safari zake za karibuni</h2></div>
+        ${r.rides.length
+          ? `<div class="rp-scroll"><table class="rp-table"><thead><tr><th>Muda</th><th>Safari</th><th>Hali</th><th class="num">Nauli</th><th>Ofa</th></tr></thead><tbody>${r.rides
+              .map((x) => `<tr><td class="rp-nowrap"><a href="#/safari/${esc(x.id)}">${esc(formatDate(x.requestedAt, true))}</a></td>
+                <td>${esc(x.from)} → ${esc(x.to)}</td>
+                <td><span class="badge badge-${RIDE_TONE(x.status)}">${esc(RIDE[x.status] ?? x.status)}</span></td>
+                <td class="num">${formatTsh(x.fare)}</td>
+                <td>${x.promoDiscount ? `<strong>−${formatTsh(x.promoDiscount)}</strong><span class="rp-sub">${esc(x.promoTitle ?? '')}</span>` : x.promoDropped ? '<span class="rp-sub">Ofa iliondolewa: madereva walio karibu walikuwa wamemaliza nafasi zao za ofa</span>' : '<span class="muted">Bila ofa</span>'}</td></tr>`)
+              .join('')}</tbody></table></div>`
+          : '<p class="empty">Bado hajaagiza safari.</p>'}
+      </section>`;
+  } catch (e) {
+    if (ctx.onAuthError(e)) return;
+    box.innerHTML = '';
+    err.textContent = e.message;
+    err.hidden = false;
+  }
 }
 
 // ------------------------------------------------------------------ malipo kwa madereva
@@ -450,6 +562,7 @@ async function onClick(event) {
   const status = event.target.closest('[data-ofa-status]');
   if (status) {
     const to = status.dataset.ofaStatus;
+    if (to === 'ACTIVE') return askActivate(status);
     const ask = { ACTIVE: 'Washa ofa hii sasa? Wateja wataanza kuiona mara moja.', PAUSED: 'Simamisha ofa hii? Safari zilizokwisha agizwa zinabaki na bei yake.', ENDED: 'Maliza ofa hii kabisa? Haitaweza kuwashwa tena.' }[to];
     if (!confirm(ask)) return;
     status.disabled = true;
@@ -461,6 +574,23 @@ async function onClick(event) {
       status.disabled = false;
       return fail(err);
     }
+  }
+  const go = event.target.closest('[data-ofa-activate]');
+  if (go) {
+    go.disabled = true;
+    try {
+      await ctx.api.post(`/api/admin/promotions/${go.dataset.ofaActivate}/status`, { status: 'ACTIVE' });
+      toast('Ofa imewashwa');
+      return open(location.hash.replace(/^#/, '').split('?')[0].split('/').filter(Boolean));
+    } catch (err) {
+      go.disabled = false;
+      return fail(err);
+    }
+  }
+  if (event.target.closest('[data-ofa-activate-cancel]')) {
+    event.target.closest('.ofa-confirm')?.remove();
+    host.querySelectorAll('[data-ofa-status="ACTIVE"]').forEach((b) => (b.disabled = false));
+    return;
   }
   const owed = event.target.closest('[data-pay-owed]');
   if (owed) {
@@ -510,6 +640,32 @@ function onInput(event) {
   }
 }
 
+/** "Washa ofa": kwanza onyesha wateja wangapi wataiona na maonyo yoyote, kisha thibitisha. */
+async function askActivate(button) {
+  host.querySelectorAll('.ofa-confirm').forEach((el) => el.remove());
+  button.disabled = true;
+  const id = button.dataset.id;
+  const where = button.closest('.ofa-actions');
+  try {
+    const r = await ctx.api.get(`/api/admin/promotions/${id}/preview`);
+    const blocking = r.eligible === 0 || r.warnings.some((w) => w.level === 'warn');
+    where.insertAdjacentHTML(
+      'afterend',
+      `<div class="ofa-confirm${blocking ? ' has-warn' : ''}" role="alertdialog" aria-labelledby="ofa-confirm-title">
+        <h3 id="ofa-confirm-title">${blocking ? 'Angalia kabla ya kuwasha' : 'Washa ofa hii sasa?'}</h3>
+        <div class="ofa-check">${checkHtml(r)}</div>
+        <div class="actions"><button class="btn btn-primary" type="button" data-ofa-activate="${esc(id)}">${blocking ? 'Washa hata hivyo' : 'Ndiyo, washa'}</button>
+        <a class="btn btn-ghost" href="#/ofa/${esc(id)}?hariri=1">Badilisha kwanza</a>
+        <button class="btn btn-ghost" type="button" data-ofa-activate-cancel>Acha</button></div>
+      </div>`,
+    );
+    where.nextElementSibling.querySelector('[data-ofa-activate]').focus();
+  } catch (err) {
+    button.disabled = false;
+    fail(err);
+  }
+}
+
 async function onSubmit(event) {
   event.preventDefault();
   const form = event.target;
@@ -529,6 +685,20 @@ async function onSubmit(event) {
       box.hidden = false;
       button.disabled = false;
     }
+  }
+  if (form.id === 'check-form') {
+    checkState = {
+      phone: document.getElementById('ck-phone').value.trim(),
+      fare: Number(document.getElementById('ck-fare').value) || 3000,
+      vehicle: document.getElementById('ck-vehicle').value,
+    };
+    if (!checkState.phone) {
+      const err = document.getElementById('ck-error');
+      err.textContent = 'Weka namba ya simu ya mteja.';
+      err.hidden = false;
+      return;
+    }
+    return runCheck();
   }
   if (form.id === 'payout-form') {
     const box = document.getElementById('pay-error');

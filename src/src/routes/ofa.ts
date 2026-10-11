@@ -4,11 +4,14 @@
 //            POST /api/driver/payout-accounts                → weka / badilisha namba ya kupokea malipo
 //            POST /api/driver/payout-accounts/:id/delete
 //   Ofisi:   GET/POST /api/admin/promotions, GET/PUT /api/admin/promotions/:id, POST /api/admin/promotions/:id/status
+//            POST /api/admin/promotions/preview, GET /api/admin/promotions/:id/preview  → wateja wangapi + maonyo
+//            GET  /api/admin/promotions/check?phone=&fare=&vehicle=  → kwa nini mteja huyu anaona / haoni ofa
 //            GET  /api/admin/promo-payouts(.csv), GET/POST /api/admin/promo-payouts/:driverId, POST /api/admin/promo-payouts/void/:id
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { ADMIN_ROLES, requireRole } from '../middleware/auth.js';
 import {
+  checkCustomerOffers,
   createPromotion,
   deletePayoutAccount,
   driverPayoutDetail,
@@ -17,7 +20,10 @@ import {
   listPromotions,
   NETWORKS,
   offersForPassenger,
+  offersWithNotice,
   payoutsCsv,
+  previewPromotion,
+  previewSavedPromotion,
   promotionDetail,
   recordPayout,
   savePayoutAccount,
@@ -55,6 +61,25 @@ const promoSchema = z.object({
   endsAt: optDate,
 });
 
+// Hakiki ya fomu wakati unaandika: jina na kichwa si lazima bado
+const previewSchema = promoSchema.omit({ name: true, title: true, description: true }).extend({ id: z.uuid().optional() });
+
+const checkSchema = z.object({
+  phone: z
+    .string({ error: 'Weka namba ya simu ya mteja' })
+    .trim()
+    .transform((v, ctx) => {
+      const p = normalizeTzPhone(v);
+      if (!p) {
+        ctx.addIssue({ code: 'custom', message: 'Namba ya simu si sahihi (mfano: 0712 345 678)' });
+        return z.NEVER;
+      }
+      return p;
+    }),
+  fare: z.coerce.number({ error: 'Weka nauli' }).int().min(100, 'Nauli angalau TSh 100').max(1_000_000).default(3000),
+  vehicle: z.enum(['BODABODA', 'BAJAJI']).default('BODABODA'),
+});
+
 const accountSchema = z
   .object({
     id: z.uuid().optional(),
@@ -89,7 +114,11 @@ export async function ofaRoutes(app: FastifyInstance): Promise<void> {
   const uid = (request: { currentUser: { id: string } }) => request.currentUser.id;
 
   // ---- Abiria
-  app.get('/api/offers', user, async (request) => ok(await offersForPassenger(uid(request))));
+  // ?full=1 → { offers, notice } (app mpya); bila → orodha tu (app za zamani)
+  app.get('/api/offers', user, async (request) => {
+    const { full } = z.object({ full: z.string().optional() }).parse(request.query);
+    return ok(full === '1' ? await offersWithNotice(uid(request)) : await offersForPassenger(uid(request)));
+  });
 
   // ---- Dereva
   app.get('/api/driver/promo-wallet', user, async (request) => ok(await driverPromoWallet(uid(request))));
@@ -103,6 +132,15 @@ export async function ofaRoutes(app: FastifyInstance): Promise<void> {
   app.post('/api/admin/promotions', adminOnly, async (request, reply) =>
     reply.status(201).send(ok(await createPromotion(uid(request), promoSchema.parse(request.body)))),
   );
+  app.post('/api/admin/promotions/preview', adminOnly, async (request) => {
+    const { id, ...input } = previewSchema.parse(request.body);
+    return ok(await previewPromotion(input, id));
+  });
+  app.get('/api/admin/promotions/check', adminOnly, async (request) => {
+    const q = checkSchema.parse(request.query);
+    return ok(await checkCustomerOffers(q.phone, { fare: q.fare, vehicleType: q.vehicle }));
+  });
+  app.get('/api/admin/promotions/:id/preview', adminOnly, async (request) => ok(await previewSavedPromotion(idParam.parse(request.params).id)));
   app.get('/api/admin/promotions/:id', adminOnly, async (request) => ok(await promotionDetail(idParam.parse(request.params).id)));
   app.put('/api/admin/promotions/:id', adminOnly, async (request) =>
     ok(await updatePromotion(uid(request), idParam.parse(request.params).id, promoSchema.parse(request.body))),

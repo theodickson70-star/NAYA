@@ -30,7 +30,7 @@ const api = createApi('naya_app_token');
 const $ = (id) => document.getElementById(id);
 const views = ['view-loading', 'view-intro', 'view-auth', 'view-verify', 'view-role', 'view-offline', 'view-app'];
 const MAX_BYTES = 3 * 1024 * 1024;
-const VERSION = '0.14.2';
+const VERSION = '0.14.3';
 
 let account = null; // { user, activeMode, driverStatus, canDrive }
 let driver = null; // wasifu wa udereva (mode ya Dereva)
@@ -572,9 +572,10 @@ async function renderPassengerHome() {
   }
   if (!passengerOffers || Date.now() - passengerOffers.at > 60_000) {
     try {
-      passengerOffers = { at: Date.now(), list: await api.get('/api/offers') };
+      const r = await api.get('/api/offers?full=1');
+      passengerOffers = { at: Date.now(), list: r.offers ?? [], notice: r.notice ?? null };
     } catch {
-      passengerOffers = { at: Date.now(), list: [] };
+      passengerOffers = { at: Date.now(), list: [], notice: null };
     }
   }
   let planner;
@@ -723,7 +724,8 @@ function tripPlanner() {
 /** Bango la ofa kwa mteja (ofa yenye nguvu zaidi kwanza). */
 function offerBanner() {
   const list = passengerOffers?.list ?? [];
-  if (!list.length) return '';
+  // Ofa zipo lakini hazimfai mteja huyu (mf. ni dereva): mwambie kwa upole badala ya kukaa kimya
+  if (!list.length) return passengerOffers?.notice ? `<p class="promo-notice" role="note">${esc(passengerOffers.notice)}</p>` : '';
   const o = list[0];
   const left = o.ridesLeft !== null && o.ridesLeft !== undefined ? `<span class="offer-chip">Safari ${o.ridesLeft} zimebaki</span>` : '';
   const until = o.endsAt ? `<span class="offer-chip">Hadi ${esc(new Date(o.endsAt).toLocaleDateString('sw-TZ', { day: 'numeric', month: 'short' }))}</span>` : '';
@@ -762,7 +764,7 @@ function estimateBlock() {
               <span class="fare-icon">${VEHICLE_ICON[o.vehicleType] ?? ''}</span>
               <span class="fare-main"><strong>${esc(VEHICLE_TYPES[o.vehicleType])}</strong><span class="muted">km ${o.distanceKm.toLocaleString('en-US')} · ${o.fixed ? 'bei ya njia hii' : 'makadirio'}</span></span>
               ${fareAmount(o)}
-              ${o.promo ? `<span class="fare-promo-tag">Ofa · NAYA inalipa ${formatTsh(o.promo.discount)}</span>` : ''}
+              ${o.promo ? `<span class="fare-promo-tag">Ofa · NAYA inalipa ${formatTsh(o.promo.discount)}</span>` : o.promoNote ? `<span class="fare-promo-tag is-note">${esc(o.promoNote)}</span>` : ''}
             </span>
           </label>`,
         )

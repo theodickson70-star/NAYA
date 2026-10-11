@@ -473,6 +473,7 @@ export async function requestRide(
   if (!option) throw conflict('Bei za chombo hiki bado hazijawekwa. Chagua chombo kingine.');
   // Ofa (punguzo) — server inaamua. Kama ofa ina kikomo cha dereva, lazima kuwe na dereva mwenye nafasi karibu.
   let promo = await bestPromotion(db, passengerId, input.vehicleType, option.fare);
+  let promoBlocked: string | null = null; // ofa ilimfaa, lakini madereva walio karibu wamemaliza nafasi zao
   if (promo) {
     const over = await driversOverPromoLimit(db, promo.promotionId);
     if (over.length) {
@@ -483,7 +484,10 @@ export async function requestRide(
       const any = nearby.some((c) => c.km <= MAX_PICKUP_KM);
       const others = any ? true : (await findCandidates(db, { rideId: null, lat: estimate.pickup.lat, lng: estimate.pickup.lng, vehicleType: input.vehicleType, passengerId, graceDays, limit: 3, exclude: [] })).some((c) => c.km <= MAX_PICKUP_KM);
       // Hakuna dereva mwenye nafasi ya ofa lakini wapo wengine → safari ya kawaida (bei kamili inaonyeshwa).
-      if (!any && others) promo = null;
+      if (!any && others) {
+        promoBlocked = promo.title;
+        promo = null;
+      }
     }
   }
 
@@ -516,6 +520,7 @@ export async function requestRide(
         ],
       );
       await history(client, row!.id, null, 'SEARCHING', passengerId);
+      if (promoBlocked) await history(client, row!.id, 'SEARCHING', 'SEARCHING', null, `Ofa imeondolewa: madereva waliopo wamefikia kikomo cha ofa (${promoBlocked})`);
       return row!.id;
     });
   } catch (error) {
@@ -523,6 +528,16 @@ export async function requestRide(
     throw error;
   }
   await notifyAdmins(rideId);
+  if (promoBlocked) {
+    await notify({
+      userId: passengerId,
+      event: 'ride',
+      rideId,
+      kind: 'promo_dropped',
+      title: 'Ofa haipatikani kwa safari hii',
+      body: `Madereva walio karibu wamefikia kikomo cha safari za ofa. Tunakutafutia dereva kwa nauli ya kawaida ${tsh(option.fare)}. Unaweza kughairi bila gharama.`,
+    });
+  }
   await dispatchRide(rideId);
   return passengerView(db, (await findRide(db, rideId))!);
 }
