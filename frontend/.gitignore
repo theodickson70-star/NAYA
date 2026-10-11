@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+*.log
+
+# App ya Android (Phase 10)
+*.jks
+*.keystore
+google-services.json
