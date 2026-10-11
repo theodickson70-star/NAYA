@@ -129,6 +129,7 @@ const ICON = {
   dot: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="9"/></svg>',
   share: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.2 10.8l7.6-4.5M8.2 13.2l7.6 4.5"/></svg>',
   alert: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4.5M12 17.5v.5"/></svg>',
+  chat: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8.5 8.5 0 0 1-12.6 7.4L3 21l1.6-5.4A8.5 8.5 0 1 1 21 12z"/><path d="M8.5 10.5h7M8.5 14h4.5"/></svg>',
 };
 
 function routeSummary(ride) {
@@ -136,7 +137,27 @@ function routeSummary(ride) {
     <div class="route-row"><span class="route-icon from">${ICON.dot}</span><span><span class="route-label">Kutoka</span><span class="route-value">${esc(ride.pickup.name)}</span></span></div>
     <div class="route-row"><span class="route-icon to">${ICON.pin}</span><span><span class="route-label">Kwenda</span><span class="route-value">${esc(ride.destination.name)}</span></span></div>
   </div>
-  <p class="ride-meta"><span>${esc(VEHICLE_TYPES[ride.vehicleType])} · km ${ride.distanceKm}</span><strong>${formatTsh(ride.fare)}</strong></p>`;
+  <p class="ride-meta"><span>${esc(VEHICLE_TYPES[ride.vehicleType])} · km ${ride.distanceKm}</span>${
+    ride.promo ? `<strong class="ride-promo-price"><s>${formatTsh(ride.fare)}</s> ${formatTsh(ride.passengerPays)}</strong>` : `<strong>${formatTsh(ride.fare)}</strong>`
+  }</p>${promoNote(ride)}`;
+}
+
+/**
+ * Kiungo cha maoni kuhusu safari hii (kichupo cha Maoni kinafunguka na safari imeambatanishwa).
+ * problem=true: safari ilikwama (hakuna dereva / imeghairiwa) → "Tuambie kilichotokea".
+ */
+function feedbackLink(ride, { problem = false, who = 'abiria' } = {}) {
+  const q = new URLSearchParams({ safari: ride.id, kutoka: ride.pickup.name, kwenda: ride.destination.name, aina: problem ? 'tatizo' : 'baada', funga: who });
+  return problem
+    ? `<a class="btn btn-ghost btn-block fb-cta-problem" href="#/maoni?${q}">${ICON.chat}Tuambie kilichotokea</a>`
+    : `<a class="fb-cta" href="#/maoni?${q}">${ICON.chat}<span><strong>Una maoni kuhusu NAYA?</strong> Tuambie — tunasoma kila ujumbe.</span></a>`;
+}
+
+/** Safari ya ofa: abiria analipa kiasi kilichopunguzwa, NAYA inamlipa dereva kilichobaki. */
+function promoNote(ride) {
+  if (!ride.promo) return '';
+  return `<p class="ride-promo-note"><span class="badge badge-ok">${esc(ride.promo.title ?? 'Ofa ya NAYA')}</span>
+    Abiria analipa ${formatTsh(ride.passengerPays)} taslimu · NAYA inalipa ${formatTsh(ride.promo.discount)}</p>`;
 }
 
 function stars(name, label) {
@@ -189,7 +210,13 @@ export function renderPassengerRide(ride) {
     ACCEPTED: ['coming', 'Dereva anakuja', etaText(ride, d?.etaMinutes, d?.distanceToPickupKm)],
     ARRIVED: ['arrived', 'Dereva amefika!', etaText(ride)],
     IN_PROGRESS: ['moving', 'Safari inaendelea', etaText(ride, d?.etaMinutes)],
-    COMPLETED: ['done', `Umefika ${ride.destination.name}!`, `Lipa dereva ${formatTsh(ride.fare)} taslimu.`],
+    COMPLETED: [
+      'done',
+      `Umefika ${ride.destination.name}!`,
+      ride.promo
+        ? `Lipa dereva ${formatTsh(ride.passengerPays)} taslimu. Ofa ya NAYA imelipa ${formatTsh(ride.promo.discount)}.`
+        : `Lipa dereva ${formatTsh(ride.fare)} taslimu.`,
+    ],
     NO_DRIVER: ['none', 'Hakuna dereva aliyepatikana karibu kwa sasa', 'Jaribu tena baada ya dakika chache.'],
     CANCELLED: ['none', 'Safari imeghairiwa', ride.cancelledBy === 'ADMIN' ? `Ofisi ya NAYA: ${ride.cancelReason ?? ''}` : ride.cancelReason ?? ''],
   }[ride.status];
@@ -218,10 +245,16 @@ export function renderPassengerRide(ride) {
             <p class="alert alert-danger" id="rate-error" role="alert" hidden></p>
             <button class="btn btn-primary btn-block" type="submit" id="rate-submit" disabled>Tuma</button>
             <button class="btn btn-ghost btn-block btn-plain" type="button" data-ride="close">Ruka</button>
-          </form>`
+          </form>
+          ${feedbackLink(ride)}`
         : ''
     }
-    ${ride.status === 'NO_DRIVER' || ride.status === 'CANCELLED' ? '<button class="btn btn-primary btn-block" type="button" data-ride="close">Sawa</button>' : ''}
+    ${
+      ride.status === 'NO_DRIVER' || ride.status === 'CANCELLED'
+        ? `<button class="btn btn-primary btn-block" type="button" data-ride="close">Sawa</button>
+           ${ride.status === 'NO_DRIVER' || ride.cancelledBy !== 'PASSENGER' ? feedbackLink(ride, { problem: true }) : ''}`
+        : ''
+    }
     ${
       canCancel
         ? cancelOpen
@@ -543,6 +576,7 @@ function offerHtml(offer) {
   return `<section class="offer" role="alertdialog" aria-labelledby="offer-title">
     <div class="offer-top"><h1 id="offer-title">Ombi jipya la safari</h1><span class="offer-timer" id="offer-seconds" style="--p:${offer.secondsLeft / (offer.totalSeconds || 60)}">${clock(offer.secondsLeft)}</span></div>
     <p class="offer-fare">${formatTsh(r.fare)}</p>
+    ${r.promo ? `<p class="offer-promo"><strong>Safari ya ofa</strong> Abiria anakulipa ${formatTsh(r.passengerPays)} taslimu · NAYA inakutumia ${formatTsh(r.promo.discount)}</p>` : ''}
     <p class="muted">${esc(VEHICLE_TYPES[r.vehicleType])} · safari ya km ${r.distanceKm} · abiria yuko km ${offer.distanceToPickupKm} kutoka kwako</p>
     ${routeSummary(r).replace(/<p class="ride-meta">[\s\S]*<\/p>/, '')}
     <p class="alert alert-danger" id="offer-error" role="alert" hidden></p>
@@ -610,18 +644,22 @@ function driverRideHtml(ride) {
   };
   if (ride.status === 'COMPLETED') {
     return `<section class="ride-head ride-done" role="status"><span class="ride-pulse" aria-hidden="true"></span>
-        <h1>Pokea ${formatTsh(ride.fare)}</h1><p>Taslimu kutoka kwa ${esc(p?.name ?? 'abiria')}.</p></section>
+        <h1>Pokea ${formatTsh(ride.passengerPays ?? ride.fare)}</h1><p>Taslimu kutoka kwa ${esc(p?.name ?? 'abiria')}.${
+          ride.promo ? ` NAYA itakutumia ${formatTsh(ride.promo.discount)} kwenye namba yako ya malipo (Akaunti → Malipo ya ofa).` : ''
+        }</p></section>
       <form class="card" id="rate-passenger-form">
         ${stars('rating', `Mpe ${esc(p?.name.split(' ')[0] ?? 'abiria')} nyota`)}
         <p class="alert alert-danger" id="rate-error" role="alert" hidden></p>
         <button class="btn btn-primary btn-block" type="submit" id="rate-submit" disabled>Tuma</button>
         <button class="btn btn-ghost btn-block btn-plain" type="button" data-ride="driver-close">Ruka</button>
-      </form>`;
+      </form>
+      ${feedbackLink(ride, { who: 'dereva' })}`;
   }
   if (ride.status === 'CANCELLED') {
     return `<section class="ride-head ride-none" role="status"><h1>Abiria ameghairi safari</h1>
         <p>${esc(ride.cancelReason ?? '')}</p></section>
-      <button class="btn btn-primary btn-block" type="button" data-ride="driver-close">Sawa</button>`;
+      <button class="btn btn-primary btn-block" type="button" data-ride="driver-close">Sawa</button>
+      ${feedbackLink(ride, { problem: true, who: 'dereva' })}`;
   }
   const step = steps[ride.status];
   const needsPin = ride.status === 'ARRIVED' && ride.pinRequired;
@@ -639,7 +677,7 @@ function driverRideHtml(ride) {
     <section class="card">
       <div class="driver-top">
         <span class="driver-photo">${esc((p?.name ?? '?').split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase())}</span>
-        <span class="driver-who"><strong>${esc(p?.name ?? 'Abiria')}</strong><span class="muted">Abiria · ${formatTsh(ride.fare)} taslimu</span></span>
+        <span class="driver-who"><strong>${esc(p?.name ?? 'Abiria')}</strong><span class="muted">Abiria · ${formatTsh(ride.passengerPays ?? ride.fare)} taslimu</span></span>
       </div>
       <div class="actions two">
         ${p ? `<a class="btn btn-ghost call" href="${tel(p.phone)}">${ICON.phone} Piga simu</a>` : ''}
@@ -1045,7 +1083,7 @@ export function historyHtml(list) {
     .slice(0, 5)
     .map(
       (r) => `<li><span><strong>${esc(r.destination.name)}</strong><span class="muted">${esc(formatDate(r.requestedAt, true))} · kutoka ${esc(r.pickup.name)}</span></span>
-        <span class="trip-right">${r.status === 'COMPLETED' ? `<strong>${formatTsh(r.fare)}</strong>` : ''}<span class="badge badge-${label[r.status][0]}">${label[r.status][1]}</span></span></li>`,
+        <span class="trip-right">${r.status === 'COMPLETED' ? `<strong>${formatTsh(r.passengerPays ?? r.fare)}</strong>` : ''}<span class="badge badge-${label[r.status][0]}">${label[r.status][1]}</span></span></li>`,
     )
     .join('')}</ul>`;
 }

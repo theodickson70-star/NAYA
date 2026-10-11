@@ -20,6 +20,8 @@ import { ofisiRoutes } from './routes/ofisi.js';
 import { placeRoutes } from './routes/places.js';
 import { pushRoutes } from './routes/push.js';
 import { rideRoutes } from './routes/rides.js';
+import { ofaRoutes } from './routes/ofa.js';
+import { ripotiRoutes } from './routes/ripoti.js';
 import { pakuaRoutes } from './routes/pakua.js';
 import { safetyRoutes } from './routes/safety.js';
 import { subscriptionRoutes } from './routes/subscriptions.js';
@@ -96,6 +98,8 @@ export async function buildApp(options: { logger?: boolean } = {}): Promise<Fast
   await app.register(ofisiRoutes);
   await app.register(safetyRoutes);
   await app.register(pakuaRoutes);
+  await app.register(ripotiRoutes);
+  await app.register(ofaRoutes);
 
   // Kurasa za NAYA: /app/ (app moja ya abiria na dereva) na /admin/ (ofisi).
   await app.register(fastifyStatic, { root: FRONTEND_DIR, prefix: '/', index: ['index.html'] });

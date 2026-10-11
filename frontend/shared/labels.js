@@ -71,6 +71,7 @@ export const FEEDBACK_TOPICS = {
   DRIVERS: 'Madereva / abiria',
   SAFETY: 'Usalama',
   IDEA: 'Wazo jipya',
+  RIDE: 'Safari hii',
 };
 
 export const FEEDBACK_STATUS = {

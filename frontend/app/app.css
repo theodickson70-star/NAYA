@@ -924,3 +924,85 @@ input, select, textarea { font-size: 17px; padding: 13px 14px; border-radius: va
 .app-update-bar { height: 8px; margin-top: 6px; border-radius: 99px; background: rgba(255, 255, 255, 0.18); overflow: hidden; }
 .app-update-bar i { display: block; height: 100%; background: var(--gold); border-radius: inherit; transition: width 0.5s; }
 @media (prefers-reduced-motion: reduce) { .app-update { animation: none; } .app-update-bar i { transition: none; } }
+
+/* ---- Ofa za wateja ---- */
+.promo-banner {
+  position: relative; display: flex; align-items: center; gap: 14px; margin: 14px 0 0; padding: 14px 16px;
+  background: linear-gradient(120deg, #FFF6D6, #FFE9A3); border: 1.5px solid #F4D36B; border-radius: var(--r-card); color: #3D2C00;
+  box-shadow: var(--shadow-1); overflow: hidden;
+}
+.promo-pct {
+  flex: none; display: grid; place-items: center; width: 70px; height: 70px; border-radius: 20px; background: var(--g800); color: var(--gold);
+  font-family: var(--font-display); font-weight: 800; font-size: 25px; letter-spacing: -0.03em; transform: rotate(-4deg);
+}
+.promo-text { min-width: 0; }
+.promo-banner h2 { margin: 0; font-size: 20px; color: #2B1F00; }
+.promo-banner p { margin: 3px 0 0; font-size: 15px; line-height: 1.35; }
+.promo-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+.promo-chips:empty { display: none; }
+.offer-chip { font-size: 13px; font-weight: 700; padding: 3px 9px; border-radius: 99px; background: rgba(255, 255, 255, 0.7); color: #5A4300; }
+.fare-promo { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.05; color: var(--g700); }
+.fare-promo s { font-family: var(--font-body); font-weight: 400; font-size: 14px; color: var(--muted); text-decoration-thickness: 1.5px; }
+.fare-body:has(.fare-promo-tag) { flex-wrap: wrap; row-gap: 8px; }
+.fare-promo-tag { flex: 0 0 calc(100% - 66px); margin-left: 66px; font-size: 13.5px; font-weight: 700; color: #6B4E00; background: #FDF0C2; padding: 4px 10px; border-radius: 9px; }
+.ride-promo-price s { font-family: var(--font-body); font-weight: 400; font-size: 15px; color: var(--muted); margin-right: 4px; }
+.ride-promo-price { color: var(--g700) !important; white-space: nowrap; }
+.ride-meta:has(.ride-promo-price) { flex-wrap: wrap; gap: 4px 10px; }
+.ride-promo-note { margin: 8px 2px 0; font-size: 14.5px; color: var(--muted); display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.offer-promo { margin: 0 0 10px; padding: 10px 12px; border-radius: 14px; background: #FFF4CC; color: #4A3700; font-size: 15px; line-height: 1.35; }
+.offer-promo strong { display: block; color: #2B1F00; }
+
+/* Akaunti ya dereva → Malipo ya ofa */
+.wallet-balance { margin: 14px 0 6px; padding: 16px; border-radius: 18px; background: var(--bg); display: flex; flex-direction: column; gap: 2px; }
+.wallet-balance span { font-size: 14.5px; color: var(--muted); }
+.wallet-balance strong { font-family: var(--font-display); font-weight: 800; font-size: 32px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.wallet-balance small { font-size: 13.5px; color: var(--muted); }
+.wallet-balance.is-owed { background: var(--g800); }
+.wallet-balance.is-owed span, .wallet-balance.is-owed small { color: rgba(255, 255, 255, 0.8); }
+.wallet-balance.is-owed strong { color: var(--gold); }
+.wallet-h { font-size: 16px; margin: 18px 0 6px; }
+.wallet-accs, .wallet-list { list-style: none; margin: 0 0 10px; padding: 0; }
+.wallet-acc, .wallet-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 11px 0; border-top: 1px solid #EDF2EF; }
+.wallet-acc:first-child, .wallet-list li:first-child { border-top: 0; }
+.wallet-acc .muted, .wallet-list .muted { font-size: 14px; display: block; }
+.wallet-acc-actions { display: flex; gap: 14px; flex: none; }
+.wallet-acc-actions .link-btn { padding: 0; }
+.link-danger { color: var(--danger); }
+.wallet-amt { font-weight: 800; white-space: nowrap; color: var(--g700); font-variant-numeric: tabular-nums; }
+.wallet-paid { color: var(--ink); }
+.wallet-form { margin: 10px 0; padding: 14px; border: 1.5px solid #E1EAE5; border-radius: 18px; }
+.wallet-form label:first-child { margin-top: 0; }
+.wallet-form-actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.wallet-more { margin-top: 10px; }
+.wallet-more summary { cursor: pointer; font-weight: 700; color: var(--g700); padding: 6px 0; }
+
+/* ---- Maoni kwa wote: kichupo cha menyu, baada ya safari, na safari ikikwama ---- */
+.tabbar { grid-template-columns: repeat(3, 1fr); }
+.tabbar a { position: relative; }
+.fb-hero { margin: 4px 2px 0; }
+.fb-hero h1 { margin: 0; }
+.fb-hero p { margin: 6px 0 0; color: var(--muted); line-height: 1.45; }
+.fb-context { display: grid; gap: 2px; padding: 12px 14px; margin-bottom: 14px; border-radius: 16px; background: var(--g100); }
+.fb-context.is-problem { background: #FDECE8; }
+.fb-context-label { font-size: 13.5px; font-weight: 700; color: var(--g700); }
+.fb-context.is-problem .fb-context-label { color: var(--danger); }
+.fb-context strong { font-size: 16.5px; }
+.fb-context .link-btn { justify-self: start; padding-top: 4px; font-size: 14.5px; }
+.fb-hints { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
+.fb-hint { font: inherit; font-size: 14px; padding: 7px 12px; border-radius: 99px; border: 1.5px solid #E1EAE5; background: var(--white); color: var(--ink); cursor: pointer; }
+.fb-hint:active { transform: scale(0.97); }
+.fb-hint:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.fb-count { text-align: right; margin: 4px 2px 0; }
+.fb-mine li.is-unread { margin: 0 -10px; padding: 12px 10px; border-radius: 14px; background: #F2FAF5; }
+.fb-office { margin: 8px 0 0; padding: 10px 12px; border-radius: 12px; background: var(--g100); }
+.fb-cta {
+  display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 14px 16px; border-radius: 18px;
+  background: var(--white); color: var(--ink); text-decoration: none; box-shadow: var(--shadow-1); line-height: 1.35;
+}
+.fb-cta svg, .fb-cta-problem svg { width: 26px; height: 26px; flex: none; fill: none; stroke: var(--g700); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.fb-cta strong { display: block; color: var(--g700); }
+.fb-cta-problem { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 10px; }
+.fb-account-link { display: flex; justify-content: space-between; align-items: center; gap: 12px; color: inherit; text-decoration: none; }
+.fb-account-link strong { display: block; font-size: 18px; }
+.fb-account-link .muted { font-size: 15px; }
+.fb-account-link > span:last-child { font-size: 28px; color: var(--g700); }

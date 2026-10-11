@@ -20,7 +20,7 @@ import {
   verifyPhoneManually,
 } from '../services/admin-users.js';
 import { AUDIENCES, audienceSizes, listBroadcasts, sendBroadcast } from '../services/broadcast.js';
-import { FEEDBACK_TOPICS, giveFeedback, handleFeedback, listFeedback, myFeedback, rideComments } from '../services/feedback.js';
+import { FEEDBACK_SOURCES, FEEDBACK_TOPICS, giveFeedback, handleFeedback, listFeedback, markFeedbackSeen, myFeedback, rideComments } from '../services/feedback.js';
 import { dailyReport, ridesCsv } from '../services/reports.js';
 import { candidatesForRide, completeByAdmin, liveOverview, offerRideToDriver } from '../services/rides.js';
 import {
@@ -71,12 +71,18 @@ export async function ofisiRoutes(app: FastifyInstance): Promise<void> {
 
   // ------------------------------------------------------------ Maoni (app)
   app.get('/api/feedback', user, async (request) => ok(await myFeedback(request.currentUser.id)));
+  app.post('/api/feedback/seen', user, async (request) => {
+    await markFeedbackSeen(request.currentUser.id);
+    return ok({ seen: true });
+  });
   app.post('/api/feedback', { ...user, config: { rateLimit: { max: 10, timeWindow: '1 hour' } } }, async (request, reply) => {
     const input = z
       .object({
         rating: z.number({ error: 'Chagua nyota' }).int().min(1, 'Chagua nyota').max(5),
         topic: z.enum(FEEDBACK_TOPICS).default('GENERAL'),
         body: text(1000, 'Andika maoni yako'),
+        rideId: z.uuid().nullable().optional(),
+        source: z.enum(FEEDBACK_SOURCES).default('MENU'),
       })
       .parse(request.body);
     const role = request.currentUser.active_mode === 'DRIVER' ? 'DRIVER' : 'PASSENGER';

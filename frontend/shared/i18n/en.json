@@ -596,7 +596,7 @@
   "Washa arifa ujue dereva akipatikana, hata ukifunga app.": "Turn on notifications to know when a driver is found, even if you close the app.",
   "Ramani: mahali pa kuchukuliwa, unakoenda, na dereva": "Map: pickup, destination and driver",
   "Mf. Aliendesha kwa uangalifu": "e.g. Drove carefully",
-  "Maoni": "Comment",
+  "Maoni": "Feedback",
   "Ghairi safari hii?": "Cancel this trip?",
   "Ndiyo, ghairi": "Yes, cancel",
   "Hapana": "No",
@@ -716,9 +716,80 @@
   "Dereva mwingine amewahi kukubali safari hii.": "Another driver accepted this ride first.",
   "Safari hii imeghairiwa.": "This ride has been cancelled.",
   "Mwingine amewahi": "Taken by another",
-  "Limeghairiwa": "Cancelled"
+  "Limeghairiwa": "Cancelled",
+  "Malipo: unalipa dereva kiasi kilichopunguzwa taslimu; NAYA inamlipa dereva kilichobaki.": "Payment: you pay the driver the reduced amount in cash; NAYA pays the driver the rest.",
+  "Safari ya ofa": "Offer ride",
+  "Ofa ya NAYA": "NAYA offer",
+  "Malipo ya ofa": "Offer payments",
+  "Ukibeba mteja wa ofa, NAYA inakulipa sehemu iliyopunguzwa kwenye namba yako ya pesa ya simu.": "When you carry an offer customer, NAYA pays you the discounted part on your mobile money number.",
+  "NAYA itakutumia": "NAYA will send you",
+  "Salio": "Balance",
+  "Weka namba yako ya kupokea pesa ili NAYA ikutumie malipo ya ofa.": "Add your mobile money number so NAYA can send your offer payments.",
+  "Namba za kupokea malipo": "Numbers for receiving payments",
+  "Weka namba ya kupokea pesa": "Add a number to receive money",
+  "Ongeza namba nyingine": "Add another number",
+  "Safari za ofa ulizobeba": "Offer rides you carried",
+  "Malipo uliyotumiwa na NAYA": "Payments NAYA sent you",
+  "Mtandao": "Network",
+  "Namba ya kupokea pesa": "Number to receive money",
+  "Jina la mwenye namba": "Name on the number",
+  "(kama lilivyosajiliwa)": "(as registered)",
+  "Namba kuu (NAYA itatuma hapa)": "Main number (NAYA sends here)",
+  "Hifadhi namba": "Save number",
+  "Acha": "Cancel",
+  "Kuu": "Main",
+  "Futa": "Delete",
+  "Futa namba hii ya kupokea malipo?": "Delete this payment number?",
+  "Namba imefutwa": "Number deleted",
+  "Namba imehifadhiwa": "Number saved",
+  "Ombi jipya la safari (ofa)": "New ride request (offer)",
+  "Ofa haipatikani kwa safari hii": "The offer is not available for this ride",
+  "Umelipwa na NAYA": "NAYA has paid you",
+  "Namba hii tayari imewekwa.": "This number is already added.",
+  "Unaweza kuweka namba 3 tu. Futa moja kwanza.": "You can add only 3 numbers. Delete one first.",
+  "Namba hii haikupatikana.": "This number was not found.",
+  "Weka jina la mwenye namba (kama lilivyosajiliwa)": "Enter the name on the number (as registered)",
+  "Namba ya akaunti ya benki si sahihi": "The bank account number is not valid",
+  "Chagua mtandao": "Choose a network",
+  "Weka namba": "Enter the number",
+  "Tuambie kilichotokea": "Tell us what happened",
+  "Samahani kwa usumbufu. Eleza kilichotokea — ofisi ya NAYA inasoma na kukujibu hapa.": "Sorry for the trouble. Describe what happened — the NAYA office reads it and replies here.",
+  "Unaonaje kazi na NAYA? Maoni yako kuhusu maombi, wateja, app au malipo yanafika ofisini moja kwa moja.": "How is working with NAYA? Your feedback about requests, customers, the app or payments goes straight to the office.",
+  "Unaonaje huduma ya NAYA? Maoni yako yanafika ofisini moja kwa moja, na majibu yanakuja hapa.": "How is the NAYA service? Your feedback goes straight to the office, and replies come here.",
+  "Safari iliyokwama": "Ride that went wrong",
+  "Kuhusu safari": "About the ride",
+  "Maoni ya jumla badala yake": "General feedback instead",
+  "Safari hii ilikuwaje?": "How was this ride?",
+  "Unaipa NAYA nyota ngapi?": "How many stars do you give NAYA?",
+  "Mfano: nilisubiri dakika 10 Stendi bila dereva kupatikana": "Example: I waited 10 minutes at the Stand and no driver was found",
+  "Nilisubiri muda mrefu bila dereva": "I waited a long time without a driver",
+  "Dereva alighairi": "The driver cancelled",
+  "Bei haikuwa sawa": "The price was not right",
+  "App ilikataa / ilikwama": "The app failed / got stuck",
+  "Jibu jipya": "New reply",
+  "Jibu la ofisi:": "Office reply:",
+  "Bado hujatuma maoni. Maoni yako ya kwanza yanaweza kuboresha NAYA kwa wote.": "You have not sent feedback yet. Your first feedback can make NAYA better for everyone.",
+  "Una maoni kuhusu NAYA?": "Any feedback about NAYA?",
+  "Tuambie — tunasoma kila ujumbe.": "Tell us — we read every message.",
+  "Ofisi ya NAYA inasoma kila ujumbe na kukujibu.": "The NAYA office reads every message and replies to you.",
+  "Ombi jipya la safari! Bonyeza Nyumbani.": "New ride request! Tap Home.",
+  "Safari hii": "This ride",
+  "Jibu jipya la ofisi kuhusu maoni yako": "New office reply to your feedback",
+  "Safari hii haikupatikana.": "This ride was not found."
  },
  "patterns": [
+  [
+   "Umefikia kikomo cha safari {} za ofa wiki hii. Safari za kawaida unaendelea kupokea.",
+   "You have reached the limit of {} offer rides this week. You will keep receiving normal rides."
+  ],
+  [
+   "Umefikia kikomo cha safari {} za ofa leo. Safari za kawaida unaendelea kupokea.",
+   "You have reached the limit of {} offer rides today. You will keep receiving normal rides."
+  ],
+  [
+   "Umefikia kikomo cha safari {} za ofa kwenye ofa hii. Safari za kawaida unaendelea kupokea.",
+   "You have reached the limit of {} offer rides for this offer. You will keep receiving normal rides."
+  ],
   [
    "Uko km {} kutoka {}, eneo la karibu la NAYA. Utapokea maombi ya wateja walio ndani ya km {} kutoka ulipo tu.",
    "You are {} km from {}, the nearest NAYA place. You will only receive requests from passengers within {} km of you."
@@ -1206,6 +1277,66 @@
   [
    "Upakuaji umeshindwa ({})",
    "Download failed ({})"
+  ],
+  [
+   "Safari {} zimebaki",
+   "{} rides left"
+  ],
+  [
+   "Hadi {}",
+   "Until {}"
+  ],
+  [
+   "Ofa {} zinakusubiri",
+   "{} offers for you"
+  ],
+  [
+   "{} · NAYA inalipa {}",
+   "{} · NAYA pays {}"
+  ],
+  [
+   "Abiria analipa {} taslimu · NAYA inalipa {}",
+   "Passenger pays {} cash · NAYA pays {}"
+  ],
+  [
+   "Lipa dereva {} taslimu. Ofa ya NAYA imelipa {}.",
+   "Pay the driver {} in cash. The NAYA offer paid {}."
+  ],
+  [
+   "Taslimu kutoka kwa {}. NAYA itakutumia {} kwenye namba yako ya malipo (Akaunti → Malipo ya ofa).",
+   "Cash from {}. NAYA will send you {} on your payment number (Account → Offer payments)."
+  ],
+  [
+   "Abiria anakulipa {} taslimu · NAYA inakutumia {}",
+   "The passenger pays you {} cash · NAYA sends you {}"
+  ],
+  [
+   "Safari za ofa {} · Jumla {} · Umeshatumiwa {}",
+   "Offer rides {} · Total {} · Already sent {}"
+  ],
+  [
+   "{} (abiria {} + NAYA {}) · {} → {}",
+   "{} (passenger {} + NAYA {}) · {} → {}"
+  ],
+  [
+   "Lipa dereva {} taslimu. Ofa ya NAYA imelipa {}. Asante kwa kusafiri na NAYA.",
+   "Pay the driver {} in cash. The NAYA offer paid {}. Thank you for travelling with NAYA."
+  ],
+  [
+   "Madereva walio karibu wamefikia kikomo cha safari za ofa. Tunaendelea kukutafutia dereva kwa nauli ya kawaida {}. Unaweza kughairi bila gharama.",
+   "Nearby drivers have reached their offer ride limit. We are still finding you a driver at the normal fare of {}. You can cancel at no cost."
+  ],
+  [
+   "NAYA imekutumia {} kwenye {} {} (malipo ya safari za ofa). Kumbukumbu: {}.",
+   "NAYA has sent you {} on {} {} (offer ride payments). Reference: {}."
+  ],
+  [
+   "Umefikia kikomo cha safari {} za ofa {}. Safari za kawaida unaendelea kupokea.",
+   "You have reached the limit of {} offer rides {}. You will keep receiving normal rides."
+  ],
+  [
+   "Ofa · NAYA inalipa {}",
+   "Offer · NAYA pays {}"
   ]
  ]
 }

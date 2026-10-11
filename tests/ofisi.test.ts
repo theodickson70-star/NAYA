@@ -318,6 +318,42 @@ describe('NAYA Phase 11.1 — Maoni', () => {
     assert.equal(n.rows[0].title, 'Tumefanyia kazi maoni yako');
   });
 
+  it('jibu la ofisi: kitone cha "jibu jipya" mpaka mtoaji afungue Maoni', async () => {
+    assert.equal((await call('GET', '/api/account', undefined, 'p1')).json.data.feedbackUnread, 1);
+    const mine = (await call('GET', '/api/feedback', undefined, 'p1')).json.data;
+    assert.equal(mine.find((f: any) => f.id === fid).unread, true);
+    assert.equal((await call('POST', '/api/feedback/seen', {}, 'p1')).status, 200);
+    assert.equal((await call('GET', '/api/account', undefined, 'p1')).json.data.feedbackUnread, 0);
+    assert.equal((await call('GET', '/api/feedback', undefined, 'p1')).json.data.find((f: any) => f.id === fid).unread, false);
+  });
+
+  it('maoni kuhusu safari moja (baada ya safari / safari ilikwama): safari lazima iwe ya mtoaji', async () => {
+    const loc = await db.query(`INSERT INTO naya.locations (name, category, lat, lng) VALUES ($1, 'OTHER', -5.3, 32.5) RETURNING id`, [`Maoni Loc ${Date.now()}`]);
+    const ride = await db.query(
+      `INSERT INTO naya.rides (passenger_id, vehicle_type, status, pickup_name, pickup_lat, pickup_lng, dest_location_id, dest_name, dest_lat, dest_lng, distance_km, fare)
+       VALUES ($1, 'BODABODA', 'NO_DRIVER', 'Stendi Maoni', -5.31, 32.5, $2, 'Soko Maoni', -5.3, 32.5, 1.2, 1500) RETURNING id`,
+      [ids.p1, loc.rows[0].id],
+    );
+    const rideId = ride.rows[0].id;
+    try {
+      const notMine = await call('POST', '/api/feedback', { rating: 2, topic: 'RIDE', body: 'Si safari yangu', rideId, source: 'PROBLEM' }, 'd1');
+      assert.equal(notMine.status, 404);
+      const res = await call('POST', '/api/feedback', { rating: 2, topic: 'RIDE', body: 'Nilisubiri muda mrefu bila dereva', rideId, source: 'PROBLEM' }, 'p1');
+      assert.equal(res.status, 201, res.json.message);
+      assert.equal(res.json.data.source, 'PROBLEM');
+      assert.equal(res.json.data.ride.from, 'Stendi Maoni');
+      const admin = (await call('GET', '/api/admin/feedback?status=NEW', undefined, 'admin')).json.data.items;
+      const seen = admin.find((f: any) => f.id === res.json.data.id);
+      assert.equal(seen.rideId, rideId);
+      assert.equal(seen.ride.to, 'Soko Maoni');
+      assert.equal((await call('POST', '/api/feedback', { rating: 4, body: 'Chanzo kibaya', source: 'HACK' }, 'p1')).status, 400);
+    } finally {
+      await db.query('DELETE FROM naya.feedback WHERE ride_id = $1', [rideId]);
+      await db.query('DELETE FROM naya.rides WHERE id = $1', [rideId]);
+      await db.query('DELETE FROM naya.locations WHERE id = $1', [loc.rows[0].id]);
+    }
+  });
+
   it('maoni ya safari (nyota za abiria) yanaonekana ofisini', async () => {
     const r = await call('GET', '/api/admin/ride-comments?all=1', undefined, 'admin');
     assert.equal(r.status, 200);

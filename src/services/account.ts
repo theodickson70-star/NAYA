@@ -1,5 +1,6 @@
 // Akaunti moja ya NAYA: mtumiaji yule yule anaweza kuwa abiria na dereva, na anabadili "mode".
 // Kubadili mode HAKUTENGENEZI akaunti mpya — ni safu moja ya naya.users (active_mode).
+import { unreadFeedbackCount } from './feedback.js';
 import { db, transaction } from '../db/pool.js';
 import { notFound } from '../utils/http.js';
 import { driverStatusOf, ensureDriverProfile } from './drivers.js';
@@ -27,6 +28,8 @@ export async function getAccount(user: UserRow) {
     androidApkUrl: '/pakua/',
     /** Majibu ya ofisi (Msaada) ambayo mtumiaji bado hajasoma. */
     supportUnread: await unreadSupportCount(user.id),
+    /** Majibu ya ofisi kwa maoni ambayo mtumiaji bado hajaona (kitone kwenye kichupo cha Maoni). */
+    feedbackUnread: await unreadFeedbackCount(user.id),
     /** Masharti: amekubali toleo la sasa? (wa zamani wanaombwa kukubali kwenye app) */
     terms: await termsState(db, user.id),
   };

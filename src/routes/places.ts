@@ -14,6 +14,7 @@ import {
   updateLocation,
 } from '../services/places.js';
 import { routeFareCounts, routeFaresFrom, saveRouteFares } from '../services/route-fares.js';
+import { withPromotions } from '../services/promotions.js';
 import { ok } from '../utils/http.js';
 import {
   estimateSchema,
@@ -37,7 +38,7 @@ export async function placeRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post('/api/fares/estimate', { ...userOnly, config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (request) =>
-    ok(await estimateTrip(estimateSchema.parse(request.body))),
+    ok(await withPromotions(request.currentUser.id, await estimateTrip(estimateSchema.parse(request.body)))),
   );
 
   // ---- Ofisi ----

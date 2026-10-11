@@ -211,6 +211,54 @@ mabadiliko ya NAYA yanayopushiwa Railway yanaonekana kwenye app papo hapo — **
 - Bila keystore, APK ni ya "debug" (inafaa kwa kusambaza moja kwa moja). GitHub inahifadhi ufunguo wake ili update isakinike juu
   ya ya zamani; ikitokea simu ikakataa ("App not installed"), futa NAYA ya zamani kisha usakinishe mpya.
 
+## Maoni kwa wote (0.14.1)
+
+- **Kichupo cha "Maoni"** kwenye menyu ya chini (Nyumbani · Maoni · Akaunti) kwa abiria na madereva: nyota, mada, maoni, na orodha ya maoni uliyotuma pamoja na **jibu la ofisi**. Jibu jipya → kitone kwenye kichupo, kinaondoka ukishasoma.
+- **Baada ya safari:** chini ya nyota, "Una maoni kuhusu NAYA?" → maoni yanaambatana na safari hiyo.
+- **Safari ikikwama** (hakuna dereva / imeghairiwa na dereva au ofisi): kitufe **"Tuambie kilichotokea"** chenye mifano ya haraka; ukishatuma, skrini ya safari hiyo inafungwa.
+- Ofisi → Maoni inaonyesha safari iliyoambatanishwa ("Safari ilikwama" / "Baada ya safari") na link ya safari.
+- Dereva akiwa kwenye Maoni au Akaunti ombi jipya likiingia, app inamrudisha Nyumbani asilikose.
+- Migration `020_maoni_wazi.sql`: `feedback.ride_id`, `source`, `reply_seen_at` na mada mpya "Safari hii" — hakuna data inayofutwa.
+
+## Ofa za wateja na malipo ya NAYA kwa madereva (0.14.0)
+
+Ofisi → **Ofa**:
+- **Kuunda ofa:** wateja wote au wateja wapya (hawajawahi kusafiri), asilimia ya punguzo, punguzo la juu kwa safari, nauli ya chini/juu, vyombo, safari kwa kila mteja, safari kwa kila dereva (kwa siku / wiki / kipindi chote), bajeti ya NAYA, tarehe ya kuanza na kuisha, kipaumbele. Fomu inaonyesha mfano wa bei (safari ya 2,000 / 3,000 / 5,000) unapoandika.
+- **Kuwasha / kusimamisha / kumaliza** ofa. Ofa mpya inaanza ikiwa imesimamishwa.
+- **Takwimu kwa kila ofa:** safari, wateja, madereva, gharama ya NAYA, walicholipa wateja, bajeti iliyobaki, na orodha ya safari zake.
+- Ofa mbili za sasa zimeandaliwa (zimesimamishwa — bonyeza **Washa ofa**):
+  1. *Nusu bei kwa wateja wote* — 50%, kila dereva safari 3 za ofa kwa wiki.
+  2. *Mteja mpya: safari 2 nusu bei* — 50%, punguzo hadi TSh 1,500, safari 2 kwa mteja.
+
+Kanuni:
+- Safari moja = ofa moja tu, yenye punguzo kubwa zaidi kwa mteja (zikilingana, kipaumbele kikubwa zaidi). Punguzo linahesabiwa na server, linazungushwa chini kwa TSh 50.
+- Mteja analipa dereva (nauli − punguzo) taslimu; NAYA inamdai dereva punguzo safari ikikamilika.
+- Kikomo cha dereva: ombi la safari ya ofa linaenda kwa madereva walio na nafasi tu. Kama hakuna dereva mwenye nafasi karibu, safari inaendelea kwa nauli kamili na mteja anaambiwa wazi (anaweza kughairi bure).
+- Safari iliyoghairiwa au iliyokosa dereva inarudisha nafasi ya mteja na bajeti.
+- Mtumiaji aliye dereva (au anayeomba kuwa dereva) hapati ofa.
+
+Malipo kwa madereva (Ofisi → Ofa → **Malipo kwa madereva**):
+- Dereva anaweka namba zake za kupokea pesa kwenye app (Akaunti → **Malipo ya ofa**): M-Pesa, Mixx by Yas (Tigo Pesa), Airtel Money, HaloPesa, T-Pesa au benki; hadi namba 3, moja kuu.
+- Ofisi inaona kila dereva: safari za ofa, NAYA inadaiwa kiasi gani, kimelipwa kiasi gani, salio, na **namba ya kutuma pesa**. Pakua Excel (CSV).
+- Ofisi inatuma pesa kwanza, kisha **inaandika malipo** pamoja na namba ya muamala (kiasi hakizidi deni; muamala mmoja hautumiki mara mbili). Dereva anapata arifa + SMS. Malipo yaliyokosewa yanafutwa kwa sababu.
+- Migration `019_ofa.sql`: tables `promotions`, `driver_payout_accounts`, `promo_payouts` na columns za ofa kwenye `rides` — hakuna data inayofutwa.
+
+## Ripoti kamili za ofisi (0.13.4)
+
+Ofisi → **Ripoti** ina vichupo 6. Kila kimoja kina namba za muhtasari, vichujio, kutafuta, orodha nzima (safu 100 kwa mara, "Onyesha zaidi") na **Pakua Excel (CSV)** ya orodha nzima:
+
+| Kichupo | Inaonyesha |
+|---|---|
+| Muhtasari | Chati za zamani: safari kila siku, mapato, saa, maeneo, madereva bora |
+| Madereva | Madereva tu (chaguo-msingi: waliothibitishwa): chombo, plate, ada, online, safari, nyota, maombi aliyopewa/alikubali/alikataa/hakujibu, APK au link |
+| Wateja | Waliojisajili kama wateja tu (bila usajili wa dereva): maombi, yaliyofanikiwa, aliyoghairi, alicholipa, ombi la mwisho |
+| APK na link | Wateja na madereva wanaotumia APK dhidi ya link, upakuaji wa APK kila siku, na orodha ya kila kundi |
+| Maombi ya safari | Kila ombi: lilifanikiwa au la, nani alilipokea, na **kila dereva aliyepewa** alifanya nini (alikubali / alikataa / hakujibu / mwingine amewahi); pamoja na jedwali la kila dereva |
+| Online sasa | Madereva walio online: tayari kupokea ombi / ana ombi / safarini / hajaonekana / ada imeisha. Inasasishwa kila sekunde 15 |
+
+- API: `GET /api/admin/ripoti/{madereva|wateja|app|maombi|online}` na `.csv` (ofisi tu).
+- **APK au link:** app inatuma kichwa `x-naya-client: apk|web`. Migration `018_ripoti.sql` inaongeza `users.app_client`, `app_seen_at`, `apk_since` (columns mpya tu). Waliokwisha sajili simu ya APK (Firebase) wanahesabiwa APK mara moja; wengine wanaonekana "Haijulikani" mpaka wafungue NAYA tena.
+
 ## Kumpata dereva haraka: mawimbi (0.13.3)
 
 - **Wimbi la 1:** ombi linaenda kwa dereva aliye karibu zaidi peke yake kwa sekunde 20 (`FIRST_OFFER_SECONDS`).

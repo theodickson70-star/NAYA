@@ -62,7 +62,7 @@ async function drawList() {
         : rides
             .map(
               (r) => `<a class="ride-row" href="#/safari/${esc(r.id)}">
-                <span class="col-time"><strong>${esc(formatDate(r.requestedAt, true))}</strong><br><span class="driver-sub">${esc(VEHICLE_TYPES[r.vehicleType])} · ${formatTsh(r.fare)}</span></span>
+                <span class="col-time"><strong>${esc(formatDate(r.requestedAt, true))}</strong><br><span class="driver-sub">${esc(VEHICLE_TYPES[r.vehicleType])} · ${formatTsh(r.fare)}${r.promo ? ' · ofa' : ''}</span></span>
                 <span class="ride-route"><strong>${esc(r.pickupName)} → ${esc(r.destinationName)}</strong><span class="driver-sub">km ${r.distanceKm}</span></span>
                 <span class="col-people driver-sub">Abiria: ${esc(r.passengerName)}<br>Dereva: ${r.driverName ? `${esc(r.driverName)} (${esc(r.plateNumber ?? '')})` : '—'}</span>
                 <span>${badge(r.status)}</span>
@@ -92,7 +92,7 @@ function render(r) {
     <div class="detail-head">
       <div>
         <h1>${esc(r.pickup.name)} → ${esc(r.destination.name)}</h1>
-        <p class="muted">${esc(VEHICLE_TYPES[r.vehicleType])} · km ${r.distanceKm} · ${formatTsh(r.fare)} taslimu · Imeagizwa ${esc(formatDate(r.requestedAt, true))}</p>
+        <p class="muted">${esc(VEHICLE_TYPES[r.vehicleType])} · km ${r.distanceKm} · ${r.promo ? `${formatTsh(r.fare)} — abiria ${formatTsh(r.passengerPays)} taslimu + ofa ya NAYA ${formatTsh(r.promo.discount)} (${esc(r.promo.title ?? '')})` : `${formatTsh(r.fare)} taslimu`} · Imeagizwa ${esc(formatDate(r.requestedAt, true))}</p>
       </div>
       ${badge(r.status)}
     </div>
