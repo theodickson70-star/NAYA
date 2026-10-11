@@ -22,8 +22,17 @@ import { assertSubscriptionOk, describeSubscription, getSettings, SUBSCRIPTION_O
 export type RideStatus = 'SEARCHING' | 'ACCEPTED' | 'ARRIVED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'NO_DRIVER';
 type VehicleType = 'BODABODA' | 'BAJAJI';
 
-export const OFFER_SECONDS = 60; // dakika 1: muda wa dereva kukubali ombi (akikataa, linaenda kwa anayefuata papo hapo)
-export const SEARCH_TIMEOUT_SECONDS = 600; // dakika 10 bila dereva → NO_DRIVER (madereva ~10 wanaweza kujaribiwa, dakika 1 kila mmoja)
+/**
+ * Kumpata dereva kwa MAWIMBI (kama Bolt/Uber):
+ *   Wimbi la 1: dereva aliye karibu zaidi peke yake, sekunde FIRST_OFFER_SECONDS.
+ *   Asipokubali (amekataa / muda umeisha): madereva WAVE_SIZE wanaofuata kwa PAMOJA, sekunde OFFER_SECONDS —
+ *   anayebonyeza "Kubali" kwanza ndiye anapata safari; wengine ombi linaondoka ("dereva mwingine amewahi").
+ *   Bado hakuna? Wimbi jingine la madereva WAVE_SIZE wanaofuata, mpaka SEARCH_TIMEOUT_SECONDS.
+ */
+export const FIRST_OFFER_SECONDS = 20;
+export const OFFER_SECONDS = 30; // kila wimbi baada ya la kwanza (na ombi la ofisi kwa dereva maalum)
+export const WAVE_SIZE = 3;
+export const SEARCH_TIMEOUT_SECONDS = 600; // dakika 10 bila dereva → NO_DRIVER
 export const NEARBY_LIMIT = 3; // "NAYA karibu nawe": madereva wangapi wa kila chombo abiria anawaona
 export const MAX_PICKUP_KM = 10; // dereva awe ndani ya umbali huu kutoka kwa abiria
 export const DRIVER_STALE_SECONDS = 120; // dereva wa browser asiyeonekana kwa muda huu hapewi maombi
@@ -142,9 +151,9 @@ async function offlineDriversWhoMissOffers(driverIds: string[]) {
   if (off.length) await notifyAdmins();
 }
 
-/** Kwa safari moja: kama hakuna ombi linalosubiri, mpe dereva aliye karibu zaidi; muda ukiisha → NO_DRIVER. */
+/** Kwa safari moja: wimbi linalofuata la maombi (kama hakuna ombi linalosubiri); muda wa kutafuta ukiisha → NO_DRIVER. */
 export async function dispatchRide(rideId: string): Promise<void> {
-  type Outcome = { offeredTo?: string; noDriver?: boolean; passengerId?: string; ride?: RideRow };
+  type Outcome = { offeredTo?: string[]; seconds?: number; noDriver?: boolean; passengerId?: string; ride?: RideRow };
   const outcome: Outcome = await transaction(async (client): Promise<Outcome> => {
     const ride = await one<RideRow & { search_age_s: number }>(
       client,
@@ -157,8 +166,13 @@ export async function dispatchRide(rideId: string): Promise<void> {
       `UPDATE naya.ride_offers SET status = 'EXPIRED', responded_at = now() WHERE ride_id = $1 AND status = 'PENDING' AND expires_at <= now()`,
       [rideId],
     );
-    const waiting = await one(client, `SELECT 1 FROM naya.ride_offers WHERE ride_id = $1 AND status = 'PENDING'`, [rideId]);
+    // Wimbi bado linaendelea (angalau dereva mmoja bado anaweza kukubali) → subiri.
+    const waiting = await one(client, `SELECT 1 FROM naya.ride_offers WHERE ride_id = $1 AND status = 'PENDING' LIMIT 1`, [rideId]);
     if (waiting) return {};
+    const tried = await one<{ n: number }>(client, `SELECT count(*)::int AS n FROM naya.ride_offers WHERE ride_id = $1`, [rideId]);
+    const firstWave = (tried?.n ?? 0) === 0;
+    const waveSize = firstWave ? 1 : WAVE_SIZE;
+    const seconds = firstWave ? FIRST_OFFER_SECONDS : OFFER_SECONDS;
 
     const { graceDays } = await getSettings(client);
     const candidates = await many<{ user_id: string; km: number }>(
@@ -174,21 +188,23 @@ export async function dispatchRide(rideId: string): Promise<void> {
           AND NOT EXISTS (SELECT 1 FROM naya.ride_offers o WHERE o.driver_id = d.user_id AND o.status = 'PENDING')
           AND NOT EXISTS (SELECT 1 FROM naya.ride_offers o WHERE o.ride_id = $1 AND o.driver_id = d.user_id)
         ORDER BY km ASC
-        LIMIT 5`,
-      [rideId, ride.pickup_lat, ride.pickup_lng, ride.vehicle_type, DRIVER_STALE_SECONDS, ride.passenger_id, graceDays],
+        LIMIT $8`,
+      [rideId, ride.pickup_lat, ride.pickup_lng, ride.vehicle_type, DRIVER_STALE_SECONDS, ride.passenger_id, graceDays, waveSize + 5],
     );
+    const offeredTo: string[] = [];
     for (const candidate of candidates) {
-      if (candidate.km > MAX_PICKUP_KM) break;
+      if (candidate.km > MAX_PICKUP_KM || offeredTo.length >= waveSize) break;
       // ON CONFLICT: dereva huyu amepewa ombi jingine sekunde hii hii → jaribu anayefuata.
       const offered = await one(
         client,
         `INSERT INTO naya.ride_offers (ride_id, driver_id, distance_km, expires_at)
          VALUES ($1, $2, $3, now() + make_interval(secs => $4::float8))
          ON CONFLICT DO NOTHING RETURNING id`,
-        [rideId, candidate.user_id, round1(candidate.km), OFFER_SECONDS],
+        [rideId, candidate.user_id, round1(candidate.km), seconds],
       );
-      if (offered) return { offeredTo: candidate.user_id, ride };
+      if (offered) offeredTo.push(candidate.user_id);
     }
+    if (offeredTo.length) return { offeredTo, seconds, ride };
 
     if (ride.search_age_s > SEARCH_TIMEOUT_SECONDS) {
       await client.query(`UPDATE naya.rides SET status = 'NO_DRIVER', updated_at = now() WHERE id = $1`, [rideId]);
@@ -198,18 +214,22 @@ export async function dispatchRide(rideId: string): Promise<void> {
     return {};
   });
 
-  if (outcome.offeredTo && outcome.ride) {
+  if (outcome.offeredTo?.length && outcome.ride) {
     const r = outcome.ride;
-    await notify({
-      userId: outcome.offeredTo,
-      event: 'offer',
-      rideId,
-      kind: 'offer',
-      title: 'Ombi jipya la safari',
-      body: `${tsh(r.fare)} · ${r.pickup_name} → ${r.dest_name}`,
-      urgent: true,
-      ttlSeconds: OFFER_SECONDS,
-    });
+    await Promise.all(
+      outcome.offeredTo.map((userId) =>
+        notify({
+          userId,
+          event: 'offer',
+          rideId,
+          kind: 'offer',
+          title: 'Ombi jipya la safari',
+          body: `${tsh(r.fare)} · ${r.pickup_name} → ${r.dest_name}`,
+          urgent: true,
+          ttlSeconds: outcome.seconds ?? OFFER_SECONDS,
+        }),
+      ),
+    );
     await notifyAdmins(rideId);
   }
   if (outcome.noDriver && outcome.passengerId) {
@@ -445,7 +465,7 @@ export async function cancelByPassenger(passengerId: string, rideId: string, rea
     );
     const offers = await many<{ driver_id: string }>(
       client,
-      `UPDATE naya.ride_offers SET status = 'EXPIRED', responded_at = now() WHERE ride_id = $1 AND status = 'PENDING' RETURNING driver_id`,
+      `UPDATE naya.ride_offers SET status = 'CANCELLED', responded_at = now() WHERE ride_id = $1 AND status = 'PENDING' RETURNING driver_id`,
       [rideId],
     );
     await history(client, rideId, ride.status, 'CANCELLED', passengerId, reason ?? 'Abiria ameghairi');
@@ -621,9 +641,11 @@ export async function driverState(driverId: string) {
     ride_id: string;
     distance_km: number;
     seconds_left: number;
+    total_seconds: number;
   }>(
     db,
-    `SELECT id, ride_id, distance_km, greatest(0, extract(epoch FROM expires_at - now()))::float8 AS seconds_left
+    `SELECT id, ride_id, distance_km, greatest(0, extract(epoch FROM expires_at - now()))::float8 AS seconds_left,
+            round(extract(epoch FROM expires_at - offered_at))::int AS total_seconds
        FROM naya.ride_offers WHERE driver_id = $1 AND status = 'PENDING'`,
     [driverId],
   );
@@ -633,7 +655,7 @@ export async function driverState(driverId: string) {
     offer = {
       id: offerRow.id,
       secondsLeft: Math.floor(offerRow.seconds_left),
-      totalSeconds: OFFER_SECONDS,
+      totalSeconds: offerRow.total_seconds || OFFER_SECONDS,
       distanceToPickupKm: offerRow.distance_km,
       ride: { ...baseView(ride) },
     };
@@ -664,9 +686,20 @@ export async function driverState(driverId: string) {
     const nearest = await nearestServicePoint({ lat: Number(d.last_lat), lng: Number(d.last_lng) });
     if (nearest && nearest.km > SERVICE_RADIUS_KM) serviceArea = { far: true, km: Math.round(nearest.km), nearest: nearest.name, pickupKm: MAX_PICKUP_KM };
   }
+  // Ombi la mwisho lililoondoka bila dereva kujibu (ili app imwambie kwa nini): mwingine amewahi / limeghairiwa.
+  const lastOffer = offer
+    ? null
+    : await one<{ id: string; status: string }>(
+        db,
+        `SELECT id, status FROM naya.ride_offers
+          WHERE driver_id = $1 AND status IN ('TAKEN', 'CANCELLED') AND responded_at > now() - interval '2 minutes'
+          ORDER BY responded_at DESC LIMIT 1`,
+        [driverId],
+      );
   return {
     driverStatus: d.status,
     online: d.is_online,
+    lastOffer,
     serviceArea,
     subscription: { ...describeSubscription(d.paid_until, settings), paymentInstructions: settings.paymentInstructions },
     offer,
@@ -680,6 +713,8 @@ export async function driverState(driverId: string) {
 
 export async function acceptOffer(driverId: string, offerId: string) {
   let lostRide: string | null = null;
+  let takenFrom: string[] = [];
+  let takenRide = '';
   try {
     await transaction(async (client) => {
       await approvedDriver(client, driverId);
@@ -689,6 +724,8 @@ export async function acceptOffer(driverId: string, offerId: string) {
         [offerId, driverId],
       );
       if (!offer) throw notFound('Ombi halikupatikana.');
+      if (offer.status === 'TAKEN') throw conflict('Dereva mwingine amewahi kukubali safari hii.');
+      if (offer.status === 'CANCELLED') throw conflict('Safari hii imeghairiwa.');
       if (offer.status !== 'PENDING' || offer.expired) {
         if (offer.status === 'PENDING') {
           await client.query(`UPDATE naya.ride_offers SET status = 'EXPIRED', responded_at = now() WHERE id = $1`, [offerId]);
@@ -706,6 +743,14 @@ export async function acceptOffer(driverId: string, offerId: string) {
         [ride.id, driverId],
       );
       await client.query(`UPDATE naya.ride_offers SET status = 'ACCEPTED', responded_at = now() WHERE id = $1`, [offerId]);
+      // Wengine wa wimbi hili: dereva huyu amewahi.
+      const others = await many<{ driver_id: string }>(
+        client,
+        `UPDATE naya.ride_offers SET status = 'TAKEN', responded_at = now() WHERE ride_id = $1 AND status = 'PENDING' RETURNING driver_id`,
+        [ride.id],
+      );
+      takenFrom = others.map((o) => o.driver_id);
+      takenRide = ride.id;
       await history(client, ride.id, 'SEARCHING', 'ACCEPTED', driverId);
     });
   } catch (error) {
@@ -713,6 +758,8 @@ export async function acceptOffer(driverId: string, offerId: string) {
     if (isUniqueViolation(error)) throw conflict('Una safari nyingine inayoendelea.');
     throw error;
   }
+  // Simu za wengine wa wimbi zinyamaze, na skrini zao ziondoe ombi.
+  for (const d of takenFrom) await notify({ userId: d, event: 'offer', rideId: takenRide });
   const state = await driverState(driverId);
   if (state.ride) {
     const card = await driverCard(db, driverId);
@@ -956,7 +1003,7 @@ export async function cancelByAdmin(adminId: string, rideId: string, reason: str
     );
     const offers = await many<{ driver_id: string }>(
       client,
-      `UPDATE naya.ride_offers SET status = 'EXPIRED', responded_at = now() WHERE ride_id = $1 AND status = 'PENDING' RETURNING driver_id`,
+      `UPDATE naya.ride_offers SET status = 'CANCELLED', responded_at = now() WHERE ride_id = $1 AND status = 'PENDING' RETURNING driver_id`,
       [rideId],
     );
     await history(client, rideId, ride.status, 'CANCELLED', adminId, reason);
@@ -1064,7 +1111,7 @@ export async function offerRideToDriver(adminId: string, rideId: string, driverI
     // Ombi lililokuwa likimsubiri dereva mwingine linaondolewa; ombi la dereva huyu ndilo pekee.
     const others = await many<{ driver_id: string }>(
       client,
-      `UPDATE naya.ride_offers SET status = 'EXPIRED', responded_at = now() WHERE ride_id = $1 AND status = 'PENDING' RETURNING driver_id`,
+      `UPDATE naya.ride_offers SET status = 'CANCELLED', responded_at = now() WHERE ride_id = $1 AND status = 'PENDING' RETURNING driver_id`,
       [rideId],
     );
     // Dereva aliyewahi kukataa safari hii anaweza kupewa tena na ofisi.

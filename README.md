@@ -211,6 +211,13 @@ mabadiliko ya NAYA yanayopushiwa Railway yanaonekana kwenye app papo hapo — **
 - Bila keystore, APK ni ya "debug" (inafaa kwa kusambaza moja kwa moja). GitHub inahifadhi ufunguo wake ili update isakinike juu
   ya ya zamani; ikitokea simu ikakataa ("App not installed"), futa NAYA ya zamani kisha usakinishe mpya.
 
+## Kumpata dereva haraka: mawimbi (0.13.3)
+
+- **Wimbi la 1:** ombi linaenda kwa dereva aliye karibu zaidi peke yake kwa sekunde 20 (`FIRST_OFFER_SECONDS`).
+- **Wimbi la 2 na kuendelea:** akikataa au asipojibu, madereva 3 wanaofuata (`WAVE_SIZE`) wanapata ombi **kwa pamoja** kwa sekunde 30 (`OFFER_SECONDS`). Anayebonyeza "Kubali" kwanza anapata safari; wengine ombi linaondoka na wanaambiwa "Dereva mwingine amewahi kukubali ombi hili".
+- Bado hakuna? Wimbi jingine la madereva 3 wanaofuata, mpaka dakika 10 (`SEARCH_TIMEOUT_SECONDS`).
+- Migration `017_mawimbi.sql`: hali mpya za ombi `TAKEN` (mwingine amewahi) na `CANCELLED` (abiria/ofisi imeghairi). Hazihesabiwi kama "hakujibu", kwa hiyo dereva hawekwi offline kwa sababu yake. Hakuna data inayofutwa.
+
 ## Maombi skrini ikiwa imezimwa (0.13.2)
 
 - APK mpya ina huduma ya chinichini (`NayaDriverService`): dereva akiwa online inatuma mahali kila sekunde 30 hata skrini ikiwa imezimwa, na inaonyesha arifa ya kudumu "NAYA: Uko online". Inasimama dereva akienda offline, akihamia upande wa abiria au akitoka.

@@ -710,7 +710,13 @@
   "Faili lililopakuliwa si la NAYA": "The downloaded file is not NAYA",
   "Tayari una toleo jipya zaidi": "You already have the newest version",
   "Hakuna nafasi kwenye simu": "Not enough space on the phone",
-  "Lina maboresho mapya. Sasisha ukiwa huna safari inayoendelea.": "It has new improvements. Update when you have no ride in progress."
+  "Lina maboresho mapya. Sasisha ukiwa huna safari inayoendelea.": "It has new improvements. Update when you have no ride in progress.",
+  "Dereva mwingine amewahi kukubali ombi hili": "Another driver accepted this request first",
+  "Abiria ameghairi ombi": "The passenger cancelled the request",
+  "Dereva mwingine amewahi kukubali safari hii.": "Another driver accepted this ride first.",
+  "Safari hii imeghairiwa.": "This ride has been cancelled.",
+  "Mwingine amewahi": "Taken by another",
+  "Limeghairiwa": "Cancelled"
  },
  "patterns": [
   [
