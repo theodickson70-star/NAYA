@@ -8,6 +8,7 @@ import * as feedbackAdmin from './feedback-admin.js';
 import * as liveAdmin from './live-admin.js';
 import * as places from './places.js';
 import * as reportsAdmin from './reports-admin.js';
+import * as ofaAdmin from './ofa-admin.js';
 import * as supportAdmin from './support-admin.js';
 import * as usersAdmin from './users-admin.js';
 import * as ridesAdmin from './rides-admin.js';
@@ -29,7 +30,7 @@ const $ = (id) => document.getElementById(id);
 const views = ['view-loading', 'view-login', 'view-offline', 'view-app'];
 const pages = [
   'page-overview', 'page-drivers', 'page-driver', 'page-locations', 'page-fares', 'page-rides', 'page-ride', 'page-subscriptions', 'page-sos',
-  'page-live', 'page-users', 'page-user', 'page-support', 'page-ticket', 'page-reports', 'page-broadcast', 'page-feedback',
+  'page-live', 'page-users', 'page-user', 'page-support', 'page-ticket', 'page-reports', 'page-broadcast', 'page-feedback', 'page-offers',
 ];
 let me = null;
 
@@ -150,17 +151,19 @@ function route() {
   else if (parts[0] === 'msaada' && parts[1]) page = 'page-ticket';
   else if (parts[0] === 'msaada') page = 'page-support';
   else if (parts[0] === 'ripoti') page = 'page-reports';
+  else if (parts[0] === 'ofa') page = 'page-offers';
   else if (parts[0] === 'matangazo') page = 'page-broadcast';
   else if (parts[0] === 'maoni') page = 'page-feedback';
   closeMenu();
   ridesAdmin.stop();
   liveAdmin.stop();
+  reportsAdmin.stop();
   driverOnPage = null;
   for (const p of pages) $(p).hidden = p !== page;
   const navFor = {
     'page-overview': 'overview', 'page-drivers': 'drivers', 'page-driver': 'drivers', 'page-locations': 'locations', 'page-fares': 'fares',
     'page-rides': 'rides', 'page-ride': 'rides', 'page-subscriptions': 'subscriptions', 'page-sos': 'sos', 'page-live': 'live',
-    'page-users': 'users', 'page-user': 'users', 'page-support': 'support', 'page-ticket': 'support', 'page-reports': 'reports', 'page-broadcast': 'broadcast', 'page-feedback': 'feedback',
+    'page-users': 'users', 'page-user': 'users', 'page-support': 'support', 'page-ticket': 'support', 'page-reports': 'reports', 'page-broadcast': 'broadcast', 'page-feedback': 'feedback', 'page-offers': 'offers',
   };
   for (const a of document.querySelectorAll('[data-nav]')) {
     const active = a.dataset.nav === navFor[page];
@@ -182,7 +185,8 @@ function route() {
   if (page === 'page-user') usersAdmin.loadUser(parts[1]);
   if (page === 'page-support') supportAdmin.loadList(params);
   if (page === 'page-ticket') supportAdmin.loadTicket(parts[1]);
-  if (page === 'page-reports') reportsAdmin.load();
+  if (page === 'page-reports') reportsAdmin.open(parts[1] ?? '', params);
+  if (page === 'page-offers') ofaAdmin.open(parts);
   if (page === 'page-broadcast') broadcastAdmin.load();
   if (page === 'page-feedback') feedbackAdmin.load();
 }
@@ -782,6 +786,7 @@ usersAdmin.setup({ api, onAuthError: handleAuthError });
 supportAdmin.setup({ api, onAuthError: handleAuthError });
 liveAdmin.setup({ api, onAuthError: handleAuthError });
 reportsAdmin.setup({ api, onAuthError: handleAuthError });
+ofaAdmin.setup({ api, onAuthError: handleAuthError });
 broadcastAdmin.setup({ api, onAuthError: handleAuthError });
 feedbackAdmin.setup({ api, onAuthError: handleAuthError });
 start();

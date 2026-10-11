@@ -71,6 +71,7 @@ export const FEEDBACK_TOPICS = {
   DRIVERS: 'Madereva / abiria',
   SAFETY: 'Usalama',
   IDEA: 'Wazo jipya',
+  RIDE: 'Safari hii',
 };
 
 export const FEEDBACK_STATUS = {
@@ -113,4 +114,28 @@ export const LOCATION_CATEGORIES = {
 /** 1700 → "TSh 1,700" */
 export function formatTsh(amount) {
   return `TSh ${Math.round(Number(amount) || 0).toLocaleString('en-US')}`;
+}
+
+/** Alama za safari za kutiliwa shaka (GPS) — ofisi inaziona kwenye safari, ripoti na malipo ya ofa. */
+export const RIDE_FLAGS = {
+  START_FAR: { label: 'Ilianza mbali na abiria', hint: 'Dereva alianza safari akiwa zaidi ya mita 500 kutoka mahali pa kumchukua abiria.' },
+  ENDED_FAR: { label: 'Iliishia mbali na unakoenda', hint: 'Safari ilimalizwa zaidi ya mita 500 kutoka unakoenda.' },
+  TOO_SHORT: { label: 'Fupi kupita kiasi', hint: 'Safari ilimalizwa chini ya dakika 1 baada ya kuanza, ingawa njia ni ndefu.' },
+  AUTO_TIMEOUT: { label: 'Ilijifunga baada ya saa 3', hint: 'Hakuna aliyemaliza safari; NAYA iliifunga yenyewe baada ya saa 3.' },
+};
+
+/** Nani alimaliza safari. */
+export const COMPLETED_BY = {
+  DRIVER: 'Dereva',
+  PASSENGER: 'Abiria (Nimefika)',
+  AUTO: 'NAYA yenyewe (GPS)',
+  ADMIN: 'Ofisi',
+};
+
+/** Vibandiko vya alama: <span class="badge badge-warn" title="…">…</span> */
+export function flagBadges(flags, esc) {
+  return (flags ?? [])
+    .filter((f) => RIDE_FLAGS[f])
+    .map((f) => `<span class="badge badge-warn" title="${esc(RIDE_FLAGS[f].hint)}">${esc(RIDE_FLAGS[f].label)}</span>`)
+    .join(' ');
 }

@@ -5,18 +5,34 @@ import { badRequest, conflict, notFound } from '../utils/http.js';
 import { writeAudit } from './audit.js';
 import { notify, notifyAdmins } from './notify.js';
 
-export const FEEDBACK_TOPICS = ['GENERAL', 'APP', 'PRICES', 'DRIVERS', 'SAFETY', 'IDEA'] as const;
+export const FEEDBACK_TOPICS = ['GENERAL', 'APP', 'PRICES', 'DRIVERS', 'SAFETY', 'IDEA', 'RIDE'] as const;
+export const FEEDBACK_SOURCES = ['MENU', 'AFTER_RIDE', 'PROBLEM', 'ACCOUNT'] as const;
+export type FeedbackSource = (typeof FEEDBACK_SOURCES)[number];
 export type FeedbackTopic = (typeof FEEDBACK_TOPICS)[number];
 export type FeedbackStatus = 'NEW' | 'REVIEWED' | 'ACTED';
 
 /** Mtumiaji mmoja asitume maoni zaidi ya haya kwa siku (kuzuia kujaza). */
 const MAX_PER_DAY = 5;
 
-const COLUMNS = `f.id, f.role, f.rating, f.topic, f.body, f.status, f.office_note AS "officeNote", f.created_at AS "createdAt", f.handled_at AS "handledAt"`;
+const COLUMNS = `f.id, f.role, f.rating, f.topic, f.body, f.status, f.office_note AS "officeNote", f.created_at AS "createdAt", f.handled_at AS "handledAt",
+  f.source, f.ride_id AS "rideId",
+  (SELECT json_build_object('from', r.pickup_name, 'to', r.dest_name, 'status', r.status, 'at', r.requested_at) FROM naya.rides r WHERE r.id = f.ride_id) AS ride`;
+/** Jibu la ofisi ambalo mtoaji bado hajaliona. */
+const UNREAD_SQL = `f.office_note IS NOT NULL AND (f.reply_seen_at IS NULL OR f.reply_seen_at < f.handled_at)`;
 
-export async function giveFeedback(userId: string, input: { rating: number; topic: FeedbackTopic; body: string; role: 'PASSENGER' | 'DRIVER' }) {
+export async function giveFeedback(
+  userId: string,
+  input: { rating: number; topic: FeedbackTopic; body: string; role: 'PASSENGER' | 'DRIVER'; rideId?: string | null; source?: FeedbackSource },
+) {
   const body = input.body.trim();
   if (body.length < 3) throw badRequest('Andika maoni yako kwa maneno machache.');
+  // Safari iliyotajwa lazima iwe ya mtoaji (abiria au dereva wake)
+  let rideId: string | null = null;
+  if (input.rideId) {
+    const ride = await one<{ id: string }>(db, 'SELECT id FROM naya.rides WHERE id = $1 AND (passenger_id = $2 OR driver_id = $2)', [input.rideId, userId]);
+    if (!ride) throw notFound('Safari hii haikupatikana.');
+    rideId = ride.id;
+  }
   const today = await one<{ n: number }>(
     db,
     `SELECT count(*)::int AS n FROM naya.feedback WHERE user_id = $1 AND created_at > now() - interval '1 day'`,
@@ -25,16 +41,30 @@ export async function giveFeedback(userId: string, input: { rating: number; topi
   if ((today?.n ?? 0) >= MAX_PER_DAY) throw conflict('Asante! Umeshatuma maoni mengi leo — tutayasoma yote. Jaribu tena kesho.');
   const row = await one(
     db,
-    `INSERT INTO naya.feedback (user_id, role, rating, topic, body) VALUES ($1, $2, $3, $4, $5)
-     RETURNING id, role, rating, topic, body, status, office_note AS "officeNote", created_at AS "createdAt", handled_at AS "handledAt"`,
-    [userId, input.role, input.rating, input.topic, body.slice(0, 1000)],
+    `INSERT INTO naya.feedback (user_id, role, rating, topic, body, ride_id, source) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+    [userId, input.role, input.rating, input.topic, body.slice(0, 1000), rideId, input.source ?? 'MENU'],
   );
   await notifyAdmins();
-  return row;
+  return one(db, `SELECT ${COLUMNS} FROM naya.feedback f WHERE f.id = $1`, [(row as { id: string }).id]);
 }
 
 export function myFeedback(userId: string) {
-  return many(db, `SELECT ${COLUMNS} FROM naya.feedback f WHERE f.user_id = $1 ORDER BY f.created_at DESC LIMIT 20`, [userId]);
+  return many(
+    db,
+    `SELECT ${COLUMNS}, (${UNREAD_SQL}) AS unread FROM naya.feedback f WHERE f.user_id = $1 ORDER BY f.created_at DESC LIMIT 30`,
+    [userId],
+  );
+}
+
+/** Majibu ya ofisi kwa maoni ambayo mtoaji bado hajayaona. */
+export async function unreadFeedbackCount(userId: string) {
+  const row = await one<{ n: number }>(db, `SELECT count(*)::int AS n FROM naya.feedback f WHERE f.user_id = $1 AND ${UNREAD_SQL}`, [userId]);
+  return row?.n ?? 0;
+}
+
+/** Mtoaji amefungua kichupo cha Maoni: majibu yote yameonekana. */
+export async function markFeedbackSeen(userId: string) {
+  await db.query(`UPDATE naya.feedback f SET reply_seen_at = now() WHERE f.user_id = $1 AND ${UNREAD_SQL}`, [userId]);
 }
 
 // ------------------------------------------------------------------ Ofisi

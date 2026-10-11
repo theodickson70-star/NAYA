@@ -166,8 +166,9 @@ describe('NAYA Phase 5+6 — safari', () => {
     const s1 = await state('d1');
     assert.ok(s1.offer, 'd1 hakupata ombi');
     assert.equal(s1.offer.ride.id, rideId);
-    assert.ok(s1.offer.secondsLeft > 50 && s1.offer.secondsLeft <= 60, `secondsLeft ${s1.offer.secondsLeft}`);
-    assert.equal(s1.offer.totalSeconds, 60);
+    // Wimbi la kwanza: aliye karibu zaidi peke yake, sekunde 20
+    assert.ok(s1.offer.secondsLeft > 15 && s1.offer.secondsLeft <= 20, `secondsLeft ${s1.offer.secondsLeft}`);
+    assert.equal(s1.offer.totalSeconds, 20);
     assert.equal((await state('d2')).offer, null);
     assert.equal((await state('d3')).offer, null); // bajaji haipewi ombi la bodaboda
   });
@@ -222,10 +223,10 @@ describe('NAYA Phase 5+6 — safari', () => {
     assert.equal((await call('POST', `/api/driver/rides/${rideId}/complete`, {}, 'd1')).status, 409);
     assert.equal((await call('POST', `/api/driver/rides/${rideId}/arrive`, {}, 'd2')).status, 404);
     assert.equal((await call('POST', `/api/driver/rides/${rideId}/arrive`, {}, 'd1')).json.data.ride.status, 'ARRIVED');
-    const pin = (await call('GET', '/api/rides/current', undefined, 'p1')).json.data.pin;
-    assert.match(pin, /^\d{4}$/);
-    assert.equal((await call('POST', `/api/driver/rides/${rideId}/start`, {}, 'd1')).status, 400); // PIN inahitajika
-    assert.equal((await call('POST', `/api/driver/rides/${rideId}/start`, { pin }, 'd1')).json.data.ride.status, 'IN_PROGRESS');
+    // Safari ya kawaida (si ya ofa): hakuna PIN — kama Bolt, dereva anabonyeza tu "Anza safari"
+    assert.equal((await call('GET', '/api/rides/current', undefined, 'p1')).json.data.pin, null);
+    assert.equal((await state('d1')).ride.pinRequired, false);
+    assert.equal((await call('POST', `/api/driver/rides/${rideId}/start`, {}, 'd1')).json.data.ride.status, 'IN_PROGRESS');
     assert.equal((await call('POST', `/api/rides/${rideId}/cancel`, {}, 'p1')).status, 409); // imeshaanza
     assert.equal((await call('POST', `/api/rides/${rideId}/rate`, { rating: 5 }, 'p1')).status, 409); // bado haijaisha
     const done = await call('POST', `/api/driver/rides/${rideId}/complete`, {}, 'd1');

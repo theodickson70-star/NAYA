@@ -81,6 +81,7 @@
           <a href="#/wateja" data-nav="users"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M17 14.5a4.5 4.5 0 0 1 4.5 4.5"/></svg><span>Wateja</span></a>
           <a href="#/madereva" data-nav="drivers"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/><path d="M8.5 6h7"/></svg><span>Madereva</span><span id="nav-pending" class="nav-count" hidden></span></a>
         <p class="side-group">Biashara</p>
+          <a href="#/ofa" data-nav="offers"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 5 5 19"/><circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="17" r="2.5"/></svg><span>Ofa</span></a>
           <a href="#/ada" data-nav="subscriptions"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 9.5v5M18 9.5v5"/></svg><span>Ada ya mwezi</span></a>
           <a href="#/bei" data-nav="fares"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg><span>Bei</span></a>
           <a href="#/maeneo" data-nav="locations"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg><span>Maeneo</span></a>
@@ -420,10 +421,24 @@
       <div id="fb-list" class="fb-list" aria-live="polite"></div>
     </main>
 
+    <!-- Ofa za wateja na malipo kwa madereva (ofa-admin.js) -->
+    <main id="page-offers" class="page page-wide" hidden></main>
+
     <!-- Ripoti -->
     <main id="page-reports" class="page page-wide" hidden>
-      <div class="page-head">
-        <h1>Ripoti</h1>
+      <h1>Ripoti</h1>
+      <nav class="rp-tabs" id="rp-tabs" aria-label="Aina ya ripoti">
+        <a href="#/ripoti" data-rp="">Muhtasari</a>
+        <a href="#/ripoti/madereva" data-rp="madereva">Madereva</a>
+        <a href="#/ripoti/wateja" data-rp="wateja">Wateja</a>
+        <a href="#/ripoti/app" data-rp="app">APK na link</a>
+        <a href="#/ripoti/maombi" data-rp="maombi">Maombi ya safari</a>
+        <a href="#/ripoti/online" data-rp="online">Online sasa</a>
+      </nav>
+      <div id="rp-view" hidden></div>
+      <div id="rp-summary">
+      <div class="page-head rp-sub-head">
+        <p class="muted">Mwenendo wa safari, mapato na maeneo kwa kipindi ulichochagua.</p>
         <div class="filters" id="report-range" role="group" aria-label="Kipindi">
           <button type="button" class="chip" data-days="7" aria-pressed="false">Siku 7</button>
           <button type="button" class="chip" data-days="30" aria-pressed="true">Siku 30</button>
@@ -458,6 +473,7 @@
         <div><h2>Pakua safari (Excel / CSV)</h2><p class="muted small">Safari zote za kipindi ulichochagua, pamoja na abiria, dereva, nauli na hali.</p></div>
         <button class="btn btn-primary" type="button" id="report-csv">Pakua CSV</button>
       </section>
+      </div>
     </main>
 
     <!-- Matangazo -->

@@ -75,6 +75,12 @@ export async function load() {
                 ${tag(FEEDBACK_STATUS[f.status].tone, FEEDBACK_STATUS[f.status].label)}
               </header>
               <p class="fb-body">${esc(f.body)}</p>
+              ${
+                f.ride
+                  ? `<p class="fb-ride"><span class="badge badge-${f.source === 'PROBLEM' ? 'bad' : 'muted'}">${f.source === 'PROBLEM' ? 'Safari ilikwama' : 'Baada ya safari'}</span>
+                      <a href="#/safari/${esc(f.rideId)}">${esc(f.ride.from)} → ${esc(f.ride.to)}</a> <span class="muted small">${esc(formatDate(f.ride.at, true))}</span></p>`
+                  : ''
+              }
               <p class="muted small"><a href="#/wateja/${esc(f.userId)}">${esc(f.userName)}</a> · ${f.role === 'DRIVER' ? 'Dereva' : 'Mteja'} ·
                 <a href="tel:+${esc(f.userPhone)}">${esc(formatPhone(f.userPhone))}</a> · ${esc(formatDate(f.createdAt, true))}</p>
               ${

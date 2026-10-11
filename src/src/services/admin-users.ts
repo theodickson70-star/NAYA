@@ -162,7 +162,7 @@ export async function suspendUser(adminId: string, id: string, reason: string) {
     );
     await client.query('UPDATE naya.drivers SET is_online = false WHERE user_id = $1', [id]);
     await client.query(
-      `UPDATE naya.ride_offers SET status = 'EXPIRED', responded_at = now() WHERE driver_id = $1 AND status = 'PENDING'`,
+      `UPDATE naya.ride_offers SET status = 'CANCELLED', responded_at = now() WHERE driver_id = $1 AND status = 'PENDING'`,
       [id],
     );
     await client.query('DELETE FROM naya.fcm_tokens WHERE user_id = $1', [id]);
@@ -241,7 +241,7 @@ export async function messageUser(adminId: string, id: string, input: { body: st
 export async function forceDriverOffline(adminId: string, id: string) {
   const updated = await one(db, 'UPDATE naya.drivers SET is_online = false WHERE user_id = $1 AND is_online RETURNING user_id', [id]);
   if (!updated) throw conflict('Dereva huyu hayuko online.');
-  await db.query(`UPDATE naya.ride_offers SET status = 'EXPIRED', responded_at = now() WHERE driver_id = $1 AND status = 'PENDING'`, [id]);
+  await db.query(`UPDATE naya.ride_offers SET status = 'CANCELLED', responded_at = now() WHERE driver_id = $1 AND status = 'PENDING'`, [id]);
   await writeAudit(db, { actorId: adminId, action: 'driver.forced_offline', targetType: 'driver', targetId: id });
   await notify({ userId: id, event: 'driver', kind: 'forced_offline', title: 'Umetolewa online na ofisi', body: 'Ukiwa tayari kupokea safari, nenda online tena.' });
   await notifyAdmins();

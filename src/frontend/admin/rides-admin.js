@@ -1,6 +1,6 @@
 // Ofisi: safari zinazoendelea na zote, historia ya kila safari, na kughairi safari iliyokwama.
 import { escapeHtml as esc } from '/shared/api.js';
-import { formatDate, formatPhone, formatTsh, VEHICLE_TYPES } from '/shared/labels.js';
+import { COMPLETED_BY, flagBadges, formatDate, formatPhone, formatTsh, RIDE_FLAGS, VEHICLE_TYPES } from '/shared/labels.js';
 
 const $ = (id) => document.getElementById(id);
 let ctx = null; // { api, onAuthError }
@@ -62,7 +62,7 @@ async function drawList() {
         : rides
             .map(
               (r) => `<a class="ride-row" href="#/safari/${esc(r.id)}">
-                <span class="col-time"><strong>${esc(formatDate(r.requestedAt, true))}</strong><br><span class="driver-sub">${esc(VEHICLE_TYPES[r.vehicleType])} · ${formatTsh(r.fare)}</span></span>
+                <span class="col-time"><strong>${esc(formatDate(r.requestedAt, true))}</strong><br><span class="driver-sub">${esc(VEHICLE_TYPES[r.vehicleType])} · ${formatTsh(r.fare)}${r.promo ? ' · ofa' : ''}</span></span>
                 <span class="ride-route"><strong>${esc(r.pickupName)} → ${esc(r.destinationName)}</strong><span class="driver-sub">km ${r.distanceKm}</span></span>
                 <span class="col-people driver-sub">Abiria: ${esc(r.passengerName)}<br>Dereva: ${r.driverName ? `${esc(r.driverName)} (${esc(r.plateNumber ?? '')})` : '—'}</span>
                 <span>${badge(r.status)}</span>
@@ -92,7 +92,7 @@ function render(r) {
     <div class="detail-head">
       <div>
         <h1>${esc(r.pickup.name)} → ${esc(r.destination.name)}</h1>
-        <p class="muted">${esc(VEHICLE_TYPES[r.vehicleType])} · km ${r.distanceKm} · ${formatTsh(r.fare)} taslimu · Imeagizwa ${esc(formatDate(r.requestedAt, true))}</p>
+        <p class="muted">${esc(VEHICLE_TYPES[r.vehicleType])} · km ${r.distanceKm} · ${r.promo ? `${formatTsh(r.fare)} — abiria ${formatTsh(r.passengerPays)} taslimu + ofa ya NAYA ${formatTsh(r.promo.discount)} (${esc(r.promo.title ?? '')})` : `${formatTsh(r.fare)} taslimu`} · Imeagizwa ${esc(formatDate(r.requestedAt, true))}</p>
       </div>
       ${badge(r.status)}
     </div>
@@ -104,6 +104,19 @@ function render(r) {
         : r.pinAttempts > 0
           ? `<p class="muted small">PIN imekosewa mara ${r.pinAttempts}.</p>`
           : ''
+    }
+    ${
+      (r.flags ?? []).some((f) => RIDE_FLAGS[f])
+        ? `<div class="alert alert-warn"><strong>Ya kutiliwa shaka:</strong> ${flagBadges(r.flags, esc)}<ul class="flag-list">${r.flags
+            .filter((f) => RIDE_FLAGS[f])
+            .map((f) => `<li>${esc(RIDE_FLAGS[f].hint)}</li>`)
+            .join('')}</ul>Mpigie abiria kuthibitisha kama safari ilifanyika kweli${r.promo ? ' kabla ya kumlipa dereva ofa' : ''}.</div>`
+        : ''
+    }
+    ${
+      r.status === 'COMPLETED' && r.completedBy
+        ? `<p class="muted small">Ilimalizwa na: <strong>${esc(COMPLETED_BY[r.completedBy] ?? r.completedBy)}</strong>${r.autoArrived ? ' · "Nimefika" iliwekwa na GPS' : ''}${r.autoStarted ? ' · Safari ilianzishwa na GPS' : ''}${r.promo ? ' · Safari ya ofa (PIN)' : ''}</p>`
+        : ''
     }
     ${r.shared ? '<p class="muted small">Abiria ameshiriki safari hii na ndugu/rafiki.</p>' : ''}
     <div class="people">
@@ -145,7 +158,7 @@ function render(r) {
           : `<ul class="history">${r.offers
               .map(
                 (o) => `<li><span><strong>${esc(o.driverName)}</strong> · km ${o.distanceKm ?? '–'} kutoka kwa abiria</span><span class="muted">${
-                  { PENDING: 'Linasubiri', ACCEPTED: 'Amekubali', DECLINED: 'Amekataa', EXPIRED: 'Muda umeisha' }[o.status]
+                  { PENDING: 'Linasubiri', ACCEPTED: 'Amekubali', DECLINED: 'Amekataa', EXPIRED: 'Muda umeisha', TAKEN: 'Mwingine amewahi', CANCELLED: 'Limeghairiwa' }[o.status]
                 } · ${esc(formatDate(o.offeredAt, true))}</span></li>`,
               )
               .join('')}</ul>`
@@ -155,7 +168,7 @@ function render(r) {
       r.status === 'SEARCHING'
         ? `<section class="intervene" aria-labelledby="iv-title">
             <h2 id="iv-title">Mpe dereva maalum</h2>
-            <p class="muted">Safari hii bado inatafuta dereva. Chagua dereva aliye online — simu yake italia kama ombi la kawaida (dakika 1 kukubali).</p>
+            <p class="muted">Safari hii bado inatafuta dereva. Chagua dereva aliye online — simu yake italia kama ombi la kawaida (sekunde 30 kukubali).</p>
             <div id="cand-list" class="cand-list"><p class="muted">Inatafuta madereva…</p></div>
             <p class="alert alert-danger" id="cand-error" role="alert" hidden></p>
           </section>`

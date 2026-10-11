@@ -19,6 +19,8 @@ import { nearbyMap } from '/shared/map.js';
 import * as rides from './rides.js';
 import * as support from './support.js';
 import * as feedback from './feedback.js';
+import * as wallet from './wallet.js';
+import * as appUpdate from './update.js';
 import * as terms from './terms.js';
 import { initI18n, langSwitchHtml, onLangChange } from '/shared/i18n.js';
 import { finishSplash, previewSound, setSoundEnabled, soundEnabled, splashActive, splashReady } from './splash.js';
@@ -28,7 +30,7 @@ const api = createApi('naya_app_token');
 const $ = (id) => document.getElementById(id);
 const views = ['view-loading', 'view-intro', 'view-auth', 'view-verify', 'view-role', 'view-offline', 'view-app'];
 const MAX_BYTES = 3 * 1024 * 1024;
-const VERSION = '0.13.1';
+const VERSION = '0.14.2';
 
 let account = null; // { user, activeMode, driverStatus, canDrive }
 let driver = null; // wasifu wa udereva (mode ya Dereva)
@@ -41,6 +43,7 @@ const thumbs = new Map();
 const trip = { pickup: null, destination: null, estimate: null, estimateError: null, selected: null, gps: 'idle', loading: false };
 let places = null; // maeneo ya huduma (cache)
 let tripHistory = null; // safari za abiria zilizopita (cache)
+let passengerOffers = null; // ofa za mteja { at, list } (cache ya dakika 1)
 let realtime = null; // muunganisho wa taarifa za papo hapo
 
 // Akaunti ya zamani ya app ya dereva: mtu asilazimike kuingia upya.
@@ -403,7 +406,10 @@ $('role-form').addEventListener('submit', async (event) => {
 async function switchMode(mode, { goHome } = {}) {
   account = await api.put('/api/account/mode', { mode });
   rides.stopPolling();
-  if (mode === 'PASSENGER') rides.stopGps();
+  if (mode === 'PASSENGER') {
+    rides.stopGps();
+    rides.stopBackground();
+  }
   driver = null;
   editingVehicle = false;
   show('view-app');
@@ -431,12 +437,12 @@ function startRealtime() {
           account = await api.get('/api/account');
           setSupportDot();
           if (support.openTicketId()) support.renderTicket(support.openTicketId());
-          else if (tab === 'account' && location.hash === '#/akaunti') {
-            // Usifute maoni anayoandika sasa hivi — sasisha orodha tu.
-            if (feedback.isTyping()) {
-              feedback.loadCardList();
-              support.loadCardList();
-            } else renderAccount();
+          else if (tab === 'feedback') {
+            // Jibu la ofisi limefika ukiwa kwenye Maoni: sasisha orodha tu (usifute unachoandika).
+            feedback.loadList();
+          } else if (tab === 'account' && location.hash === '#/akaunti') {
+            if (wallet.isEditing()) support.loadCardList();
+            else renderAccount();
           }
         } catch (err) {
           handleError(err);
@@ -456,6 +462,19 @@ function startRealtime() {
         }
         return;
       }
+      // Dereva yuko kwenye Maoni / Akaunti na ombi jipya likaingia: mrudishe Nyumbani asilikose.
+      if (type === 'offer' && account.activeMode === 'DRIVER' && tab !== 'home') {
+        try {
+          const state = await api.get('/api/driver/state');
+          if (state.offer) {
+            if (feedback.isTyping()) toast('Ombi jipya la safari! Bonyeza Nyumbani.');
+            else location.hash = '#/';
+          }
+        } catch {
+          // itaonekana ukirudi Nyumbani
+        }
+        return;
+      }
       rides.onRealtime(type, data);
     },
   });
@@ -466,7 +485,7 @@ function route() {
   if (!account) return;
   rides.stopPolling();
   stopNearby();
-  tab = location.hash.startsWith('#/akaunti') ? 'account' : 'home';
+  tab = location.hash.startsWith('#/akaunti') ? 'account' : location.hash.startsWith('#/maoni') ? 'feedback' : 'home';
   const picker = location.hash.match(/^#\/chagua\/(kwenda|kutoka)/)?.[1] ?? null;
   for (const a of document.querySelectorAll('[data-tab]')) {
     if (a.dataset.tab === tab) a.setAttribute('aria-current', 'page');
@@ -491,6 +510,7 @@ function route() {
   const supportPath = location.hash.match(/^#\/akaunti\/msaada(?:\/([0-9a-f-]{36}))?/);
   if (supportPath) return supportPath[1] ? support.renderTicket(supportPath[1]) : support.renderNew();
   if (tab === 'account') return renderAccount();
+  if (tab === 'feedback') return feedback.renderPage(new URLSearchParams(location.hash.split('?')[1] ?? ''));
   if (driverMode) return loadDriver();
   if (picker) return renderPicker(picker === 'kwenda' ? 'destination' : 'pickup');
   renderPassengerHome();
@@ -550,6 +570,13 @@ async function renderPassengerHome() {
   } catch {
     tripHistory = null;
   }
+  if (!passengerOffers || Date.now() - passengerOffers.at > 60_000) {
+    try {
+      passengerOffers = { at: Date.now(), list: await api.get('/api/offers') };
+    } catch {
+      passengerOffers = { at: Date.now(), list: [] };
+    }
+  }
   let planner;
   try {
     const list = await loadPlaces();
@@ -569,6 +596,7 @@ async function renderPassengerHome() {
     <section class="card trip trip-card" aria-labelledby="where-title">
       ${planner}
     </section>
+    ${offerBanner()}
     <section class="card nearby-card" aria-labelledby="nearby-title">
       <div class="nearby-head"><h2 id="nearby-title">NAYA karibu nawe</h2><span class="nearby-live"><i></i>Live</span></div>
       <p class="nearby-summary" id="nearby-summary">Inatafuta bodaboda zilizo karibu…</p>
@@ -692,6 +720,29 @@ function tripPlanner() {
     ${estimateBlock()}`;
 }
 
+/** Bango la ofa kwa mteja (ofa yenye nguvu zaidi kwanza). */
+function offerBanner() {
+  const list = passengerOffers?.list ?? [];
+  if (!list.length) return '';
+  const o = list[0];
+  const left = o.ridesLeft !== null && o.ridesLeft !== undefined ? `<span class="offer-chip">Safari ${o.ridesLeft} zimebaki</span>` : '';
+  const until = o.endsAt ? `<span class="offer-chip">Hadi ${esc(new Date(o.endsAt).toLocaleDateString('sw-TZ', { day: 'numeric', month: 'short' }))}</span>` : '';
+  const more = list.length > 1 ? `<span class="offer-chip">Ofa ${list.length} zinakusubiri</span>` : '';
+  return `<section class="promo-banner" aria-labelledby="promo-title">
+      <span class="promo-pct" aria-hidden="true">−${o.discountPercent}%</span>
+      <div class="promo-text">
+        <h2 id="promo-title">${esc(o.title)}</h2>
+        ${o.description ? `<p>${esc(o.description)}</p>` : ''}
+        <div class="promo-chips">${left}${until}${more}</div>
+      </div>
+    </section>`;
+}
+
+const fareAmount = (o) =>
+  o.promo
+    ? `<span class="fare-amount fare-promo"><s>${formatTsh(o.fare)}</s>${formatTsh(o.promo.passengerPays)}</span>`
+    : `<span class="fare-amount">${formatTsh(o.fare)}</span>`;
+
 function estimateBlock() {
   if (!trip.pickup || !trip.destination) return '';
   if (trip.loading) return '<p class="muted">Inahesabu nauli…</p>';
@@ -710,7 +761,8 @@ function estimateBlock() {
             <span class="fare-body">
               <span class="fare-icon">${VEHICLE_ICON[o.vehicleType] ?? ''}</span>
               <span class="fare-main"><strong>${esc(VEHICLE_TYPES[o.vehicleType])}</strong><span class="muted">km ${o.distanceKm.toLocaleString('en-US')} · ${o.fixed ? 'bei ya njia hii' : 'makadirio'}</span></span>
-              <span class="fare-amount">${formatTsh(o.fare)}</span>
+              ${fareAmount(o)}
+              ${o.promo ? `<span class="fare-promo-tag">Ofa · NAYA inalipa ${formatTsh(o.promo.discount)}</span>` : ''}
             </span>
           </label>`,
         )
@@ -718,7 +770,11 @@ function estimateBlock() {
     </fieldset>
     <p class="alert alert-danger" id="book-error" role="alert" hidden></p>
     <button class="btn btn-primary btn-block" type="button" data-action="book">Agiza safari</button>
-    <p class="muted small" style="margin-top:8px">Malipo: taslimu kwa dereva. Nauli ni makadirio kwa umbali wa barabara.</p>`;
+    <p class="muted small" style="margin-top:8px">${
+      options.some((o) => o.promo)
+        ? 'Malipo: unalipa dereva kiasi kilichopunguzwa taslimu; NAYA inamlipa dereva kilichobaki.'
+        : 'Malipo: taslimu kwa dereva. Nauli ni makadirio kwa umbali wa barabara.'
+    }</p>`;
 }
 
 async function refreshEstimate() {
@@ -817,6 +873,8 @@ function statusBadge(status) {
 function setSupportDot() {
   const dot = $('tab-dot');
   if (dot) dot.hidden = !account?.supportUnread;
+  const fb = $('tab-dot-fb');
+  if (fb) fb.hidden = !account?.feedbackUnread;
 }
 
 $('app-content').addEventListener('submit', async (event) => {
@@ -884,6 +942,8 @@ function renderAccount() {
         : ''
     }
 
+    ${driverStatus === 'APPROVED' || driverStatus === 'SUSPENDED' ? wallet.cardHtml() : ''}
+
     <section class="card" aria-labelledby="notify-title">
       <h2 id="notify-title">Arifa</h2>
       <p class="muted" id="push-status">Inaangalia…</p>
@@ -905,7 +965,10 @@ function renderAccount() {
 
     ${support.cardHtml(account.supportUnread)}
 
-    ${feedback.cardHtml()}
+    <a class="card fb-account-link" href="#/maoni">
+      <span><strong>Toa maoni</strong><span class="muted">Ofisi ya NAYA inasoma kila ujumbe na kukujibu.</span></span>
+      <span aria-hidden="true">›</span>
+    </a>
 
     <section class="card" aria-labelledby="pw-title">
       <details class="pw-details">
@@ -943,9 +1006,9 @@ function renderAccount() {
     <p class="version">NAYA ${VERSION} · TWENDE PAMOJA</p>`;
   loadNotificationSection();
   support.loadCardList();
-  feedback.loadCardList();
   setSupportDot();
   if ($('sub-body')) loadSubscriptionSection();
+  if ($('wallet-body')) wallet.load();
 }
 
 const SUB_STATE = {
@@ -1158,7 +1221,7 @@ function renderOnboarding() {
           }
           <label class="terms-check" for="driver-terms">
             <input type="checkbox" id="driver-terms">
-            <span>Nimesoma na ninakubali <a href="/masharti/#dereva" data-terms="dereva">Masharti ya Dereva</a> wa NAYA: kofia mbili, bei ya app tu, PIN kabla ya safari, na ada ya mwezi.</span>
+            <span>Nimesoma na ninakubali <a href="/masharti/#dereva" data-terms="dereva">Masharti ya Dereva</a> wa NAYA: kofia mbili, bei ya app tu, kuanza na kumaliza safari kwenye app, na ada ya mwezi.</span>
           </label>
           <p class="alert alert-danger" id="submit-error" role="alert" hidden></p>
           <button class="btn btn-primary btn-block" type="button" data-action="submit" ${req.canSubmit ? '' : 'disabled'}>Tuma kwa uthibitisho</button>
@@ -1366,6 +1429,7 @@ $('app-content').addEventListener('click', async (event) => {
       const pickup = trip.pickup.type === 'gps' ? { lat: trip.pickup.lat, lng: trip.pickup.lng } : { locationId: trip.pickup.id };
       await rides.book({ pickup, destination: { locationId: trip.destination.id }, vehicleType: trip.selected });
       tripHistory = null;
+      passengerOffers = null;
     } catch (err) {
       if (handleError(err, 'book-error')) return;
       button.disabled = false;
@@ -1454,6 +1518,7 @@ function signOutLocally() {
   realtime = null;
   rides.reset();
   tripHistory = null;
+  passengerOffers = null;
   account = null;
   driver = null;
   places = null;
@@ -1469,7 +1534,17 @@ function signOutLocally() {
 $('retry-button').addEventListener('click', start);
 
 support.init({ api, handleError, toast, isDriver: () => account?.activeMode === 'DRIVER' });
-feedback.init({ api, handleError, toast });
+feedback.init({
+  api,
+  handleError,
+  toast,
+  setUnread: (n) => {
+    if (account) account.feedbackUnread = n;
+    setSupportDot();
+  },
+});
+wallet.init({ api, handleError, toast });
+appUpdate.init({ api });
 rides.init({
   api,
   pushState: () => pushState(api),
@@ -1481,6 +1556,7 @@ rides.init({
   isDriverHome: () => account?.activeMode === 'DRIVER' && tab === 'home' && driver?.driver.status === 'APPROVED',
   onPassengerRideClosed: () => {
     tripHistory = null;
+    passengerOffers = null;
     trip.estimate = null;
     refreshEstimate();
   },

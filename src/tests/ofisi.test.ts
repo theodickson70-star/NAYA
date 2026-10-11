@@ -236,8 +236,11 @@ describe('NAYA Phase 11 — ramani, kuingilia safari, matangazo, ripoti, utafuta
   it('safari iliyokwama: ofisi inaimaliza ikiwa imeanza tu', async () => {
     assert.equal((await call('POST', `/api/admin/rides/${rideId}/complete`, {}, 'admin')).status, 409);
     const pin = (await db.query('SELECT start_pin FROM naya.rides WHERE id = $1', [rideId])).rows[0].start_pin;
-    await call('POST', `/api/driver/rides/${rideId}/arrive`, {}, 'd2');
-    const started = await call('POST', `/api/driver/rides/${rideId}/start`, { pin }, 'd2');
+    // d2 yuko km ~15: "Nimefika" ya mkono inakataliwa mpaka GPS yake ionyeshe yuko karibu na abiria
+    assert.equal((await call('POST', `/api/driver/rides/${rideId}/arrive`, {}, 'd2')).status, 409);
+    await call('POST', '/api/driver/location', { lat: A.lat - 0.003, lng: A.lng }, 'd2');
+    assert.equal((await call('POST', `/api/driver/rides/${rideId}/arrive`, {}, 'd2')).status, 200);
+    const started = await call('POST', `/api/driver/rides/${rideId}/start`, pin ? { pin } : {}, 'd2');
     assert.equal(started.status, 200, started.json.message);
     const done = await call('POST', `/api/admin/rides/${rideId}/complete`, { note: 'Dereva alisahau kubonyeza Maliza' }, 'admin');
     assert.equal(done.status, 200, done.json.message);
@@ -316,6 +319,42 @@ describe('NAYA Phase 11.1 — Maoni', () => {
     assert.equal(mine.officeNote, 'Tumeongeza bajaji 2 za usiku kuanzia wiki hii.');
     const n = await db.query(`SELECT title FROM naya.notifications WHERE user_id = $1 AND kind = 'feedback_reply'`, [ids.p1]);
     assert.equal(n.rows[0].title, 'Tumefanyia kazi maoni yako');
+  });
+
+  it('jibu la ofisi: kitone cha "jibu jipya" mpaka mtoaji afungue Maoni', async () => {
+    assert.equal((await call('GET', '/api/account', undefined, 'p1')).json.data.feedbackUnread, 1);
+    const mine = (await call('GET', '/api/feedback', undefined, 'p1')).json.data;
+    assert.equal(mine.find((f: any) => f.id === fid).unread, true);
+    assert.equal((await call('POST', '/api/feedback/seen', {}, 'p1')).status, 200);
+    assert.equal((await call('GET', '/api/account', undefined, 'p1')).json.data.feedbackUnread, 0);
+    assert.equal((await call('GET', '/api/feedback', undefined, 'p1')).json.data.find((f: any) => f.id === fid).unread, false);
+  });
+
+  it('maoni kuhusu safari moja (baada ya safari / safari ilikwama): safari lazima iwe ya mtoaji', async () => {
+    const loc = await db.query(`INSERT INTO naya.locations (name, category, lat, lng) VALUES ($1, 'OTHER', -5.3, 32.5) RETURNING id`, [`Maoni Loc ${Date.now()}`]);
+    const ride = await db.query(
+      `INSERT INTO naya.rides (passenger_id, vehicle_type, status, pickup_name, pickup_lat, pickup_lng, dest_location_id, dest_name, dest_lat, dest_lng, distance_km, fare)
+       VALUES ($1, 'BODABODA', 'NO_DRIVER', 'Stendi Maoni', -5.31, 32.5, $2, 'Soko Maoni', -5.3, 32.5, 1.2, 1500) RETURNING id`,
+      [ids.p1, loc.rows[0].id],
+    );
+    const rideId = ride.rows[0].id;
+    try {
+      const notMine = await call('POST', '/api/feedback', { rating: 2, topic: 'RIDE', body: 'Si safari yangu', rideId, source: 'PROBLEM' }, 'd1');
+      assert.equal(notMine.status, 404);
+      const res = await call('POST', '/api/feedback', { rating: 2, topic: 'RIDE', body: 'Nilisubiri muda mrefu bila dereva', rideId, source: 'PROBLEM' }, 'p1');
+      assert.equal(res.status, 201, res.json.message);
+      assert.equal(res.json.data.source, 'PROBLEM');
+      assert.equal(res.json.data.ride.from, 'Stendi Maoni');
+      const admin = (await call('GET', '/api/admin/feedback?status=NEW', undefined, 'admin')).json.data.items;
+      const seen = admin.find((f: any) => f.id === res.json.data.id);
+      assert.equal(seen.rideId, rideId);
+      assert.equal(seen.ride.to, 'Soko Maoni');
+      assert.equal((await call('POST', '/api/feedback', { rating: 4, body: 'Chanzo kibaya', source: 'HACK' }, 'p1')).status, 400);
+    } finally {
+      await db.query('DELETE FROM naya.feedback WHERE ride_id = $1', [rideId]);
+      await db.query('DELETE FROM naya.rides WHERE id = $1', [rideId]);
+      await db.query('DELETE FROM naya.locations WHERE id = $1', [loc.rows[0].id]);
+    }
   });
 
   it('maoni ya safari (nyota za abiria) yanaonekana ofisini', async () => {

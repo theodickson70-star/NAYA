@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.net.Uri;
 import android.os.Build;
+import android.os.PowerManager;
 import android.provider.Settings;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PermissionState;
@@ -54,7 +55,21 @@ public class NayaNativePlugin extends Plugin {
         r.put("notifications", NayaAlerts.notificationsEnabled(c));
         r.put("fullScreen", NayaAlerts.canFullScreen(c));
         r.put("token", NayaAlerts.savedToken(c));
+        r.put("driverService", true);
+        r.put("batteryUnrestricted", batteryUnrestricted(c));
+        r.put("updater", true);
+        r.put("versionCode", NayaUpdater.currentVersionCode(c));
+        r.put("canInstall", NayaUpdater.canInstall(c));
         return r;
+    }
+
+    @Override
+    public void load() {
+        try {
+            NayaUpdater.cleanup(getContext());
+        } catch (Exception ignored) {
+            // si muhimu
+        }
     }
 
     @PluginMethod
@@ -149,5 +164,95 @@ public class NayaNativePlugin extends Plugin {
         data.put("body", "Hivi ndivyo simu itakavyolia ombi jipya likifika. Gusa kuzima.");
         NayaAlerts.showOffer(getContext(), data, true, seconds * 1000L);
         call.resolve(info());
+    }
+
+    private static boolean batteryUnrestricted(Context c) {
+        if (Build.VERSION.SDK_INT < 23) return true;
+        PowerManager pm = (PowerManager) c.getSystemService(Context.POWER_SERVICE);
+        return pm != null && pm.isIgnoringBatteryOptimizations(c.getPackageName());
+    }
+
+    /** Dereva yuko online: endelea kutuma mahali alipo hata skrini ikizimwa. { token, base } */
+    @PluginMethod
+    public void startDriverService(PluginCall call) {
+        String token = call.getString("token");
+        String base = call.getString("base");
+        if (token == null || base == null) {
+            call.reject("token na base zinahitajika", "BAD_ARGS");
+            return;
+        }
+        if (!NayaDriverService.hasLocationPermission(getContext())) {
+            call.reject("Ruhusa ya mahali haijatolewa", "NO_LOCATION");
+            return;
+        }
+        try {
+            NayaDriverService.start(getContext(), token, base);
+            call.resolve(info());
+        } catch (Exception e) {
+            call.reject("Imeshindwa kuanzisha huduma ya online", "SERVICE_FAILED");
+        }
+    }
+
+    @PluginMethod
+    public void stopDriverService(PluginCall call) {
+        NayaDriverService.stop(getContext());
+        call.resolve();
+    }
+
+    /** "Ruhusu NAYA ifanye kazi skrini ikizimwa": dirisha la Android la kuondoa kizuizi cha betri kwa NAYA. */
+    @PluginMethod
+    public void requestBatteryUnrestricted(PluginCall call) {
+        Context c = getContext();
+        if (!batteryUnrestricted(c) && Build.VERSION.SDK_INT >= 23) {
+            try {
+                Intent i = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + c.getPackageName()));
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                c.startActivity(i);
+            } catch (Exception e) {
+                Intent i = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                c.startActivity(i);
+            }
+        }
+        call.resolve(info());
+    }
+
+    // ------------------------------------------------------------------ "Sasisha" ndani ya app
+
+    /** { url } → inaanza kupakua APK mpya; ikimaliza dirisha la "Install" linafunguka. Fuatilia kwa updateStatus. */
+    @PluginMethod
+    public void installUpdate(PluginCall call) {
+        String url = call.getString("url");
+        if (url == null || !url.startsWith("https://")) {
+            call.reject("url ya https inahitajika", "BAD_ARGS");
+            return;
+        }
+        Context c = getContext();
+        JSObject r = new JSObject();
+        if (!NayaUpdater.canInstall(c)) {
+            NayaUpdater.openInstallPermission(c);
+            r.put("needsPermission", true);
+            call.resolve(r);
+            return;
+        }
+        if (NayaUpdater.READY.equals(NayaUpdater.state()) && NayaUpdater.reopen(c)) {
+            r.put("state", NayaUpdater.READY);
+            call.resolve(r);
+            return;
+        }
+        NayaUpdater.start(c.getApplicationContext(), url);
+        r.put("state", NayaUpdater.state());
+        call.resolve(r);
+    }
+
+    /** { state: idle|downloading|ready|error, percent, error } */
+    @PluginMethod
+    public void updateStatus(PluginCall call) {
+        JSObject r = new JSObject();
+        r.put("state", NayaUpdater.state());
+        r.put("percent", NayaUpdater.percent());
+        r.put("error", NayaUpdater.error());
+        r.put("canInstall", NayaUpdater.canInstall(getContext()));
+        call.resolve(r);
     }
 }

@@ -40,6 +40,20 @@ describe('NAYA Phase 13 — Pakua app', () => {
     assert.ok(stats.today >= 1);
   });
 
+  it('"Sasisha" ndani ya app: /api/app/latest inatoa toleo jipya na link ya https; upakuaji wa sasisho hauhesabiwi', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/app/latest' });
+    assert.equal(res.statusCode, 200);
+    const data = res.json().data;
+    assert.equal(data.apk, process.env.ANDROID_APK_URL || DEFAULT_APK_URL);
+    assert.match(data.apk, /^https:\/\//);
+    assert.equal(data.page, '/pakua/apk?sasisha=1');
+    assert.ok(data.versionCode === null || Number.isInteger(data.versionCode));
+    const before = (await downloadStats()).total;
+    const upd = await app.inject({ method: 'GET', url: '/pakua/apk?sasisha=1', headers: { 'user-agent': ANDROID }, remoteAddress: '10.13.0.2' });
+    assert.equal(upd.statusCode, 302);
+    assert.equal((await downloadStats()).total, before);
+  });
+
   it('QR code ni SVG ya ukurasa wa kupakua', async () => {
     const res = await app.inject({ method: 'GET', url: '/pakua/qr.svg', headers: { host: 'naya.example' } });
     assert.equal(res.statusCode, 200);

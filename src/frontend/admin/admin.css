@@ -554,3 +554,141 @@ a.kpi:hover { border-color: var(--naya-green); }
 .stars { color: #E2A800; font-size: 18px; letter-spacing: 1px; }
 .stars-off { color: #D9DFDB; }
 .filter-gap { width: 12px; }
+
+/* ---- Ripoti kamili (Madereva · Wateja · APK na link · Maombi · Online sasa) ---- */
+.rp-tabs { display: flex; gap: 4px; margin: 14px 0 6px; padding: 4px; background: #EAF1ED; border-radius: 14px; overflow-x: auto; scrollbar-width: none; }
+.rp-tabs::-webkit-scrollbar { display: none; }
+.rp-tabs a { flex: none; padding: 9px 16px; border-radius: 10px; color: var(--muted); font-weight: 700; font-size: 15px; text-decoration: none; white-space: nowrap; }
+.rp-tabs a:hover { color: var(--ink); background: rgba(255, 255, 255, 0.6); }
+.rp-tabs a[aria-current="page"] { background: var(--white); color: var(--naya-green-dark); box-shadow: 0 1px 3px rgba(16, 32, 26, 0.12); }
+.rp-tabs a:focus-visible { outline: 3px solid var(--warning); outline-offset: -3px; }
+.rp-sub-head { margin-top: 10px; }
+.rp-sub-head .filters { margin: 0; }
+.rp-lead { margin: 12px 0 0; color: var(--muted); max-width: 75ch; }
+.rp-loading { padding: 40px 0; }
+.rp-h2 { margin: 34px 0 0; }
+
+.rp-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 16px 0 4px; }
+.rp-stat { background: var(--white); border: 1px solid var(--line); border-radius: 14px; padding: 13px 15px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rp-stat span { font-size: 13.5px; color: var(--muted); }
+.rp-stat strong { font-family: var(--font-display); font-weight: 800; font-size: 28px; line-height: 1.1; color: var(--ink); overflow-wrap: anywhere; }
+.rp-stat small { font-size: 12.5px; color: var(--muted); }
+.rp-stat-hero { background: var(--naya-green-dark); border-color: var(--naya-green-dark); }
+.rp-stat-hero span, .rp-stat-hero small { color: rgba(255, 255, 255, 0.78); }
+.rp-stat-hero strong { color: var(--warning); }
+.rp-stat-ok strong { color: var(--naya-green); }
+.rp-stat-bad strong { color: var(--danger); }
+
+.rp-chips { margin: 12px 0 0; }
+.rp-chips + .rp-chips { margin-top: 8px; }
+.rp-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin: 14px 0 10px; }
+.rp-toolbar .search { flex: 1 1 260px; max-width: 420px; }
+
+.rp-scroll { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius-md); overflow-x: auto; transition: opacity 0.2s; }
+.rp-scroll.is-loading { opacity: 0.55; }
+.rp-table { width: 100%; min-width: 860px; border-collapse: collapse; font-size: 14.5px; }
+.rp-table th { position: sticky; top: 0; background: #F3F7F5; text-align: left; font-size: 13px; font-weight: 700; color: var(--muted); padding: 10px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.rp-table th small { font-weight: 400; }
+.rp-table td { padding: 11px 12px; vertical-align: top; border-top: 1px solid var(--line); }
+.rp-table tbody tr:first-child td { border-top: 0; }
+.rp-table tbody tr:hover td { background: #FAFCFB; }
+.rp-table .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rp-table td.ok, .rp-offers .ok { color: var(--naya-green); font-weight: 700; }
+.rp-table td.bad, .rp-offers .bad { color: var(--danger); font-weight: 700; }
+.rp-table td.warn, .rp-offers .warn { color: var(--warning-ink); font-weight: 700; }
+.rp-offers i { font-style: normal; }
+.rp-sub { display: block; margin-top: 2px; font-size: 13px; color: var(--muted); }
+.rp-sub-inline { font-size: 13px; color: var(--muted); }
+.rp-person { display: flex; flex-direction: column; color: inherit; text-decoration: none; }
+.rp-person strong { color: var(--ink); }
+.rp-person span { font-size: 13px; color: var(--muted); }
+.rp-person:hover strong { color: var(--naya-green); text-decoration: underline; }
+.rp-table a { color: var(--naya-green-dark); }
+.rp-badges { display: flex; flex-wrap: wrap; gap: 4px; }
+.rp-badges .badge, .rp-table .badge { font-size: 12.5px; padding: 2px 9px; }
+.rp-online { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
+.rp-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--offline); flex: none; }
+.rp-dot-on { background: #18A765; box-shadow: 0 0 0 3px rgba(24, 167, 101, 0.18); }
+.rp-offer-list { margin: 0; padding-left: 18px; display: grid; gap: 5px; min-width: 260px; }
+.rp-offer-list li { line-height: 1.35; }
+.rp-offer-list .badge { margin-left: 2px; }
+.rp-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin: 10px 2px 0; font-size: 14px; }
+
+.rp-split .panel-head { margin-bottom: 10px; }
+.rp-bar { display: flex; height: 16px; border-radius: 99px; overflow: hidden; background: #EEF2F0; gap: 2px; }
+.rp-bar i { display: block; min-width: 4px; }
+.rp-bar-apk, .rp-legend .rp-bar-apk { background: var(--naya-green); }
+.rp-bar-web, .rp-legend .rp-bar-web { background: var(--warning); }
+.rp-bar-unknown, .rp-legend .rp-bar-unknown { background: #B9C6BF; }
+.rp-legend { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 14.5px; }
+.rp-legend li { display: flex; align-items: center; gap: 7px; }
+.rp-legend i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+.rp-legend span { color: var(--muted); }
+.rp-lines { margin: 10px 0 0; padding-left: 18px; display: grid; gap: 6px; }
+
+@media (max-width: 760px) {
+  .rp-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rp-stat strong { font-size: 23px; }
+  .rp-toolbar .search { max-width: none; }
+}
+.rp-nowrap { white-space: nowrap; }
+
+/* ---- Ofa za wateja ---- */
+.rp-stat-link { text-decoration: none; color: inherit; }
+.rp-stat-link:hover strong { text-decoration: underline; }
+.ofa-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 14px; }
+.ofa-card { background: var(--white); border: 1px solid var(--line); border-radius: 18px; padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; }
+.ofa-card.is-live { border-color: var(--naya-green); box-shadow: inset 4px 0 0 var(--naya-green); }
+.ofa-card header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.ofa-card h2 { margin: 0; font-size: 19px; }
+.ofa-card h2 a { color: var(--ink); text-decoration: none; }
+.ofa-card h2 a:hover { color: var(--naya-green); text-decoration: underline; }
+.ofa-card header p { margin: 2px 0 0; font-size: 14px; }
+.ofa-rules { margin: 0; font-size: 15px; line-height: 1.45; }
+.ofa-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 2px 0 0; }
+.ofa-stats div { background: var(--bg); border-radius: 12px; padding: 8px 10px; min-width: 0; }
+.ofa-stats dt { font-size: 12.5px; color: var(--muted); }
+.ofa-stats dd { margin: 0; font-weight: 800; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.ofa-stats small { font-weight: 400; color: var(--muted); }
+.ofa-budget { display: grid; gap: 4px; font-size: 13.5px; color: var(--muted); }
+.ofa-budget-bar { height: 8px; border-radius: 99px; background: #EEF2F0; overflow: hidden; }
+.ofa-budget-bar i { display: block; height: 100%; background: var(--warning); border-radius: inherit; }
+.ofa-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+.ofa-example { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; font-size: 14.5px; }
+.ofa-example li { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 8px 10px; background: var(--bg); border-radius: 10px; }
+.ofa-form-title { margin: 6px 0 0; }
+.ofa-form-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; align-items: start; }
+.ofa-form h3 { margin: 26px 0 0; font-size: 17px; }
+.ofa-audience { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ofa-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; }
+.ofa-fields label { font-size: 14.5px; }
+.ofa-vehicles { border: 0; padding: 0; margin: 14px 0 0; display: flex; gap: 18px; flex-wrap: wrap; }
+.ofa-vehicles legend { font-weight: 700; padding: 0; margin-bottom: 4px; }
+.ofa-preview { position: sticky; top: 16px; background: #FFF8E0; border: 1px solid #F4D36B; border-radius: 16px; padding: 16px; }
+.ofa-preview h3 { margin: 0 0 8px; }
+.ofa-preview .ofa-example li { background: rgba(255, 255, 255, 0.75); }
+.ofa-owed { color: var(--danger); }
+.pay-accounts { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.pay-acc-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
+.pay-acc-list li { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 10px 12px; background: var(--white); border: 1px solid var(--line); border-radius: 12px; }
+.pay-acc-list li span:last-child { color: var(--muted); }
+.rp-table tr.is-void td { color: var(--muted); text-decoration: line-through; }
+.rp-table tr.is-void td:last-child { text-decoration: none; }
+.ofa-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 80; margin: 0; background: var(--ink); color: var(--white); padding: 12px 18px; border-radius: 14px; font-weight: 700; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25); }
+.ofa-toast[hidden] { display: none; }
+@media (max-width: 960px) {
+  .ofa-form-grid { grid-template-columns: 1fr; }
+  .ofa-preview { position: static; }
+  .ofa-list { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .ofa-fields, .ofa-audience { grid-template-columns: 1fr; }
+  .ofa-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.fb-ride { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 6px 0 0; font-size: 14.5px; }
+.fb-ride a { color: var(--naya-green-dark); font-weight: 700; }
+
+/* Safari za kutiliwa shaka (GPS) */
+.flag-list { margin: 6px 0 6px 18px; padding: 0; font-size: 14px; }
+.rp-sub .badge + .badge { margin-left: 4px; }

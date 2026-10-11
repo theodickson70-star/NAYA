@@ -103,7 +103,8 @@ export async function ridesCsv(days: number) {
     db,
     `SELECT r.id, to_char(r.requested_at AT TIME ZONE $2, 'YYYY-MM-DD HH24:MI') AS "Ilianza",
             r.status AS "Hali", r.vehicle_type AS "Chombo", r.pickup_name AS "Kutoka", r.dest_name AS "Kwenda",
-            r.distance_km AS "Km", r.fare AS "Nauli (TSh)",
+            r.distance_km AS "Km", r.fare AS "Nauli (TSh)", r.fare - r.promo_discount AS "Abiria alilipa (TSh)",
+            r.promo_discount AS "Ofa ya NAYA (TSh)", r.promo_title AS "Ofa",
             p.full_name AS "Abiria", p.phone AS "Simu ya abiria",
             du.full_name AS "Dereva", du.phone AS "Simu ya dereva", d.plate_number AS "Plate",
             r.rating_for_driver AS "Nyota (dereva)", r.cancelled_by AS "Aliyeghairi", r.cancel_reason AS "Sababu"
