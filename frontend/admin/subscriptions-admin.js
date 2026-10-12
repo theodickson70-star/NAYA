@@ -47,7 +47,13 @@ export function setup(context) {
 
 export async function loadPage() {
   $('sub-error').hidden = true;
-  await Promise.all([loadList(), loadSettings(), loadOpenMode()]);
+  await loadList();
+}
+
+/** Mipangilio ya mfumo → "Maombi ya safari" (mfumo huru) na "Ada ya mwezi" (fomu). */
+export async function loadSettingsSection() {
+  $('sub-settings-error').hidden = true;
+  await Promise.all([loadSettings(), loadOpenMode()]);
 }
 
 // ------------------------------------------------------------------ Mfumo huru (madereva wachache)
@@ -73,7 +79,7 @@ async function loadOpenMode() {
     openMode = (await ctx.api.get('/api/admin/settings/dispatch')).openMode;
     renderOpenMode();
   } catch (err) {
-    fail(err, 'sub-error');
+    fail(err, 'om-error');
   }
 }
 

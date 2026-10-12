@@ -115,6 +115,25 @@ Alama za kutiliwa shaka (`rides.flags`), zinaonekana kwa ofisi kwenye safari, Ri
 DRIVER, PASSENGER, AUTO au ADMIN. Migration `021_safari_rahisi.sql` inaongeza safu tu (haifuti data); safari zinazoendelea zisizo
 za ofa zinaondolewa PIN ili zisikwame.
 
+## Ofisi — mpangilio mpya (0.18.0)
+
+Menyu ya pembeni kwa makundi (inaweza kukunjwa kuwa alama tu; inakumbukwa kwenye browser):
+
+| Kundi | Kurasa |
+|---|---|
+| — | Muhtasari, Ripoti |
+| Operesheni | Ramani live, Safari, Dharura |
+| Watu | Madereva, Wateja |
+| Fedha | **Malipo** (`#/malipo`: salio la Abliner, malipo yanayosubiri uamuzi, madeni ya ofa, miamala), Ada ya mwezi, Ofa |
+| Mawasiliano | Msaada, Maoni, Matangazo |
+| Mipangilio | **Mipangilio ya mfumo** (`#/mipangilio`: mfumo huru, malipo ya simu, ada), Bei na nauli, Maeneo |
+
+- Muhtasari una kadi ya **salio la akaunti kuu ya Abliner** (`GET /api/admin/payments/wallet` — server inaliuliza Abliner mara moja kila
+  sekunde 30): pesa zilizoingia/kutoka leo, zinazosubiri uthibitisho. Salio likishuka chini ya kiwango (`PUT /api/admin/payments/wallet-settings`,
+  chaguo-msingi TSh 1,000) → kadi nyekundu + "Kazi zinazokusubiri".
+- Anwani za zamani `#/ofa/malipo…` na `#/ofa/miamala` zinapelekwa `#/malipo/madereva…` na `#/malipo/miamala`.
+- Mwendo (animations) unaheshimu "reduce motion" ya kifaa.
+
 ## Abliner — malipo halisi ya simu (0.17.0)
 
 Imejengwa kwa nyaraka za https://abliner.net/docs tu (hakuna endpoint iliyobuniwa):

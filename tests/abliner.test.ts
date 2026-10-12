@@ -262,6 +262,25 @@ describe('Abliner — mipangilio', () => {
   });
 });
 
+describe('Salio la akaunti kuu (ofisi)', () => {
+  it('GET /wallet: salio la Abliner + pesa za leo; onyo likiwa chini ya kiwango; si ofisi → 403', async () => {
+    const w = await call('GET', '/api/admin/payments/wallet?refresh=1', undefined, 'admin');
+    assert.equal(w.status, 200);
+    assert.equal(w.json.data.connected, true);
+    assert.equal(w.json.data.balance, 250000);
+    assert.equal(w.json.data.lowBalance, 1000); // chaguo-msingi
+    assert.equal(w.json.data.low, false);
+    assert.ok('inAmount' in w.json.data.today && 'outAmount' in w.json.data.today);
+    assert.ok(!w.body.includes(KEY) && !w.body.includes(SECRET));
+    assert.equal((await call('PUT', '/api/admin/payments/wallet-settings', { lowBalance: -1 }, 'admin')).status, 400);
+    assert.equal((await call('PUT', '/api/admin/payments/wallet-settings', { lowBalance: 300000 }, 'admin')).json.data.lowBalance, 300000);
+    assert.equal((await call('GET', '/api/admin/payments/wallet', undefined, 'admin')).json.data.low, true);
+    assert.equal((await call('PUT', '/api/admin/payments/wallet-settings', { lowBalance: 1000 }, 'admin')).status, 200);
+    assert.equal((await call('GET', '/api/admin/payments/wallet', undefined, 'd1')).status, 403);
+    assert.equal((await call('PUT', '/api/admin/payments/wallet-settings', { lowBalance: 0 }, 'd1')).status, 403);
+  });
+});
+
 describe('Abliner — ada ya mwezi (deposit / USSD push)', () => {
   let paymentId = '';
   let reference = '';

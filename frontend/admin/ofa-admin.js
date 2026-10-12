@@ -3,10 +3,15 @@
 //   #/ofa/mpya               kuunda ofa
 //   #/ofa/<id>               ofa moja: kanuni, takwimu, safari zake, kubadilisha
 //   #/ofa/chunguza           kwa nini mteja fulani anaona / haoni ofa (namba ya simu)
-//   #/ofa/malipo             madereva wanaodaiwa na NAYA
-//   #/ofa/malipo/<driverId>  dereva mmoja: deni, namba za kutuma pesa, kuandika malipo, historia
+// Fedha → Malipo (0.18.0):
+//   #/malipo                    muhtasari: salio la Abliner, malipo yanayosubiri ukaguzi / yaliyoshindwa
+//   #/malipo/madereva           madereva wanaodaiwa na NAYA
+//   #/malipo/madereva/<id>      dereva mmoja: deni, namba za kutuma pesa, kuandika malipo, historia
+//   #/malipo/miamala            miamala yote ya simu
 import { escapeHtml as esc } from '/shared/api.js';
 import { flagBadges, formatDate, formatPhone, formatTsh } from '/shared/labels.js';
+import { toast as uiToast } from './ui.js';
+import { loadWallet } from './wallet-admin.js';
 
 let ctx = null;
 let host = null;
@@ -19,20 +24,7 @@ const n = (v) => Number(v ?? 0).toLocaleString('en-US');
 const STATUS = { ACTIVE: ['Inaendelea', 'ok'], PAUSED: ['Imesimamishwa', 'warn'], ENDED: ['Imeisha', 'muted'] };
 const PERIOD = { DAY: 'kwa siku', WEEK: 'kwa wiki', TOTAL: 'kipindi chote cha ofa' };
 const RIDE = { SEARCHING: 'Inatafuta', ACCEPTED: 'Dereva anakuja', ARRIVED: 'Amefika', IN_PROGRESS: 'Safarini', COMPLETED: 'Imekamilika', CANCELLED: 'Imeghairiwa', NO_DRIVER: 'Hakuna dereva' };
-function toast(message) {
-  let el = document.getElementById('ofa-toast');
-  if (!el) {
-    el = document.createElement('p');
-    el.id = 'ofa-toast';
-    el.className = 'ofa-toast';
-    el.setAttribute('role', 'status');
-    document.body.append(el);
-  }
-  el.textContent = message;
-  el.hidden = false;
-  clearTimeout(el._t);
-  el._t = setTimeout(() => (el.hidden = true), 3500);
-}
+const toast = (message) => uiToast(message);
 const showNumber = (network, phone) => (network === 'BANK' ? phone : formatPhone(phone));
 
 export function setup(context) {
@@ -50,24 +42,35 @@ export function open(parts) {
   view += 1;
   clearTimeout(searchTimer);
   clearTimeout(previewTimer);
-  const [, a, b] = parts;
+  const [root, a, b] = parts;
   host.innerHTML = '<p class="muted rp-loading">Inapakia…</p>';
-  if (a === 'miamala') return loadTransactions();
-  if (a === 'malipo' && b) return loadPayoutDriver(b);
-  if (a === 'malipo') return loadPayouts();
+  if (root === 'malipo') {
+    if (a === 'miamala') return loadTransactions();
+    if (a === 'madereva' && b) return loadPayoutDriver(b);
+    if (a === 'madereva') return loadPayouts();
+    return loadFinanceHome();
+  }
   if (a === 'mpya') return renderForm(null);
   if (a === 'chunguza') return renderCheck();
   if (a) return loadOffer(a);
   return loadList();
 }
 
-const tabs = (current) => `<h1>Ofa za wateja</h1>
-  <nav class="rp-tabs" aria-label="Ofa">
-    <a href="#/ofa"${current === 'list' ? ' aria-current="page"' : ''}>Ofa</a>
-    <a href="#/ofa/chunguza"${current === 'check' ? ' aria-current="page"' : ''}>Chunguza mteja</a>
-    <a href="#/ofa/malipo"${current === 'pay' ? ' aria-current="page"' : ''}>Malipo kwa madereva</a>
-    <a href="#/ofa/miamala"${current === 'tx' ? ' aria-current="page"' : ''}>Miamala ya simu</a>
-  </nav>`;
+const cur = (on) => (on ? ' aria-current="page"' : '');
+const tabs = (current) =>
+  ['home', 'pay', 'tx'].includes(current)
+    ? `<div class="page-head"><div><h1>Malipo</h1><p class="muted">Salio la Abliner, malipo ya ofa kwa madereva na miamala yote ya simu.</p></div>
+        <a class="btn btn-ghost btn-small" href="#/mipangilio#malipo">Mipangilio ya malipo</a></div>
+      <nav class="rp-tabs" aria-label="Malipo">
+        <a href="#/malipo"${cur(current === 'home')}>Muhtasari</a>
+        <a href="#/malipo/madereva"${cur(current === 'pay')}>Madeni ya ofa kwa madereva</a>
+        <a href="#/malipo/miamala"${cur(current === 'tx')}>Miamala ya simu</a>
+      </nav>`
+    : `<div class="page-head"><div><h1>Ofa za wateja</h1><p class="muted">Punguzo kwa wateja — NAYA inamlipa dereva sehemu yake.</p></div></div>
+      <nav class="rp-tabs" aria-label="Ofa">
+        <a href="#/ofa"${cur(current === 'list')}>Ofa zote</a>
+        <a href="#/ofa/chunguza"${cur(current === 'check')}>Chunguza mteja</a>
+      </nav>`;
 
 const fail = (err) => {
   if (ctx.onAuthError(err)) return;
@@ -145,7 +148,7 @@ async function loadList() {
         <div class="rp-stat"><span>Safari za ofa</span><strong>${n(totals.rides)}</strong><small>Zilizokamilika</small></div>
         <div class="rp-stat"><span>Gharama ya NAYA</span><strong>${formatTsh(totals.cost)}</strong><small>Punguzo lote</small></div>
         <div class="rp-stat"><span>Imeshalipwa madereva</span><strong>${formatTsh(totals.paid)}</strong></div>
-        <a class="rp-stat rp-stat-link${totals.owed > 0 ? ' rp-stat-bad' : ''}" href="#/ofa/malipo"><span>Deni kwa madereva</span><strong>${formatTsh(totals.owed)}</strong><small>Fungua malipo</small></a>
+        <a class="rp-stat rp-stat-link${totals.owed > 0 ? ' rp-stat-bad' : ''}" href="#/malipo/madereva"><span>Deni kwa madereva</span><strong>${formatTsh(totals.owed)}</strong><small>Fungua malipo</small></a>
       </section>
       <div class="rp-toolbar"><a class="btn btn-ghost" href="#/ofa/chunguza">Mteja haoni ofa? Chunguza</a><a class="btn btn-primary" href="#/ofa/mpya">Unda ofa mpya</a></div>
       <div class="ofa-list">${promotions.length ? promotions.map(card).join('') : '<p class="empty">Bado hakuna ofa. Bonyeza "Unda ofa mpya".</p>'}</div>`;
@@ -354,24 +357,25 @@ async function loadFormCheck(v) {
 const PAY_STATUS = { PENDING: ['warn', 'Inasubiri'], SUCCESS: ['ok', 'Imefaulu'], FAILED: ['bad', 'Imeshindwa'] };
 let txState = { kind: '', status: '', q: '' };
 
-/** Juu ya "Malipo kwa madereva": hali ya malipo ya papo hapo, kikomo, na safari zinazosubiri ukaguzi / zilizoshindwa. */
-async function loadAutoPay(v) {
+/** Fedha → Malipo (#/malipo): salio la Abliner, hali ya malipo ya papo hapo, na malipo yanayohitaji uamuzi wa ofisi. */
+async function loadFinanceHome() {
+  const v = view;
+  host.innerHTML = `${tabs('home')}<div id="fin-wallet" class="wallet-slot"><div class="wallet-card is-loading" aria-busy="true"></div></div><div id="auto-pay"></div>`;
+  loadWallet(document.getElementById('fin-wallet'), { ctx, full: true });
   const box = document.getElementById('auto-pay');
-  if (!box) return;
   try {
     const [o, q] = await Promise.all([ctx.api.get('/api/admin/payments/overview'), ctx.api.get('/api/admin/payments/queue')]);
     if (!current(v) || !document.getElementById('auto-pay')) return;
-    const checkBox = `<div class="ap-check"><button class="btn btn-ghost btn-small" type="button" data-auto="check">Kagua muunganiko wa Abliner</button><div id="ap-check" aria-live="polite"></div></div>`;
     if (!o.config.enabled) {
       box.innerHTML = `<section class="panel auto-pay is-off"><h2>Malipo ya papo hapo</h2>
-        <p class="muted">Kampuni ya malipo bado haijaunganishwa (PAYMENT_PROVIDER kwenye Railway). Mpaka iunganishwe, lipa madereva kwa mkono hapa chini.</p>${checkBox}</section>`;
+        <p class="muted">Kampuni ya malipo bado haijaunganishwa (PAYMENT_PROVIDER kwenye Railway). Mpaka iunganishwe, lipa madereva kwa mkono kwenye <a href="#/malipo/madereva">Madeni ya ofa</a>.</p></section>`;
       return;
     }
     const s = o.settings;
     const rowsHeld = q.held
       .map(
         (r) => `<tr><td class="rp-nowrap"><a href="#/safari/${esc(r.id)}">${esc(formatDate(r.completedAt, true))}</a></td>
-          <td><a href="#/ofa/malipo/${esc(r.driverId)}"><strong>${esc(r.driverName)}</strong></a><span class="rp-sub">${esc(r.plate ?? '')}</span></td>
+          <td><a href="#/malipo/madereva/${esc(r.driverId)}"><strong>${esc(r.driverName)}</strong></a><span class="rp-sub">${esc(r.plate ?? '')}</span></td>
           <td>${esc(r.from)} → ${esc(r.to)}${(r.flags ?? []).length ? `<span class="rp-sub">${flagBadges(r.flags, esc)}</span>` : ''}</td>
           <td>${esc(r.reason ?? '')}</td>
           <td class="num"><strong>${formatTsh(r.amount)}</strong><span class="rp-sub">${r.network ? `${esc(r.networkLabel)} ${esc(showNumber(r.network, r.payPhone))}` : 'Hajaweka namba'}</span></td>
@@ -382,7 +386,7 @@ async function loadAutoPay(v) {
     const rowsFailed = q.failed
       .map(
         (r) => `<tr><td class="rp-nowrap"><a href="#/safari/${esc(r.id)}">${esc(formatDate(r.completedAt, true))}</a></td>
-          <td><a href="#/ofa/malipo/${esc(r.driverId)}"><strong>${esc(r.driverName)}</strong></a><span class="rp-sub">${esc(r.plate ?? '')}</span></td>
+          <td><a href="#/malipo/madereva/${esc(r.driverId)}"><strong>${esc(r.driverName)}</strong></a><span class="rp-sub">${esc(r.plate ?? '')}</span></td>
           <td>${esc(r.from)} → ${esc(r.to)}</td>
           <td><span class="badge badge-bad">Imeshindwa</span> ${esc(r.reason ?? '')}<span class="rp-sub">Jaribio la ${n(r.attempt ?? 1)}</span></td>
           <td class="num"><strong>${formatTsh(r.amount)}</strong><span class="rp-sub">${r.network ? `${esc(r.networkLabel)} ${esc(showNumber(r.network, r.payPhone))}` : ''}</span></td>
@@ -392,18 +396,9 @@ async function loadAutoPay(v) {
       .join('');
     const head = '<thead><tr><th>Ilikamilika</th><th>Dereva</th><th>Safari</th><th>Sababu</th><th class="num">Kiasi</th><th></th></tr></thead>';
     box.innerHTML = `<section class="panel auto-pay">
-      <div class="panel-head"><h2>Malipo ya papo hapo</h2><span class="badge badge-${s.enabled ? 'ok' : 'muted'}">${s.enabled ? 'Yamewashwa' : 'Yamezimwa'}</span></div>
-      <p class="small">Kampuni ya malipo: <strong>${esc(o.config.provider === 'abliner' ? 'Abliner' : o.config.provider ?? '')}</strong></p>
-      ${checkBox}
-      <p class="muted">Safari ya ofa ikikamilika, NAYA inatuma sehemu ya dereva kwenye namba yake kuu yenyewe — kama safari ni safi na ndani ya kikomo cha siku. Nyingine zinasubiri ukaguzi hapa.</p>
-      <form class="auto-pay-form" id="auto-pay-form" novalidate>
-        <label class="check"><input type="checkbox" id="ap-enabled"${s.enabled ? ' checked' : ''}> Tuma malipo ya ofa yenyewe</label>
-        <label for="ap-limit">Kikomo kwa dereva kwa siku (TSh)</label>
-        <input id="ap-limit" type="number" min="500" step="500" value="${esc(s.dailyLimit)}">
-        <button class="btn btn-ghost btn-small" type="submit">Hifadhi</button>
-        <p class="alert alert-danger" id="ap-error" role="alert" hidden></p>
-      </form>
-      <p class="small muted">Siku 30 zilizopita: malipo ya ofa ${n(o.totals.payoutCount)} (${formatTsh(o.totals.payoutAmount)}) · ada kwa simu ${n(o.totals.subscriptionCount)} (${formatTsh(o.totals.subscriptionAmount)}) · <a href="#/ofa/miamala">Miamala yote</a></p>
+      <div class="panel-head"><h2>Malipo ya ofa ya papo hapo</h2><span class="badge badge-${s.enabled ? 'ok' : 'muted'}">${s.enabled ? 'Yamewashwa' : 'Yamezimwa'}</span></div>
+      <p class="muted">Safari ya ofa ikikamilika, NAYA inamtumia dereva sehemu yake kwenye namba yake kuu — kama safari ni safi na ndani ya kikomo cha <strong>${formatTsh(s.dailyLimit)}</strong> kwa siku. Nyingine zinasubiri uamuzi wako hapa chini. <a href="#/mipangilio#malipo">Badilisha</a></p>
+      <p class="small muted">Siku 30 zilizopita: malipo ya ofa ${n(o.totals.payoutCount)} (${formatTsh(o.totals.payoutAmount)}) · ada kwa simu ${n(o.totals.subscriptionCount)} (${formatTsh(o.totals.subscriptionAmount)}) · <a href="#/malipo/miamala">Miamala yote</a></p>
       ${q.held.length ? `<h3>Inasubiri ukaguzi <span class="badge badge-warn">${n(q.held.length)}</span></h3><div class="rp-scroll"><table class="rp-table">${head}<tbody>${rowsHeld}</tbody></table></div>` : ''}
       ${q.failed.length ? `<h3>Yameshindwa kutumwa <span class="badge badge-bad">${n(q.failed.length)}</span></h3><div class="rp-scroll"><table class="rp-table">${head}<tbody>${rowsFailed}</tbody></table></div>` : ''}
       ${
@@ -444,7 +439,7 @@ async function loadTransactions() {
               const [tone, label] = PAY_STATUS[t.status];
               return `<tr><td class="rp-nowrap">${esc(formatDate(t.createdAt, true))}</td>
                 <td>${t.kind === 'SUBSCRIPTION' ? `Ada ya mwezi<span class="rp-sub">Imeingia${t.months ? ` · miezi ${n(t.months)}` : ''}</span>` : 'Malipo ya ofa<span class="rp-sub">Imetoka</span>'}</td>
-                <td><a href="#/ofa/malipo/${esc(t.driverId)}">${esc(t.driverName)}</a></td>
+                <td><a href="#/malipo/madereva/${esc(t.driverId)}">${esc(t.driverName)}</a></td>
                 <td>${esc(t.networkLabel)}<span class="rp-sub">${esc(formatPhone(t.phone))}</span></td>
                 <td class="num"><strong>${formatTsh(t.amount)}</strong></td>
                 <td><span class="badge badge-${tone}">${label}</span>${t.failureReason ? `<span class="rp-sub">${esc(t.failureReason)}</span>` : ''}</td>
@@ -559,7 +554,6 @@ async function loadPayouts() {
         <div class="rp-stat"><span>Imeshalipwa</span><strong>${formatTsh(s.paid)}</strong></div>
         <div class="rp-stat${s.noNumber ? ' rp-stat-bad' : ''}"><span>Hawajaweka namba</span><strong>${n(s.noNumber)}</strong><small>Wanadai lakini hawana namba</small></div>
       </section>
-      <div id="auto-pay"></div>
       <div class="filters rp-chips" role="group" aria-label="Kichujio">
         <button type="button" class="chip" data-pay-owed="1" aria-pressed="${payState.owed}">Wanaodai</button>
         <button type="button" class="chip" data-pay-owed="0" aria-pressed="${!payState.owed}">Wote</button>
@@ -572,14 +566,14 @@ async function loadPayouts() {
         ? `<div class="rp-scroll"><table class="rp-table"><thead><tr><th>Dereva</th><th class="num">Safari za ofa</th><th class="num">NAYA inadaiwa</th><th class="num">Imelipwa</th><th class="num">Salio</th><th>Tuma kwenye namba</th><th>Malipo ya mwisho</th><th></th></tr></thead><tbody>${r.rows
             .map(
               (d) => `<tr>
-                <td><a class="rp-person" href="#/ofa/malipo/${esc(d.id)}"><strong>${esc(d.name)}</strong><span>${esc(formatPhone(d.phone))} · ${esc(d.plate ?? '')}</span></a></td>
+                <td><a class="rp-person" href="#/malipo/madereva/${esc(d.id)}"><strong>${esc(d.name)}</strong><span>${esc(formatPhone(d.phone))} · ${esc(d.plate ?? '')}</span></a></td>
                 <td class="num"><strong>${n(d.rides)}</strong><span class="rp-sub">Wiki hii ${n(d.weekRides)}</span></td>
                 <td class="num">${formatTsh(d.earned)}</td>
                 <td class="num">${formatTsh(d.paid)}</td>
                 <td class="num"><strong class="${d.balance > 0 ? 'ofa-owed' : ''}">${formatTsh(d.balance)}</strong></td>
                 <td>${d.network ? `<strong>${esc(d.networkLabel)}</strong><span class="rp-sub">${esc(showNumber(d.network, d.payPhone))} · ${esc(d.payName)}</span>` : '<span class="badge badge-bad">Hajaweka namba</span>'}</td>
                 <td class="rp-nowrap">${d.lastPaidAt ? esc(formatDate(d.lastPaidAt)) : '–'}</td>
-                <td>${d.balance > 0 ? `<a class="btn btn-primary btn-small" href="#/ofa/malipo/${esc(d.id)}">Lipa</a>` : `<a class="btn btn-ghost btn-small" href="#/ofa/malipo/${esc(d.id)}">Angalia</a>`}</td>
+                <td>${d.balance > 0 ? `<a class="btn btn-primary btn-small" href="#/malipo/madereva/${esc(d.id)}">Lipa</a>` : `<a class="btn btn-ghost btn-small" href="#/malipo/madereva/${esc(d.id)}">Angalia</a>`}</td>
               </tr>`,
             )
             .join('')}</tbody></table></div>`
@@ -589,7 +583,6 @@ async function loadPayouts() {
       input.focus();
       input.setSelectionRange(input.value.length, input.value.length);
     }
-    loadAutoPay(v);
   } catch (err) {
     host.innerHTML = tabs('pay');
     fail(err);
@@ -627,7 +620,7 @@ async function loadPayoutDriver(driverId) {
             </form>`
           : `<p class="alert alert-warn" role="status">Dereva huyu bado hajaweka namba ya kupokea pesa. Mwambie afungue NAYA → Akaunti → <strong>Malipo ya ofa</strong> → Weka namba.</p>`
         : '';
-    host.innerHTML = `${tabs('pay')}<a class="back-link" href="#/ofa/malipo">Rudi kwa malipo</a>
+    host.innerHTML = `${tabs('pay')}<a class="back-link" href="#/malipo/madereva">Rudi kwa malipo</a>
       <div class="page-head"><div><h2 class="ofa-form-title">${esc(d.driver.name)}</h2><p class="muted">${esc(formatPhone(d.driver.phone))} · ${esc(d.driver.plate ?? '')}</p></div>
         <a class="btn btn-ghost btn-small" href="#/madereva/${esc(driverId)}">Fungua dereva</a></div>
       <section class="rp-stats">
@@ -711,31 +704,6 @@ async function onClick(event) {
     return;
   }
   const auto = event.target.closest('[data-auto]');
-  if (auto?.dataset.auto === 'check') {
-    const out = document.getElementById('ap-check');
-    auto.disabled = true;
-    out.innerHTML = '<p class="small muted">Inakagua…</p>';
-    try {
-      const r = await ctx.api.get('/api/admin/payments/provider-check');
-      const lines = [];
-      if (r.problem) lines.push(`<p class="alert alert-danger">${esc(r.problem)}</p>`);
-      if (r.check?.ok) {
-        lines.push(`<p class="alert alert-ok">Muunganiko uko sawa${r.check.balance != null ? ` — salio la Abliner: <strong>${esc(r.check.currency ?? 'TZS')} ${esc(Number(r.check.balance).toLocaleString('en-US'))}</strong>` : ''}.</p>`);
-      } else if (r.check) {
-        lines.push(`<p class="alert alert-danger">${esc(r.check.message)}</p>`);
-      } else if (!r.problem) {
-        lines.push('<p class="alert alert-warn">PAYMENT_PROVIDER haijawekwa — malipo ya simu yamezimwa.</p>');
-      }
-      lines.push(`<p class="small">Webhook URL ya kuweka Abliner → API Keys: <code>${esc(r.webhookUrl ?? `${location.origin}/api/payments/callback/abliner`)}</code></p>`);
-      out.innerHTML = lines.join('');
-    } catch (err) {
-      out.innerHTML = '';
-      fail(err);
-    } finally {
-      auto.disabled = false;
-    }
-    return;
-  }
   if (auto) {
     const id = auto.dataset.id;
     let body = {};
@@ -748,7 +716,7 @@ async function onClick(event) {
     try {
       await ctx.api.post(`/api/admin/payments/rides/${id}/${auto.dataset.auto}`, body);
       toast(auto.dataset.auto === 'reject' ? 'Malipo yamekataliwa' : 'Malipo yanatumwa');
-      return loadPayouts();
+      return loadFinanceHome();
     } catch (err) {
       auto.disabled = false;
       return fail(err);
@@ -880,23 +848,6 @@ async function onSubmit(event) {
       box.hidden = false;
       button.disabled = false;
     }
-  }
-  if (form.id === 'auto-pay-form') {
-    const err = document.getElementById('ap-error');
-    err.hidden = true;
-    try {
-      await ctx.api.put('/api/admin/payments/auto-payout', {
-        enabled: document.getElementById('ap-enabled').checked,
-        dailyLimit: Number(document.getElementById('ap-limit').value),
-      });
-      toast('Mipangilio ya malipo imehifadhiwa');
-      return loadPayouts();
-    } catch (e) {
-      if (ctx.onAuthError(e)) return;
-      err.textContent = e.message;
-      err.hidden = false;
-    }
-    return;
   }
   if (form.id === 'check-form') {
     checkState = {

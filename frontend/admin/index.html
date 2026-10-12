@@ -69,25 +69,33 @@
         <img class="side-wordmark" src="/shared/brand/naya-wordmark-white.svg" alt="NAYA" width="92" height="26">
         <span class="side-area">Ofisi</span>
       </a>
-      <nav class="side-nav">
-        <p class="side-group">Kazi za leo</p>
-          <a href="#/" data-nav="overview"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg><span>Muhtasari</span></a>
-          <a href="#/ramani" data-nav="live"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4l-6 2v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg><span>Ramani live</span><span id="nav-online" class="nav-count nav-count-soft" hidden></span></a>
-          <a href="#/safari" data-nav="rides"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="16" r="3"/><circle cx="18.5" cy="16" r="3"/><path d="M5.5 16l4-6h5l2.5 4h1.5"/><path d="M13 6.5h3l2 4"/></svg><span>Safari</span><span id="nav-active" class="nav-count" hidden></span></a>
-          <a href="#/msaada" data-nav="support"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8.5 8.5 0 0 1-12.6 7.4L3 21l1.6-5.4A8.5 8.5 0 1 1 21 12z"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.6 2.2c-.7.4-1.1.9-1.1 1.6v.4"/><path d="M12 16.6h.01"/></svg><span>Msaada</span><span id="nav-support" class="nav-count" hidden></span></a>
-          <a href="#/maoni" data-nav="feedback"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9L12 3z"/></svg><span>Maoni</span><span id="nav-feedback" class="nav-count" hidden></span></a>
-          <a href="#/dharura" data-nav="sos"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9.5 16.5h-19L12 3z"/><path d="M12 10v4M12 17h.01"/></svg><span>Dharura</span><span id="nav-sos" class="nav-count nav-count-sos" hidden></span></a>
-        <p class="side-group">Watu</p>
-          <a href="#/wateja" data-nav="users"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M17 14.5a4.5 4.5 0 0 1 4.5 4.5"/></svg><span>Wateja</span></a>
-          <a href="#/madereva" data-nav="drivers"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/><path d="M8.5 6h7"/></svg><span>Madereva</span><span id="nav-pending" class="nav-count" hidden></span></a>
-        <p class="side-group">Biashara</p>
-          <a href="#/ofa" data-nav="offers"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 5 5 19"/><circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="17" r="2.5"/></svg><span>Ofa</span></a>
-          <a href="#/ada" data-nav="subscriptions"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 9.5v5M18 9.5v5"/></svg><span>Ada ya mwezi</span></a>
-          <a href="#/bei" data-nav="fares"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg><span>Bei</span></a>
-          <a href="#/maeneo" data-nav="locations"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg><span>Maeneo</span></a>
-          <a href="#/ripoti" data-nav="reports"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Ripoti</span></a>
-          <a href="#/matangazo" data-nav="broadcast"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4h4l7 5V5L7 10H3z"/><path d="M18 8.5a5 5 0 0 1 0 7"/></svg><span>Matangazo</span></a>
+      <nav class="side-nav" id="side-nav" aria-label="Kurasa za ofisi">
+        <span class="side-indicator" id="side-indicator" aria-hidden="true"></span>
+        <a href="#/" data-nav="overview"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg><span class="nav-label">Muhtasari</span></a>
+        <a href="#/ripoti" data-nav="reports"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span class="nav-label">Ripoti</span></a>
+        <p class="side-group"><span>Operesheni</span></p>
+        <a href="#/ramani" data-nav="live"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4l-6 2v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg><span class="nav-label">Ramani live</span><span id="nav-online" class="nav-count nav-count-soft" hidden></span></a>
+        <a href="#/safari" data-nav="rides"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="16" r="3"/><circle cx="18.5" cy="16" r="3"/><path d="M5.5 16l4-6h5l2.5 4h1.5"/><path d="M13 6.5h3l2 4"/></svg><span class="nav-label">Safari</span><span id="nav-active" class="nav-count" hidden></span></a>
+        <a href="#/dharura" data-nav="sos"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9.5 16.5h-19L12 3z"/><path d="M12 10v4M12 17h.01"/></svg><span class="nav-label">Dharura</span><span id="nav-sos" class="nav-count nav-count-sos" hidden></span></a>
+        <p class="side-group"><span>Watu</span></p>
+        <a href="#/madereva" data-nav="drivers"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/><path d="M8.5 6h7"/></svg><span class="nav-label">Madereva</span><span id="nav-pending" class="nav-count" hidden></span></a>
+        <a href="#/wateja" data-nav="users"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M17 14.5a4.5 4.5 0 0 1 4.5 4.5"/></svg><span class="nav-label">Wateja</span></a>
+        <p class="side-group"><span>Fedha</span></p>
+        <a href="#/malipo" data-nav="finance"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v4"/><rect x="3" y="7.5" width="18" height="12" rx="2.5"/><path d="M16 13.5h2"/></svg><span class="nav-label">Malipo</span><span id="nav-finance" class="nav-count" hidden></span></a>
+        <a href="#/ada" data-nav="subscriptions"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M8.5 14.5l2 2 4-4"/></svg><span class="nav-label">Ada ya mwezi</span></a>
+        <a href="#/ofa" data-nav="offers"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 5 5 19"/><circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="17" r="2.5"/></svg><span class="nav-label">Ofa</span></a>
+        <p class="side-group"><span>Mawasiliano</span></p>
+        <a href="#/msaada" data-nav="support"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8.5 8.5 0 0 1-12.6 7.4L3 21l1.6-5.4A8.5 8.5 0 1 1 21 12z"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.6 2.2c-.7.4-1.1.9-1.1 1.6v.4"/><path d="M12 16.6h.01"/></svg><span class="nav-label">Msaada</span><span id="nav-support" class="nav-count" hidden></span></a>
+        <a href="#/maoni" data-nav="feedback"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9L12 3z"/></svg><span class="nav-label">Maoni</span><span id="nav-feedback" class="nav-count" hidden></span></a>
+        <a href="#/matangazo" data-nav="broadcast"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4h4l7 5V5L7 10H3z"/><path d="M18 8.5a5 5 0 0 1 0 7"/></svg><span class="nav-label">Matangazo</span></a>
+        <p class="side-group"><span>Mipangilio</span></p>
+        <a href="#/mipangilio" data-nav="settings"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="nav-label">Mipangilio ya mfumo</span></a>
+        <a href="#/bei" data-nav="fares"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg><span class="nav-label">Bei na nauli</span></a>
+        <a href="#/maeneo" data-nav="locations"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg><span class="nav-label">Maeneo</span></a>
       </nav>
+      <button class="side-collapse" id="side-collapse" type="button" aria-pressed="false" title="Kunja menyu">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg><span class="nav-label">Kunja menyu</span>
+      </button>
       <div class="side-user">
         <span class="side-avatar" id="me-initials" aria-hidden="true"></span>
         <span class="side-me"><strong id="me-name"></strong><span>Msimamizi</span></span>
@@ -99,6 +107,7 @@
     <div class="shell-main">
       <header class="appbar">
         <button class="appbar-menu" id="menu-button" type="button" aria-label="Fungua menyu" aria-controls="sidebar" aria-expanded="false"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+        <div class="appbar-title" aria-live="polite"><span class="crumb-group" id="crumb-group"></span><strong class="crumb-page" id="crumb-page">Muhtasari</strong></div>
         <form class="global-search" id="global-search" role="search" autocomplete="off">
           <label class="sr-only" for="global-q">Tafuta</label>
           <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
@@ -139,6 +148,10 @@
         <a class="kpi" href="#/msaada"><span class="kpi-label">Msaada na dharura</span><span class="kpi-value" id="stat-support">–</span><span class="kpi-sub"><span id="stat-sos">–</span> dharura wazi</span></a>
       </section>
 
+      <div class="overview-money">
+        <div id="ov-wallet" class="wallet-slot"><div class="wallet-card is-loading" aria-busy="true"></div></div>
+      </div>
+
       <section class="panel chart-panel" aria-labelledby="trend-title">
         <div class="panel-head">
           <h2 id="trend-title">Safari zilizokamilika — siku 14</h2>
@@ -152,7 +165,7 @@
           <h2 id="setup-title">Maandalizi ya safari</h2>
           <ul class="setup-list" id="setup-list"></ul>
         </section>
-        <section class="panel" aria-labelledby="system-title">
+        <section class="panel" aria-labelledby="system-title" id="system-panel">
           <h2 id="system-title">Hali ya mfumo</h2>
           <ul class="system-list">
             <li><span id="sys-api" class="dot dot-wait"></span>Server ya NAYA</li>
@@ -303,31 +316,11 @@
         <div class="stat"><span class="stat-value" id="sub-expired">–</span><span class="stat-label">Ada zimeisha</span></div>
         <div class="stat"><span class="stat-value" id="sub-due">–</span><span class="stat-label">Zinaisha ndani ya siku 7</span></div>
       </section>
-      <section class="open-mode" id="open-mode" aria-labelledby="om-title" hidden>
-        <div>
-          <h2 id="om-title">Mfumo huru <span class="badge" id="om-badge"></span></h2>
-          <p id="om-text"></p>
-        </div>
-        <button class="btn btn-small" type="button" id="om-toggle"></button>
-        <p class="alert alert-danger" id="om-error" role="alert" hidden></p>
-      </section>
       <p class="muted small">Kurekodi malipo: fungua dereva, kisha "Ada ya mwezi" → Rekodi malipo.</p>
       <p id="sub-error" class="alert alert-danger" role="alert" hidden></p>
       <div id="sub-list" class="driver-list" aria-live="polite"></div>
 
-      <form class="decision sub-settings" id="sub-settings-form" novalidate>
-        <h2>Mipangilio ya ada</h2>
-        <div class="pay-grid">
-          <div><label for="set-fee">Ada kwa siku 30 (TSh)</label><input id="set-fee" type="number" min="0" step="500" inputmode="numeric"></div>
-          <div><label for="set-trial">Siku za bure kwa dereva mpya</label><input id="set-trial" type="number" min="0" max="90" inputmode="numeric"></div>
-          <div><label for="set-grace">Siku za kuvumiliwa baada ya kuisha</label><input id="set-grace" type="number" min="0" max="14" inputmode="numeric"></div>
-        </div>
-        <label for="set-instructions">Maelekezo ya kulipa (madereva wanayaona kwenye app)</label>
-        <textarea id="set-instructions" maxlength="500" placeholder="Mf. Lipa kwa M-Pesa namba 07XX XXX XXX (jina: NAYA), kisha tuma SMS ya muamala kwa ofisi."></textarea>
-        <p class="alert alert-danger" id="sub-settings-error" role="alert" hidden></p>
-        <p class="alert alert-ok" id="sub-settings-saved" role="status" hidden>Imehifadhiwa</p>
-        <div class="actions"><button class="btn btn-primary" type="submit">Hifadhi mipangilio</button></div>
-      </form>
+      <p class="settings-link"><a href="#/mipangilio#ada">Mipangilio ya ada (kiasi, siku za bure, maelekezo ya kulipa)</a></p>
     </main>
 
     <!-- Dharura -->
@@ -429,7 +422,76 @@
       <div id="fb-list" class="fb-list" aria-live="polite"></div>
     </main>
 
-    <!-- Ofa za wateja na malipo kwa madereva (ofa-admin.js) -->
+    <!-- Mipangilio ya mfumo (settings-admin.js + subscriptions-admin.js) -->
+    <main id="page-settings" class="page" hidden>
+      <div class="page-head"><div><h1>Mipangilio ya mfumo</h1><p class="muted">Kila kitu kinachobadilisha jinsi NAYA inavyofanya kazi, mahali pamoja.</p></div></div>
+      <nav class="settings-toc" aria-label="Sehemu za mipangilio">
+        <a href="#/mipangilio#maombi">Maombi ya safari</a>
+        <a href="#/mipangilio#malipo">Malipo ya simu</a>
+        <a href="#/mipangilio#ada">Ada ya mwezi</a>
+        <a href="#/mipangilio#mengine">Bei na maeneo</a>
+      </nav>
+
+      <section class="settings-section" id="set-maombi" aria-labelledby="set-maombi-title">
+        <header><h2 id="set-maombi-title">Maombi ya safari</h2><p class="muted">Jinsi madereva wanavyopokea maombi ya wateja.</p></header>
+        <section class="open-mode" id="open-mode" aria-labelledby="om-title" hidden>
+        <div>
+          <h3 id="om-title">Mfumo huru <span class="badge" id="om-badge"></span></h3>
+          <p id="om-text"></p>
+        </div>
+        <button class="btn btn-small" type="button" id="om-toggle"></button>
+        <p class="alert alert-danger" id="om-error" role="alert" hidden></p>
+        </section>
+      </section>
+
+      <section class="settings-section" id="set-malipo" aria-labelledby="set-malipo-title">
+        <header><h2 id="set-malipo-title">Malipo ya simu (Abliner)</h2><p class="muted">Muunganiko wa kampuni ya malipo, malipo ya ofa ya moja kwa moja na onyo la salio.</p></header>
+        <div class="settings-card">
+          <div class="settings-row">
+            <div><h3>Muunganiko</h3><p class="muted small" id="set-provider">Inaangalia…</p></div>
+            <button class="btn btn-ghost btn-small" type="button" id="set-check">Kagua muunganiko</button>
+          </div>
+          <div id="set-check-out" aria-live="polite"></div>
+        </div>
+        <form class="settings-card" id="set-autopay-form" novalidate>
+          <h3>Malipo ya ofa kwa madereva</h3>
+          <label class="check"><input type="checkbox" id="ap-enabled"> Tuma malipo ya ofa yenyewe safari ikikamilika</label>
+          <div class="settings-grid">
+            <div><label for="ap-limit">Kikomo kwa dereva kwa siku (TSh)</label><input id="ap-limit" type="number" min="500" step="500" inputmode="numeric"></div>
+            <div><label for="wl-low">Onyo la salio dogo la Abliner (TSh)</label><input id="wl-low" type="number" min="0" step="500" inputmode="numeric"></div>
+          </div>
+          <p class="muted small">Kikomo kinahesabiwa kwa siku ya Dar es Salaam. Salio likishuka chini ya kiwango cha onyo, Muhtasari na Malipo vinaonyesha onyo jekundu.</p>
+          <p class="alert alert-danger" id="ap-error" role="alert" hidden></p>
+          <div class="actions"><button class="btn btn-primary" type="submit">Hifadhi mipangilio ya malipo</button></div>
+        </form>
+      </section>
+
+      <section class="settings-section" id="set-ada" aria-labelledby="set-ada-title">
+        <header><h2 id="set-ada-title">Ada ya mwezi</h2><p class="muted">Kiasi madereva wanacholipa, siku za bure na maelekezo ya kulipa.</p></header>
+        <form class="settings-card sub-settings" id="sub-settings-form" novalidate>
+        <div class="pay-grid">
+          <div><label for="set-fee">Ada kwa siku 30 (TSh)</label><input id="set-fee" type="number" min="0" step="500" inputmode="numeric"></div>
+          <div><label for="set-trial">Siku za bure kwa dereva mpya</label><input id="set-trial" type="number" min="0" max="90" inputmode="numeric"></div>
+          <div><label for="set-grace">Siku za kuvumiliwa baada ya kuisha</label><input id="set-grace" type="number" min="0" max="14" inputmode="numeric"></div>
+        </div>
+        <label for="set-instructions">Maelekezo ya kulipa (madereva wanayaona kwenye app)</label>
+        <textarea id="set-instructions" maxlength="500" placeholder="Mf. Lipa kwa M-Pesa namba 07XX XXX XXX (jina: NAYA), kisha tuma SMS ya muamala kwa ofisi."></textarea>
+        <p class="alert alert-danger" id="sub-settings-error" role="alert" hidden></p>
+        <p class="alert alert-ok" id="sub-settings-saved" role="status" hidden>Imehifadhiwa</p>
+        <div class="actions"><button class="btn btn-primary" type="submit">Hifadhi mipangilio</button></div>
+        </form>
+      </section>
+
+      <section class="settings-section" id="set-mengine" aria-labelledby="set-mengine-title">
+        <header><h2 id="set-mengine-title">Bei na maeneo</h2><p class="muted">Kurasa zake kamili.</p></header>
+        <div class="settings-links">
+          <a class="settings-tile" href="#/bei"><strong>Bei na nauli</strong><span>Nauli ya msingi, kwa km na bei maalum za njia</span></a>
+          <a class="settings-tile" href="#/maeneo"><strong>Maeneo</strong><span>Stendi, masoko na maeneo ambayo wateja wanachagua</span></a>
+        </div>
+      </section>
+    </main>
+
+    <!-- Ofa za wateja (#/ofa) na Malipo (#/malipo) (ofa-admin.js) -->
     <main id="page-offers" class="page page-wide" hidden></main>
 
     <!-- Ripoti -->

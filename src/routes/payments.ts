@@ -21,6 +21,8 @@ import {
   paymentsOverview,
   payoutQueue,
   providerCheck,
+  saveWalletSettings,
+  walletOverview,
   rejectPayout,
   saveAutoPayout,
   startSubscriptionPayment,
@@ -95,6 +97,15 @@ export async function paymentRoutes(app: FastifyInstance): Promise<void> {
 
   // ---- Ofisi
   app.get('/api/admin/payments/overview', adminOnly, async () => ok(await paymentsOverview()));
+  app.get('/api/admin/payments/wallet', adminOnly, async (request) =>
+    ok(await walletOverview({ refresh: z.object({ refresh: z.string().optional() }).parse(request.query).refresh === '1' })),
+  );
+  app.put('/api/admin/payments/wallet-settings', adminOnly, async (request) => {
+    const input = z
+      .object({ lowBalance: z.coerce.number({ error: 'Weka kiwango' }).int('Weka namba kamili').min(0, 'Kiwango hakiwezi kuwa hasi').max(100_000_000, 'Kiwango ni kikubwa mno') })
+      .parse(request.body);
+    return ok(await saveWalletSettings(uid(request), input));
+  });
   app.get('/api/admin/payments/provider-check', { ...adminOnly, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async () => ok(await providerCheck()));
   app.get('/api/admin/payments/queue', adminOnly, async () => ok(await payoutQueue()));
   app.get('/api/admin/payments', adminOnly, async (request) => ok(await listPayments(listQuery.parse(request.query))));

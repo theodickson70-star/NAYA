@@ -632,6 +632,64 @@ export function paymentsCsv(rows: Awaited<ReturnType<typeof listPayments>>) {
   return `﻿${[head.join(','), ...lines].join('\r\n')}\r\n`;
 }
 
+// ------------------------------------------------------------------ salio la akaunti kuu (Abliner)
+
+export interface WalletSettings {
+  lowBalance: number; // salio likishuka chini ya hiki → onyo kwa ofisi
+}
+
+export async function getWalletSettings(client: Db = db): Promise<WalletSettings> {
+  const row = await one<{ value: Partial<WalletSettings> }>(client, `SELECT value FROM naya.settings WHERE key = 'wallet'`);
+  return { lowBalance: 1000, ...(row?.value ?? {}) };
+}
+
+export async function saveWalletSettings(adminId: string, input: WalletSettings) {
+  await transaction(async (client) => {
+    const before = await getWalletSettings(client);
+    await client.query(
+      `INSERT INTO naya.settings (key, value, updated_by, updated_at) VALUES ('wallet', $1, $2, now())
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_by = EXCLUDED.updated_by, updated_at = now()`,
+      [JSON.stringify(input), adminId],
+    );
+    await writeAudit(client, { actorId: adminId, action: 'settings.wallet', targetType: 'settings', targetId: null, details: { before, after: input } });
+  });
+  return getWalletSettings();
+}
+
+// Salio linasomwa Abliner mara moja kila sekunde 30 tu (dashboard ikiwa wazi kwa watu wengi haigongi Abliner kila mara).
+let balanceCache: { at: number; value: Awaited<ReturnType<typeof ablinerBalance>> } | null = null;
+async function cachedBalance(force = false) {
+  if (!force && balanceCache && Date.now() - balanceCache.at < 30_000) return balanceCache.value;
+  const value = await ablinerBalance();
+  balanceCache = { at: Date.now(), value };
+  return value;
+}
+
+/**
+ * Ofisi: salio la akaunti kuu ya Abliner + pesa za leo (saa za Dar es Salaam) + kiwango cha onyo.
+ * `balance: null` = halijulikani (Abliner haijaunganishwa au haikupatikana) — kamwe halibuniwi.
+ */
+export async function walletOverview(opts: { refresh?: boolean } = {}) {
+  const provider = getProvider();
+  const settings = await getWalletSettings();
+  const today = await one<Record<string, number>>(
+    db,
+    `SELECT coalesce(sum(amount) FILTER (WHERE direction = 'IN'), 0)::int AS "inAmount", count(*) FILTER (WHERE direction = 'IN')::int AS "inCount",
+            coalesce(sum(amount) FILTER (WHERE direction = 'OUT'), 0)::int AS "outAmount", count(*) FILTER (WHERE direction = 'OUT')::int AS "outCount"
+       FROM naya.payments
+      WHERE status = 'SUCCESS' AND completed_at >= (date_trunc('day', now() AT TIME ZONE '${TZ}') AT TIME ZONE '${TZ}')`,
+  );
+  const pending = await one<Record<string, number>>(
+    db,
+    `SELECT count(*)::int AS count, coalesce(sum(amount), 0)::int AS amount FROM naya.payments WHERE status = 'PENDING' AND direction = 'OUT'`,
+  );
+  const base = { provider: provider?.name ?? null, lowBalance: settings.lowBalance, today, pendingOut: pending, checkedAt: new Date() };
+  if (provider?.name !== 'abliner') return { ...base, connected: false, balance: null, currency: null, low: false, message: provider ? null : 'Kampuni ya malipo haijaunganishwa.' };
+  const b = await cachedBalance(opts.refresh);
+  if (!b.ok) return { ...base, connected: false, balance: null, currency: null, low: false, message: b.message };
+  return { ...base, connected: true, balance: b.balance, currency: b.currency, low: b.balance !== null && b.balance < settings.lowBalance, message: null };
+}
+
 /**
  * Ofisi: "Kagua muunganiko" — kampuni inayotumika, tatizo la mipangilio (majina ya variables tu), webhook URL,
  * na salio la Abliner (GET /api/v1/balance — haigusi pesa). Kamwe haionyeshi funguo zenyewe.
