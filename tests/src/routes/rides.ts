@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { ADMIN_ROLES, requireRole } from '../middleware/auth.js';
 import {
   acceptOffer,
+  completeByPassenger,
   advanceRide,
   cancelByAdmin,
   cancelByDriver,
@@ -90,6 +91,11 @@ export async function rideRoutes(app: FastifyInstance): Promise<void> {
     const { rating, comment } = ratingSchema.parse(request.body);
     return ok(await rateDriver(uid(request), id, rating, comment));
   });
+  // Abiria: "Nimefika — maliza safari" (dereva akisahau kubonyeza Maliza)
+  app.post('/api/rides/:id/complete', user, async (request) => {
+    const { id } = idParam.parse(request.params);
+    return ok(await completeByPassenger(uid(request), id));
+  });
   app.post('/api/rides/:id/close', user, async (request) => {
     const { id } = idParam.parse(request.params);
     return ok(await closeForPassenger(uid(request), id));
@@ -104,9 +110,14 @@ export async function rideRoutes(app: FastifyInstance): Promise<void> {
   app.get('/api/driver/state', user, async (request) => ok(await driverState(uid(request))));
   app.get('/api/driver/rides', user, async (request) => ok(await driverHistory(uid(request))));
   app.post('/api/driver/online', user, async (request) => ok(await setOnline(uid(request), onlineSchema.parse(request.body))));
-  app.post('/api/driver/location', { ...user, config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (request) =>
-    ok(await updateDriverLocation(uid(request), pingSchema.parse(request.body))),
-  );
+  app.post('/api/driver/location', { ...user, config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (request, reply) => {
+    const result = await updateDriverLocation(uid(request), pingSchema.parse(request.body));
+    // Huduma ya chinichini ya APK: dereva hayuko online tena (ameenda offline / amewekwa offline) → 409, huduma inasimama.
+    if (!result.updated && request.headers['x-naya-client'] === 'android-service') {
+      return reply.status(409).send({ success: false, message: 'Uko offline' });
+    }
+    return ok(result);
+  });
   app.post('/api/driver/offers/:id/accept', user, async (request) => {
     const { id } = idParam.parse(request.params);
     return ok(await acceptOffer(uid(request), id));

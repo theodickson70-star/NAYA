@@ -3,6 +3,9 @@
 import { escapeHtml as esc } from '/shared/api.js';
 import { formatDate, VEHICLE_TYPES } from '/shared/labels.js';
 import { rideMap } from '/shared/map.js';
+import { initI18n } from '/shared/i18n.js';
+
+initI18n();
 
 const box = document.getElementById('share-content');
 const token = location.hash.slice(1);

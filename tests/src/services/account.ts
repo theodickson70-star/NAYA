@@ -1,11 +1,14 @@
 // Akaunti moja ya NAYA: mtumiaji yule yule anaweza kuwa abiria na dereva, na anabadili "mode".
 // Kubadili mode HAKUTENGENEZI akaunti mpya — ni safu moja ya naya.users (active_mode).
+import { unreadFeedbackCount } from './feedback.js';
 import { db, transaction } from '../db/pool.js';
 import { notFound } from '../utils/http.js';
 import { driverStatusOf, ensureDriverProfile } from './drivers.js';
 import { assertCanSwitchMode, dispatchRide } from './rides.js';
 import { env } from '../config/env.js';
 import { smsEnabled } from './sms.js';
+import { unreadSupportCount } from './support.js';
+import { termsState } from './terms.js';
 import { findUserById, toPublicUser, type AppMode, type UserRow } from './users.js';
 
 export async function getAccount(user: UserRow) {
@@ -22,7 +25,15 @@ export async function getAccount(user: UserRow) {
     verificationRequired: smsEnabled() && !user.phone_verified_at,
     smsEnabled: smsEnabled(),
     /** Link ya kupakua app ya Android (APK) — kwa madereva wanaotaka kengele ya maombi. */
-    androidApkUrl: env.androidApkUrl ?? null,
+    androidApkUrl: '/pakua/',
+    /** Majibu ya ofisi (Msaada) ambayo mtumiaji bado hajasoma. */
+    supportUnread: await unreadSupportCount(user.id),
+    /** Majibu ya ofisi kwa maoni ambayo mtumiaji bado hajaona (kitone kwenye kichupo cha Maoni). */
+    feedbackUnread: await unreadFeedbackCount(user.id),
+    /** Masharti: amekubali toleo la sasa? (wa zamani wanaombwa kukubali kwenye app) */
+    terms: await termsState(db, user.id),
+    /** Mtu wa dharura (Akaunti → Usalama) — kitufe cha kumpigia kinaonekana kwenye "Dharura" safarini. */
+    emergency: user.emergency_phone ? { name: user.emergency_name ?? '', phone: user.emergency_phone } : null,
   };
 }
 

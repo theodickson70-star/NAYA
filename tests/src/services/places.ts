@@ -163,11 +163,20 @@ async function nearestLocationId(point: Point, maxKm: number): Promise<string | 
   return best?.id ?? null;
 }
 
+/** Eneo la huduma lililo karibu zaidi na pointi, na umbali wake (km, desimali moja). null = hakuna eneo bado. */
+export async function nearestServicePoint(point: Point): Promise<{ name: string; km: number } | null> {
+  let best: { name: string; km: number } | null = null;
+  for (const l of await listLocations()) {
+    const km = straightLineKm(point, l);
+    if (!best || km < best.km) best = { name: l.name, km };
+  }
+  return best ? { name: best.name, km: Math.round(best.km * 10) / 10 } : null;
+}
+
 /** Je, pointi iko ndani ya km SERVICE_RADIUS_KM kutoka eneo lolote la huduma? */
 export async function insideServiceArea(point: Point): Promise<boolean> {
-  const active = await listLocations();
-  const nearest = Math.min(...active.map((l) => straightLineKm(point, l)));
-  return Number.isFinite(nearest) && nearest <= SERVICE_RADIUS_KM;
+  const nearest = await nearestServicePoint(point);
+  return nearest !== null && nearest.km <= SERVICE_RADIUS_KM;
 }
 
 type PlaceRef = { locationId: string } | { lat: number; lng: number };
@@ -187,8 +196,13 @@ export async function estimateTrip(input: { pickup: PlaceRef; destination: { loc
   const [pickup, destination] = await Promise.all([resolvePlace(input.pickup, 'pickup'), resolvePlace(input.destination, 'destination')]);
 
   if (pickup.source === 'gps') {
-    if (!(await insideServiceArea(pickup))) {
-      throw badRequest('Uko nje ya eneo la huduma la NAYA kwa sasa. Chagua unapoanzia kwenye orodha ya maeneo.');
+    const nearest = await nearestServicePoint(pickup);
+    if (!nearest || nearest.km > SERVICE_RADIUS_KM) {
+      throw badRequest(
+        nearest
+          ? `Uko nje ya eneo la huduma la NAYA kwa sasa (km ${Math.round(nearest.km)} kutoka ${nearest.name}). Chagua unapoanzia kwenye orodha ya maeneo.`
+          : 'Uko nje ya eneo la huduma la NAYA kwa sasa. Chagua unapoanzia kwenye orodha ya maeneo.',
+      );
     }
     // Jina linalomsaidia dereva: "Karibu na <eneo lililo karibu zaidi>" (ramani inatumia GPS halisi).
     pickup.name = await describeGpsPoint(pickup);

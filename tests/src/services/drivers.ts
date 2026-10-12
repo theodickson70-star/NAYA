@@ -1,6 +1,7 @@
 // Madereva: usajili, chombo, nyaraka, kutuma kwa uthibitisho, na hatua za ofisi.
 // Kila badiliko la hali linafanyika kwa "UPDATE ... WHERE status = <hali inayotarajiwa>" ndani ya transaction,
 // kwa hiyo wasimamizi wawili hawawezi kumthibitisha na kumkataa dereva yule yule kwa wakati mmoja.
+import { acceptDriverTerms } from './terms.js';
 import { type Db, db, many, one, transaction } from '../db/pool.js';
 import { conflict, forbidden, isUniqueViolation, notFound } from '../utils/http.js';
 import type { DocumentType, VehicleInput } from '../validators/drivers.js';
@@ -209,6 +210,7 @@ export async function readDocument(driverId: string, type: DocumentType): Promis
 }
 
 export async function submitForReview(userId: string) {
+  // Route inahakikisha amekubali Masharti ya Dereva (acceptDriverTerms: true) kabla ya kufika hapa.
   await transaction(async (client) => {
     const driver = await lockEditable(client, userId);
     const check = requirements(driver, await findDocuments(client, userId));
@@ -216,6 +218,7 @@ export async function submitForReview(userId: string) {
     if (check.missingDocuments.length > 0) throw conflict('Pakia nyaraka zote zinazohitajika kwanza.');
     if (check.rejectedDocuments.length > 0) throw conflict('Badilisha nyaraka zilizokataliwa kwanza.');
     await assertPhoneVerified(client, userId);
+    await acceptDriverTerms(client, userId);
     await client.query(
       `UPDATE naya.drivers SET status = 'PENDING', submitted_at = now(), rejection_reason = NULL, updated_at = now()
         WHERE user_id = $1`,

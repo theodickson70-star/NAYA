@@ -28,6 +28,10 @@ export function createApi(storageKey) {
 
   async function send(method, path, { json, file } = {}) {
     const headers = token ? { authorization: `Bearer ${token}` } : {};
+    // Lugha ya mtumiaji: server inarudisha makosa (na kutuma arifa/SMS) kwa lugha hii.
+    headers['x-naya-lang'] = document.documentElement.lang === 'en' ? 'en' : 'sw';
+    // App ya Android (APK) au link kwenye browser — kwa ripoti za ofisi.
+    headers['x-naya-client'] = window.Capacitor?.getPlatform?.() === 'android' ? 'apk' : 'web';
     let body;
     if (file) {
       headers['content-type'] = file.type;

@@ -9,7 +9,7 @@ import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { connectionConfig, db } from '../db/pool.js';
 
-export type EventType = 'ride' | 'offer' | 'driver' | 'account' | 'admin' | 'location';
+export type EventType = 'ride' | 'offer' | 'driver' | 'account' | 'admin' | 'location' | 'support';
 
 export interface RealtimeMessage {
   type: EventType;

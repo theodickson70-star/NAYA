@@ -2,6 +2,7 @@
 //   Dereva: GET /api/driver/subscription
 //   Ofisi:  /api/admin/settings/subscription, /api/admin/subscriptions, /api/admin/drivers/:id/subscription…
 import type { FastifyInstance } from 'fastify';
+import { guessNetwork, paymentsConfig, pendingSubscriptionPayment } from '../services/payments/index.js';
 import { z } from 'zod';
 import { ADMIN_ROLES, requireRole } from '../middleware/auth.js';
 import {
@@ -15,6 +16,7 @@ import {
   subscriptionStats,
   voidPayment,
 } from '../services/subscriptions.js';
+import { getDispatchSettings, saveDispatchSettings } from '../services/dispatch-rules.js';
 import { ok } from '../utils/http.js';
 
 const driverParam = z.object({ id: z.uuid({ error: 'Dereva hajapatikana' }) });
@@ -60,9 +62,20 @@ export async function subscriptionRoutes(app: FastifyInstance): Promise<void> {
   const user = { preHandler: requireRole('USER') };
   const adminOnly = { preHandler: requireRole(...ADMIN_ROLES) };
 
-  app.get('/api/driver/subscription', user, async (request) => ok(await subscriptionForDriver(request.currentUser.id)));
+  app.get('/api/driver/subscription', user, async (request) => {
+    const sub = await subscriptionForDriver(request.currentUser.id);
+    // Malipo kwa simu: yamewashwa? + ombi linalosubiri (app ikifunguliwa upya inaendelea kusubiri PIN)
+    const config = paymentsConfig();
+    const pending = config.enabled ? await pendingSubscriptionPayment(request.currentUser.id) : null;
+    return ok({ ...sub, online: { enabled: config.enabled, networks: config.networks, suggestedNetwork: guessNetwork(request.currentUser.phone), pending } });
+  });
 
   app.get('/api/admin/settings/subscription', adminOnly, async () => ok(await getSettings()));
+  // Mfumo huru (madereva wachache): ada haitozwi, hakuna kuwekwa offline na mfumo, ombi kwa madereva wote walio karibu.
+  app.get('/api/admin/settings/dispatch', adminOnly, async () => ok(await getDispatchSettings()));
+  app.put('/api/admin/settings/dispatch', adminOnly, async (request) =>
+    ok(await saveDispatchSettings(request.currentUser.id, z.object({ openMode: z.boolean({ error: 'Chagua kuwasha au kuzima' }) }).parse(request.body))),
+  );
   app.put('/api/admin/settings/subscription', adminOnly, async (request) =>
     ok(await saveSettings(request.currentUser.id, settingsSchema.parse(request.body))),
   );

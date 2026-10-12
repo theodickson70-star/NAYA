@@ -16,9 +16,15 @@ import { adminRoutes } from './routes/admin.js';
 import { authRoutes } from './routes/auth.js';
 import { driverRoutes } from './routes/drivers.js';
 import { healthRoutes } from './routes/health.js';
+import { ofisiRoutes } from './routes/ofisi.js';
 import { placeRoutes } from './routes/places.js';
 import { pushRoutes } from './routes/push.js';
 import { rideRoutes } from './routes/rides.js';
+import { ofaRoutes } from './routes/ofa.js';
+import { ripotiRoutes } from './routes/ripoti.js';
+import { pakuaRoutes } from './routes/pakua.js';
+import { profileRoutes } from './routes/profile.js';
+import { paymentRoutes } from './routes/payments.js';
 import { safetyRoutes } from './routes/safety.js';
 import { subscriptionRoutes } from './routes/subscriptions.js';
 import { streamRoutes } from './routes/stream.js';
@@ -85,13 +91,19 @@ export async function buildApp(options: { logger?: boolean } = {}): Promise<Fast
   await app.register(adminRoutes);
   await app.register(adminDriverRoutes);
   await app.register(accountRoutes);
+  await app.register(profileRoutes);
+  await app.register(paymentRoutes);
   await app.register(driverRoutes);
   await app.register(placeRoutes);
   await app.register(rideRoutes);
   await app.register(streamRoutes);
   await app.register(pushRoutes);
   await app.register(subscriptionRoutes);
+  await app.register(ofisiRoutes);
   await app.register(safetyRoutes);
+  await app.register(pakuaRoutes);
+  await app.register(ripotiRoutes);
+  await app.register(ofaRoutes);
 
   // Kurasa za NAYA: /app/ (app moja ya abiria na dereva) na /admin/ (ofisi).
   await app.register(fastifyStatic, { root: FRONTEND_DIR, prefix: '/', index: ['index.html'] });
@@ -99,8 +111,10 @@ export async function buildApp(options: { logger?: boolean } = {}): Promise<Fast
   app.get('/admin', async (_request, reply) => reply.redirect('/admin/'));
   app.get('/app', async (_request, reply) => reply.redirect('/app/'));
   app.get('/safari', async (_request, reply) => reply.redirect('/safari/'));
+  app.get('/masharti', async (_request, reply) => reply.redirect('/masharti/'));
   // Mwanzo na anwani ya zamani ya app ya dereva → app moja ya NAYA.
-  app.get('/', async (_request, reply) => reply.redirect('/app/'));
+  // Link kuu ya NAYA: ukurasa wa kupakua app (Android → APK; iPhone na kompyuta → maelekezo).
+  app.get('/', async (_request, reply) => reply.redirect('/pakua/'));
   app.get('/dereva', async (_request, reply) => reply.redirect('/app/'));
   app.get('/dereva/', async (_request, reply) => reply.redirect('/app/'));
 

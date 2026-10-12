@@ -37,13 +37,61 @@ export const AUDIT_ACTIONS = {
   'driver.rejected': 'Alikataliwa',
   'driver.suspended': 'Alisimamishwa',
   'driver.reinstated': 'Alirudishwa kazini',
+  'driver.forced_offline': 'Alitolewa online na ofisi',
+  'user.suspended': 'Akaunti ilisimamishwa',
+  'user.reactivated': 'Akaunti ilirudishwa',
+  'user.phone_verified': 'Namba ilithibitishwa na ofisi',
+  'user.temp_password': 'Alipewa password ya muda',
+  'user.messaged': 'Alitumiwa ujumbe na ofisi',
+  'support.replied': 'Ofisi ilijibu ombi la msaada',
+  'support.resolved': 'Ombi la msaada lilitatuliwa',
+  'support.reopened': 'Ombi la msaada lilifunguliwa upya',
+  'feedback.reviewed': 'Maoni yake yalisomwa',
+  'feedback.acted': 'Maoni yake yalifanyiwa kazi',
+  'subscription.paid': 'Malipo ya ada yalirekodiwa',
+  'subscription.voided': 'Malipo ya ada yalibatilishwa',
+};
+
+export const SUPPORT_CATEGORIES = {
+  RIDE: 'Tatizo la safari',
+  FARE: 'Nauli',
+  DRIVER: 'Kuhusu dereva',
+  PASSENGER: 'Kuhusu abiria',
+  LOST_ITEM: 'Nimesahau kitu',
+  SAFETY: 'Usalama',
+  APP: 'App haifanyi kazi vizuri',
+  ACCOUNT: 'Akaunti yangu',
+  OTHER: 'Mengineyo',
+};
+
+export const FEEDBACK_TOPICS = {
+  GENERAL: 'Kwa ujumla',
+  APP: 'App ya NAYA',
+  PRICES: 'Bei',
+  DRIVERS: 'Madereva / abiria',
+  SAFETY: 'Usalama',
+  IDEA: 'Wazo jipya',
+  RIDE: 'Safari hii',
+};
+
+export const FEEDBACK_STATUS = {
+  NEW: { label: 'Mapya', tone: 'warn' },
+  REVIEWED: { label: 'Yamesomwa', tone: 'muted' },
+  ACTED: { label: 'Yamefanyiwa kazi', tone: 'ok' },
+};
+
+export const SUPPORT_STATUS = {
+  OPEN: { label: 'Inasubiri ofisi', tone: 'warn' },
+  ANSWERED: { label: 'Imejibiwa', tone: 'ok' },
+  RESOLVED: { label: 'Imetatuliwa', tone: 'muted' },
 };
 
 export function formatDate(value, withTime = false) {
   if (!value) return '–';
   const options = { day: 'numeric', month: 'short', year: 'numeric' };
   if (withTime) Object.assign(options, { hour: '2-digit', minute: '2-digit' });
-  return new Date(value).toLocaleString('sw-TZ', options);
+  const locale = typeof document !== 'undefined' && document.documentElement.lang === 'en' ? 'en-GB' : 'sw-TZ';
+  return new Date(value).toLocaleString(locale, options);
 }
 
 /** 255712345678 → 0712 345 678 */
@@ -66,4 +114,28 @@ export const LOCATION_CATEGORIES = {
 /** 1700 → "TSh 1,700" */
 export function formatTsh(amount) {
   return `TSh ${Math.round(Number(amount) || 0).toLocaleString('en-US')}`;
+}
+
+/** Alama za safari za kutiliwa shaka (GPS) — ofisi inaziona kwenye safari, ripoti na malipo ya ofa. */
+export const RIDE_FLAGS = {
+  START_FAR: { label: 'Ilianza mbali na abiria', hint: 'Dereva alianza safari akiwa zaidi ya mita 500 kutoka mahali pa kumchukua abiria.' },
+  ENDED_FAR: { label: 'Iliishia mbali na unakoenda', hint: 'Safari ilimalizwa zaidi ya mita 500 kutoka unakoenda.' },
+  TOO_SHORT: { label: 'Fupi kupita kiasi', hint: 'Safari ilimalizwa chini ya dakika 1 baada ya kuanza, ingawa njia ni ndefu.' },
+  AUTO_TIMEOUT: { label: 'Ilijifunga baada ya saa 3', hint: 'Hakuna aliyemaliza safari; NAYA iliifunga yenyewe baada ya saa 3.' },
+};
+
+/** Nani alimaliza safari. */
+export const COMPLETED_BY = {
+  DRIVER: 'Dereva',
+  PASSENGER: 'Abiria (Nimefika)',
+  AUTO: 'NAYA yenyewe (GPS)',
+  ADMIN: 'Ofisi',
+};
+
+/** Vibandiko vya alama: <span class="badge badge-warn" title="…">…</span> */
+export function flagBadges(flags, esc) {
+  return (flags ?? [])
+    .filter((f) => RIDE_FLAGS[f])
+    .map((f) => `<span class="badge badge-warn" title="${esc(RIDE_FLAGS[f].hint)}">${esc(RIDE_FLAGS[f].label)}</span>`)
+    .join(' ');
 }

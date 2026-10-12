@@ -34,6 +34,12 @@
             </intent-filter>
         </service>
 
+        <!-- Dereva online: kutuma mahali alipo hata skrini ikiwa imezimwa (arifa ndogo ya kudumu) -->
+        <service
+            android:name=".NayaDriverService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
+
         <receiver
             android:name=".StopRingReceiver"
             android:exported="false" />
@@ -68,6 +74,12 @@
     <!-- Mahali: abiria (kuchukuliwa) na dereva (kufuatiliwa kwenye safari) -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- Dereva online skrini ikiwa imezimwa: huduma ya mbele (mahali) na kuruhusiwa kutozuiwa na betri -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- "Sasisha" ndani ya app: kufungua dirisha la kusakinisha toleo jipya la NAYA -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- Picha za nyaraka za dereva (leseni, chombo) -->
     <uses-permission android:name="android.permission.CAMERA" />
 

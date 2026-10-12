@@ -64,6 +64,8 @@ const state = async (who: string) => (await call('GET', '/api/driver/state', und
 
 before(async () => {
   await runMigrations(() => {});
+  // Majaribio haya ni ya sheria za KAWAIDA (mfumo huru umezimwa); mfumo huru una majaribio yake (mfumo-huru.test.ts).
+  await db.query(`INSERT INTO naya.settings (key, value) VALUES ('dispatch', '{"openMode": false}') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`);
   app = await buildApp({ logger: false });
   for (const [name, p] of [[`Pickup R${s}`, A], [`Dest R${s}`, B]] as const) {
     const row = await db.query(`INSERT INTO naya.locations (name, category, lat, lng) VALUES ($1, 'OTHER', $2, $3) RETURNING id`, [name, p.lat, p.lng]);
@@ -91,6 +93,7 @@ after(async () => {
   await db.query('DELETE FROM naya.locations WHERE id = ANY($1::uuid[])', [locationIds]);
   await db.query('DELETE FROM naya.fare_rules');
   await app.close();
+  await db.query(`UPDATE naya.settings SET value = '{"openMode": true}' WHERE key = 'dispatch'`);
   await db.end();
 });
 
@@ -126,7 +129,16 @@ describe('NAYA Phase 5+6 — safari', () => {
   it('dereva asiyethibitishwa hawezi kwenda online (403); online bila mahali inakataliwa (400)', async () => {
     assert.equal((await call('POST', '/api/driver/online', { online: true, locationId: locationIds[0] }, 'd4')).status, 403);
     assert.equal((await call('POST', '/api/driver/online', { online: true }, 'd1')).status, 400);
-    assert.equal((await call('POST', '/api/driver/online', { online: true, lat: -6.8, lng: 39.28 }, 'd1')).status, 400);
+  });
+
+  it('dereva akiwa mbali (Dar es Salaam) bado anaweza kwenda online — anaambiwa yuko mbali na maeneo ya NAYA', async () => {
+    const far = await call('POST', '/api/driver/online', { online: true, lat: -6.8, lng: 39.28 }, 'd1');
+    assert.equal(far.status, 200, far.json.message);
+    assert.equal(far.json.data.online, true);
+    assert.equal(far.json.data.serviceArea.far, true);
+    assert.ok(far.json.data.serviceArea.km > 500);
+    assert.equal(far.json.data.serviceArea.pickupKm, 10);
+    assert.equal((await call('POST', '/api/driver/online', { online: false }, 'd1')).status, 200);
   });
 
   it('madereva wanaenda online (eneo la orodha au GPS)', async () => {
@@ -157,9 +169,10 @@ describe('NAYA Phase 5+6 — safari', () => {
     const s1 = await state('d1');
     assert.ok(s1.offer, 'd1 hakupata ombi');
     assert.equal(s1.offer.ride.id, rideId);
-    assert.ok(s1.offer.secondsLeft > 170 && s1.offer.secondsLeft <= 180, `secondsLeft ${s1.offer.secondsLeft}`);
-    assert.equal(s1.offer.totalSeconds, 180);
-    assert.equal((await state('d2')).offer, null);
+    // Wimbi la kwanza: madereva 2 walio karibu zaidi kwa pamoja, sekunde 15
+    assert.ok(s1.offer.secondsLeft > 10 && s1.offer.secondsLeft <= 15, `secondsLeft ${s1.offer.secondsLeft}`);
+    assert.equal(s1.offer.totalSeconds, 15);
+    assert.equal((await state('d2')).offer?.ride.id, rideId);
     assert.equal((await state('d3')).offer, null); // bajaji haipewi ombi la bodaboda
   });
 
@@ -213,10 +226,10 @@ describe('NAYA Phase 5+6 — safari', () => {
     assert.equal((await call('POST', `/api/driver/rides/${rideId}/complete`, {}, 'd1')).status, 409);
     assert.equal((await call('POST', `/api/driver/rides/${rideId}/arrive`, {}, 'd2')).status, 404);
     assert.equal((await call('POST', `/api/driver/rides/${rideId}/arrive`, {}, 'd1')).json.data.ride.status, 'ARRIVED');
-    const pin = (await call('GET', '/api/rides/current', undefined, 'p1')).json.data.pin;
-    assert.match(pin, /^\d{4}$/);
-    assert.equal((await call('POST', `/api/driver/rides/${rideId}/start`, {}, 'd1')).status, 400); // PIN inahitajika
-    assert.equal((await call('POST', `/api/driver/rides/${rideId}/start`, { pin }, 'd1')).json.data.ride.status, 'IN_PROGRESS');
+    // Safari ya kawaida (si ya ofa): hakuna PIN — kama Bolt, dereva anabonyeza tu "Anza safari"
+    assert.equal((await call('GET', '/api/rides/current', undefined, 'p1')).json.data.pin, null);
+    assert.equal((await state('d1')).ride.pinRequired, false);
+    assert.equal((await call('POST', `/api/driver/rides/${rideId}/start`, {}, 'd1')).json.data.ride.status, 'IN_PROGRESS');
     assert.equal((await call('POST', `/api/rides/${rideId}/cancel`, {}, 'p1')).status, 409); // imeshaanza
     assert.equal((await call('POST', `/api/rides/${rideId}/rate`, { rating: 5 }, 'p1')).status, 409); // bado haijaisha
     const done = await call('POST', `/api/driver/rides/${rideId}/complete`, {}, 'd1');

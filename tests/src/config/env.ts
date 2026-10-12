@@ -88,6 +88,8 @@ export const env = {
   firebaseServiceAccount: parseServiceAccount(read('FIREBASE_SERVICE_ACCOUNT')),
   /** Si lazima: link ya kupakua APK (mf. https://github.com/<mmiliki>/NAYA/releases/latest/download/NAYA.apk). */
   androidApkUrl: read('ANDROID_APK_URL'),
+  /** Si lazima: lazimisha namba ya toleo jipya la APK (vinginevyo inasomwa kutoka GitHub Releases). */
+  androidLatestVersionCode: Number(read('ANDROID_LATEST_VERSION_CODE') ?? '') || null,
 };
 
 if (env.androidApkUrl && !/^https:\/\//.test(env.androidApkUrl)) problems.push('ANDROID_APK_URL lazima ianze na https://');

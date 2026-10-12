@@ -37,6 +37,7 @@ before(async () => {
 });
 
 after(async () => {
+  await db.query('DELETE FROM naya.audit_logs WHERE actor_id IN (SELECT id FROM naya.users WHERE phone = ANY($1))', [[`255${customerPhone.slice(1)}`, `255${adminPhone.slice(1)}`]]);
   await db.query('DELETE FROM naya.users WHERE phone = ANY($1)', [[`255${customerPhone.slice(1)}`, `255${adminPhone.slice(1)}`]]);
   await app.close();
   await db.end();
@@ -56,7 +57,7 @@ describe('NAYA Phase 2', () => {
 
   it('mteja anajisajili; password haionekani kwenye jibu', async () => {
     const { status, json } = await call('POST', '/api/auth/register', {
-      fullName: 'Mteja Majaribio', phone: customerPhone, password: PASSWORD,
+      fullName: 'Mteja Majaribio', phone: customerPhone, password: PASSWORD, acceptTerms: true,
     });
     assert.equal(status, 201);
     assert.equal(json.success, true);
@@ -69,16 +70,32 @@ describe('NAYA Phase 2', () => {
     customerToken = json.data.token;
   });
 
+  it('masharti: bila kukubali hujisajili; aliyesajiliwa amekubali toleo la sasa; wa zamani anakubali kwenye app', async () => {
+    const refused = await call('POST', '/api/auth/register', { fullName: 'Bila Masharti', phone: '0719000001', password: PASSWORD }, undefined, '10.0.0.4');
+    assert.equal(refused.status, 400);
+    assert.match(refused.json.message, /Masharti/);
+    const me = await call('GET', '/api/account', undefined, customerToken);
+    assert.equal(me.json.data.terms.accepted, true);
+    assert.equal(me.json.data.terms.driverAccepted, null);
+    // Mtumiaji wa zamani (kabla ya masharti):
+    await db.query(`UPDATE naya.users SET terms_version = NULL, terms_accepted_at = NULL WHERE phone = $1`, [`255${customerPhone.slice(1)}`]);
+    assert.equal((await call('GET', '/api/account', undefined, customerToken)).json.data.terms.accepted, false);
+    assert.equal((await call('POST', '/api/account/terms', {}, customerToken)).status, 400);
+    const ok = await call('POST', '/api/account/terms', { accept: true }, customerToken);
+    assert.equal(ok.status, 200);
+    assert.equal(ok.json.data.accepted, true);
+  });
+
   it('namba ile ile haiwezi kusajiliwa mara mbili (409)', async () => {
     const { status, json } = await call('POST', '/api/auth/register', {
-      fullName: 'Mtu Mwingine', phone: `+255${customerPhone.slice(1)}`, password: PASSWORD,
+      fullName: 'Mtu Mwingine', phone: `+255${customerPhone.slice(1)}`, password: PASSWORD, acceptTerms: true,
     }, undefined, '10.0.0.2');
     assert.equal(status, 409);
     assert.equal(json.success, false);
   });
 
   it('uhakiki: namba mbaya na password fupi zinakataliwa (400)', async () => {
-    const { status, json } = await call('POST', '/api/auth/register', { fullName: 'Ab', phone: '12345', password: 'short' }, undefined, '10.0.0.3');
+    const { status, json } = await call('POST', '/api/auth/register', { fullName: 'Ab', phone: '12345', password: 'short', acceptTerms: true }, undefined, '10.0.0.3');
     assert.equal(status, 400);
     assert.match(json.message, /Namba ya simu si sahihi/);
     assert.match(json.message, /herufi 8/);

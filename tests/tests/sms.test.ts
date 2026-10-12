@@ -42,7 +42,7 @@ const skipCooldown = (phone: string) => db.query(`UPDATE naya.otp_codes SET crea
 
 async function register(phone: string, name: string) {
   phones.push(`255${phone.slice(1)}`);
-  const res = await call('POST', '/api/auth/register', { fullName: name, phone, password: PASSWORD });
+  const res = await call('POST', '/api/auth/register', { fullName: name, phone, password: PASSWORD, acceptTerms: true });
   assert.equal(res.status, 201, res.json.message);
   return res.json.data.token as string;
 }

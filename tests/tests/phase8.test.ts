@@ -64,6 +64,8 @@ const offerFor = async (who: string) => (await call('GET', '/api/driver/state', 
 
 before(async () => {
   await runMigrations(() => {});
+  // Majaribio haya ni ya sheria za KAWAIDA (mfumo huru umezimwa); mfumo huru una majaribio yake (mfumo-huru.test.ts).
+  await db.query(`INSERT INTO naya.settings (key, value) VALUES ('dispatch', '{"openMode": false}') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`);
   app = await buildApp({ logger: false });
   savedSettings = (await db.query(`SELECT value FROM naya.settings WHERE key = 'subscription'`)).rows[0]?.value ?? null;
   await db.query(
@@ -101,6 +103,7 @@ after(async () => {
   await db.query('DELETE FROM naya.fare_rules');
   if (savedSettings) await db.query(`UPDATE naya.settings SET value = $1 WHERE key = 'subscription'`, [JSON.stringify(savedSettings)]);
   await app.close();
+  await db.query(`UPDATE naya.settings SET value = '{"openMode": true}' WHERE key = 'dispatch'`);
   await db.end();
 });
 
@@ -234,7 +237,7 @@ describe('NAYA Phase 8 — usalama na ramani ya live', () => {
   let rideId = '';
   let pin = '';
 
-  it('safari inapata PIN; abiria anaiona, dereva haioni', async () => {
+  it('safari ya ofa inapata PIN; abiria anaiona, dereva haioni (ya kawaida haina PIN)', async () => {
     await call('POST', '/api/driver/online', { online: false }, 'expired');
     await call('POST', '/api/driver/online', { online: true, lat: A.lat - 0.002, lng: A.lng }, 'paid');
     const ride = await book('p1');
@@ -245,6 +248,9 @@ describe('NAYA Phase 8 — usalama na ramani ya live', () => {
     const accepted = await call('POST', `/api/driver/offers/${offer.id}/accept`, {}, 'paid');
     assert.equal(accepted.status, 200, accepted.json.message);
     assert.equal(accepted.json.data.ride.pin, undefined);
+    assert.equal((await call('GET', '/api/rides/current', undefined, 'p1')).json.data.pin, null); // ya kawaida: hakuna PIN
+    // PIN ni ya safari za ofa tu — iige hapa kwa kuweka PIN moja kwa moja
+    await db.query(`UPDATE naya.rides SET start_pin = '4821' WHERE id = $1`, [rideId]);
     const view = (await call('GET', '/api/rides/current', undefined, 'p1')).json.data;
     assert.match(view.pin, /^\d{4}$/);
     pin = view.pin;
@@ -278,7 +284,8 @@ describe('NAYA Phase 8 — usalama na ramani ya live', () => {
     assert.equal(view.json.data.driver.plateNumber, `MC ${s.slice(-3)} PAI`);
     assert.ok(view.json.data.driver.location);
     const text = JSON.stringify(view.json.data);
-    assert.equal(text.includes('255'), false, 'namba ya simu haipaswi kuonekana');
+    // namba ya simu (255 + tarakimu 9) — si '255' popote (inaweza kutokea kwenye muda/mahali kwa bahati)
+    assert.equal(/255[67]\d{8}/.test(text), false, 'namba ya simu haipaswi kuonekana');
     assert.equal((await call('POST', '/api/share', { token: 'x'.repeat(32) })).status, 404);
     // link mpya inaua ya zamani
     await call('POST', `/api/rides/${rideId}/share`, {}, 'p1');
@@ -326,6 +333,7 @@ describe('NAYA Phase 8 — usalama na ramani ya live', () => {
     const second = await book('p1');
     const offer = await offerFor('paid');
     await call('POST', `/api/driver/offers/${offer.id}/accept`, {}, 'paid');
+    await db.query(`UPDATE naya.rides SET start_pin = '7350' WHERE id = $1`, [second.json.data.id]);
     await call('POST', `/api/driver/rides/${second.json.data.id}/arrive`, {}, 'paid');
     const pin2 = (await call('GET', '/api/rides/current', undefined, 'p1')).json.data.pin;
     const bad2 = pin2 === '0000' ? '1111' : '0000';
