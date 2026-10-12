@@ -23,6 +23,11 @@ export interface UserRow {
   app_client?: 'apk' | 'web' | null;
   app_seen_at?: Date | null;
   apk_since?: Date | null;
+  /** Picha ya mtumiaji (migration 022) — dereva anaiona akipokea ombi la safari. */
+  photo_file_id?: string | null;
+  photo_updated_at?: Date | null;
+  emergency_name?: string | null;
+  emergency_phone?: string | null;
 }
 
 /** Mtumiaji kama anavyoonekana nje ya server — kamwe bila password_hash wala token_version. */
@@ -35,6 +40,9 @@ export interface PublicUser {
   /** Mode aliyochagua mara ya mwisho; null = bado hajachagua (aonyeshwe "Utatumiaje NAYA?"). */
   activeMode: AppMode | null;
   createdAt: Date;
+  /** Ana picha? photoVersion inabadilika picha ikibadilishwa (kwa cache ya app). */
+  hasPhoto: boolean;
+  photoVersion: number | null;
 }
 
 export function toPublicUser(u: UserRow): PublicUser {
@@ -46,6 +54,8 @@ export function toPublicUser(u: UserRow): PublicUser {
     status: u.status,
     activeMode: u.active_mode,
     createdAt: u.created_at,
+    hasPhoto: !!u.photo_file_id,
+    photoVersion: u.photo_updated_at ? new Date(u.photo_updated_at).getTime() : null,
   };
 }
 

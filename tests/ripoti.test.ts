@@ -10,7 +10,8 @@ import { hashPassword } from '../src/services/auth.js';
 import { dispatchPending } from '../src/services/rides.js';
 
 let app: FastifyInstance;
-const s = String(Date.now()).slice(-6);
+// Kiambishi kisianze na 0: utafutaji wa "0…" unachukuliwa kama namba ya simu (2557…), na jaribio lingekosa majina.
+const s = String(Date.now()).slice(-6).replace(/^0/, '1');
 const PASSWORD = 'NayaTest#2026';
 const userIds: string[] = [];
 const locationIds: string[] = [];

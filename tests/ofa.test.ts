@@ -65,8 +65,14 @@ async function finish(passenger: string, driver: string, rideId: string) {
   assert.equal(offer?.ride.id, rideId, `${driver} hakupata ombi`);
   assert.equal((await call('POST', `/api/driver/offers/${offer.id}/accept`, {}, driver)).status, 200);
   await call('POST', `/api/driver/rides/${rideId}/arrive`, {}, driver);
-  const pin = (await call('GET', '/api/rides/current', undefined, passenger)).json.data.pin;
-  await call('POST', `/api/driver/rides/${rideId}/start`, { pin }, driver);
+  const view = (await call('GET', '/api/rides/current', undefined, passenger)).json.data;
+  // PIN ni ya safari za ofa tu (kinga ya safari hewa); safari ya kawaida haina PIN
+  if (view.promo) {
+    assert.match(view.pin, /^\d{4}$/);
+    assert.equal((await call('POST', `/api/driver/rides/${rideId}/start`, {}, driver)).status, 400);
+  } else assert.equal(view.pin, null);
+  const started = await call('POST', `/api/driver/rides/${rideId}/start`, view.pin ? { pin: view.pin } : {}, driver);
+  assert.equal(started.status, 200, started.json.message);
   const done = await call('POST', `/api/driver/rides/${rideId}/complete`, {}, driver);
   assert.equal(done.status, 200, done.json.message);
   await call('POST', `/api/rides/${rideId}/close`, {}, passenger);

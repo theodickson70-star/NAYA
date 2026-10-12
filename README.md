@@ -94,6 +94,51 @@ Dereva akighairi baada ya kukubali → safari inarudi SEARCHING (dereva mwingine
   sasa hivi, na dakika za iliyo karibu kufika (`GET /api/rides/nearby`). Faragha ya dereva: hakuna jina wala namba, mahali
   panazungushwa hadi ~mita 100. Inasasishwa kila sekunde 15.
 
+## Safari rahisi — bila PIN, GPS inasaidia (0.14.2)
+
+Kama Bolt: safari ya kawaida **haina PIN**. Dereva anabonyeza "Abiria amepanda — Anza safari" na mwishoni "Maliza safari".
+PIN inabaki kwa **safari za ofa tu** (NAYA inamlipa dereva sehemu ya nauli, kwa hiyo PIN inazuia "safari hewa").
+GPS ya dereva (ping ya `/api/driver/location`) inafanya kazi ya kinga ya kusahau:
+
+| Hali | NAYA inafanya nini |
+|---|---|
+| Dereva yuko ndani ya **m 100** ya abiria | "Nimefika" inawekwa yenyewe (`auto_arrived`) |
+| Dereva anabonyeza "Nimefika" akiwa zaidi ya **km 1** | Inakataliwa (409) |
+| Baada ya kufika, dereva anaondoka **m 300+** kuelekea unakoenda | Safari inaanza yenyewe (`auto_started`) — si kwa safari za ofa: hapo dereva anakumbushwa PIN mara moja |
+| Dereva yuko ndani ya **m 200** ya unakoenda | Ukumbusho "Umefika?"; asipobonyeza, safari inamalizwa yenyewe baada ya **dakika 5** |
+| Safari haijamalizwa kwa **saa 3** | Inamalizwa yenyewe, alama `AUTO_TIMEOUT` |
+| Abiria anabonyeza "Nimefika — maliza safari" (`POST /api/rides/:id/complete`) | Safari inamalizwa, dereva anajulishwa |
+
+Alama za kutiliwa shaka (`rides.flags`), zinaonekana kwa ofisi kwenye safari, Ripoti → Maombi (na CSV) na Ofa → malipo ya dereva:
+`START_FAR` (alianza zaidi ya m 500 kutoka kwa abiria), `ENDED_FAR` (alimaliza zaidi ya m 500 kutoka unakoenda),
+`TOO_SHORT` (chini ya dakika 1 kwenye njia ndefu), `AUTO_TIMEOUT`. `completed_by` inaonyesha aliyemaliza:
+DRIVER, PASSENGER, AUTO au ADMIN. Migration `021_safari_rahisi.sql` inaongeza safu tu (haifuti data); safari zinazoendelea zisizo
+za ofa zinaondolewa PIN ili zisikwame.
+
+## Akaunti mpya (0.15.0)
+
+App → **Akaunti** sasa ni menyu (kama Bolt/Uber), si orodha ndefu ya kadi:
+
+| Sehemu | Njia | Kina nini |
+|---|---|---|
+| Wasifu | `#/akaunti/wasifu` | Picha (mraba 640px JPEG, inapunguzwa kwenye simu), jina, simu, takwimu (safari, nyota, alichookoa kwa ofa) |
+| Ofa | `#/akaunti/ofa` | Ofa zinazomfaa, alichookoa, jinsi ofa zinavyofanya kazi (haionekani kwenye mode ya Dereva) |
+| Shughuli | `#/akaunti/shughuli` | Safari zake (na za udereva kama ni dereva) + arifa |
+| Usalama | `#/akaunti/usalama` | Mtu wa dharura, vipengele vya usalama safarini, namba 112 na Msaada wa NAYA |
+| Msaada | `#/akaunti/msaada` | Simu / WhatsApp +255 628 986 770, barua pepe, ripoti tatizo (`#/akaunti/msaada/mpya`), maswali ya haraka, toa maoni |
+| Mipangilio | `#/akaunti/mipangilio` | Lugha, arifa, sauti, password, APK, masharti |
+| Udereva | `#/akaunti/ada`, `#/akaunti/malipo-ya-ofa` | Kwa madereva walioidhinishwa tu |
+
+- **Picha ya mteja inaenda kwa dereva:** dereva aliyepewa ombi anaona jina la kwanza, picha na nyota za abiria
+  (`offer.passenger`), na wakati wa safari (`ride.passenger.hasPhoto`). Picha: `GET /api/driver/rides/:id/passenger-photo` —
+  dereva wa safari au aliye na ombi linalosubiri tu; wengine 404. Namba ya simu ya abiria bado inaonekana baada ya kukubali tu.
+- API: `GET/PUT /api/account/profile`, `PUT /api/account/photo` (body = picha), `POST /api/account/photo/delete`,
+  `GET /api/account/photo`, `PUT /api/account/emergency`, `POST /api/account/emergency/delete`, `GET /api/admin/users/:id/photo`.
+- Dereva anayehakikiwa / aliyeidhinishwa hawezi kubadilisha jina mwenyewe (limethibitishwa na nyaraka).
+- **Mtu wa dharura** anaonekana kwenye "Dharura" safarini (kitufe cha kumpigia), kwa ofisi kwenye Dharura na kwenye wasifu wa mtumiaji.
+- Mawasiliano ya Msaada yako kwenye `frontend/shared/contact.js`.
+- Migration `022_akaunti.sql` inaongeza safu tu (`photo_file_id`, `photo_updated_at`, `emergency_name`, `emergency_phone`).
+
 ## Realtime na arifa (Phase 7)
 
 - **Papo hapo:** app na ofisi zinafungua `GET /api/stream` (Server-Sent Events). Tiketi ya kuingia (`POST /api/stream/ticket`) inadumu sekunde 60
@@ -121,7 +166,7 @@ Dereva akighairi baada ya kukubali → safari inarudi SEARCHING (dereva mwingine
 
 - **Ramani:** abiria anaona pikipiki ya dereva ikisogea na dakika za kufika. Dereva akiwa na safari, simu yake inatuma mahali kila sekunde 5
   (vinginevyo kila sekunde 20). Mahali pa dereva panaenda kwa abiria wa safari yake tu.
-- **PIN ya safari:** kila safari ina PIN ya tarakimu 4 inayoonekana kwa abiria tu. Dereva anaiingiza kuanza safari. Ikikosewa mara 5,
+- **PIN ya safari (safari za ofa tu tangu 0.14.2):** safari ya ofa ina PIN ya tarakimu 4 inayoonekana kwa abiria tu. Dereva anaiingiza kuanza safari. Ikikosewa mara 5,
   safari haiwezi kuanzishwa (ofisi inaona kwenye ukurasa wa safari).
 - **Shiriki safari:** abiria anatuma link (`/safari/#…`) kwa ndugu; inaonyesha dereva, plate na ramani bila kuingia, bila namba za simu,
   na inakufa saa 2 baada ya safari kuisha. Database inahifadhi SHA-256 ya link tu.
@@ -242,6 +287,22 @@ Malipo kwa madereva (Ofisi → Ofa → **Malipo kwa madereva**):
 - Ofisi inaona kila dereva: safari za ofa, NAYA inadaiwa kiasi gani, kimelipwa kiasi gani, salio, na **namba ya kutuma pesa**. Pakua Excel (CSV).
 - Ofisi inatuma pesa kwanza, kisha **inaandika malipo** pamoja na namba ya muamala (kiasi hakizidi deni; muamala mmoja hautumiki mara mbili). Dereva anapata arifa + SMS. Malipo yaliyokosewa yanafutwa kwa sababu.
 - Migration `019_ofa.sql`: tables `promotions`, `driver_payout_accounts`, `promo_payouts` na columns za ofa kwenye `rides` — hakuna data inayofutwa.
+
+
+### Uwazi wa ofa (0.14.3)
+
+- **Chunguza mteja** (Ofisi → Ofa → Chunguza mteja, `GET /api/admin/promotions/check?phone=&fare=&vehicle=`): namba ya simu →
+  "Anaona ofa" au "Haoni ofa" na sababu moja wazi (ni dereva, si mteja mpya, ameshatumia safari zake, nauli nje ya kiwango,
+  chombo kingine, ofa imesimamishwa / haijaanza / imeisha, bajeti imeisha), kila ofa na sababu yake, na safari zake 5 za karibuni
+  (ikiwemo "ofa iliondolewa" madereva walio karibu walipokuwa wamemaliza nafasi zao).
+- **Hakiki kabla ya kuwasha** (`POST /api/admin/promotions/preview`, `GET /api/admin/promotions/:id/preview`): wateja wangapi
+  wanaweza kuipata sasa, safari ngapi za siku 30 zingeipata, na maonyo (tarehe ya baadaye, chombo kimoja, nauli ya chini/juu
+  inayozuia safari nyingi, bajeti, nafasi za madereva, ofa nyingine inayoendelea). Inaonekana kwenye fomu unapoandika, na
+  "Washa ofa" sasa inaonyesha haya kwanza kabla ya kuthibitisha.
+- **Mteja anaambiwa:** `GET /api/offers?full=1` inarudisha `{ offers, notice }` — akaunti ya dereva inaambiwa "Ofa za NAYA ni kwa
+  wateja tu", aliyetumia safari zote anaambiwa. Bei ya chombo kisichopata ofa inaonyesha sababu (`promoNote`, mf. "ni kwa Bodaboda tu").
+  `GET /api/offers` bila `full` bado inarudisha orodha (app za zamani).
+- Ofa ikiondolewa wakati wa kuagiza (madereva walio karibu wamemaliza nafasi zao), mteja sasa anapata arifa papo hapo.
 
 ## Ripoti kamili za ofisi (0.13.4)
 

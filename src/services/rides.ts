@@ -12,6 +12,7 @@ import { publish } from '../realtime/hub.js';
 import { badRequest, conflict, forbidden, isUniqueViolation, notFound } from '../utils/http.js';
 import { writeAudit } from './audit.js';
 import { readDocument } from './drivers.js';
+import { passengerCard } from './profile.js';
 import { straightLineKm } from './fare-engine.js';
 import { notify, notifyAdmins } from './notify.js';
 import { estimateTrip, findLocation, nearestServicePoint, SERVICE_RADIUS_KM } from './places.js';
@@ -45,6 +46,23 @@ export const DRIVER_STALE_SECONDS = 120; // dereva wa browser asiyeonekana kwa m
 export const APP_DRIVER_STALE_SECONDS = 30 * 60;
 /** Dereva akikosa kujibu maombi haya mfululizo (simu imezimika / hayupo), anawekwa offline — wateja wasisubiri bure. */
 export const MISSED_OFFERS_OFFLINE = 2;
+/**
+ * Safari rahisi (kama Bolt): PIN ni ya safari za ofa tu. GPS ya dereva inasaidia:
+ *  - ndani ya mita 100 za abiria → "Nimefika" yenyewe;
+ *  - "Nimefika" kwa mkono inakataliwa dereva akiwa zaidi ya km 1 (GPS mpya);
+ *  - ameondoka zaidi ya mita 300 kuelekea unakoenda (bila PIN) → safari inaanza yenyewe;
+ *  - ndani ya mita 200 za unakoenda → anakumbushwa "Maliza"; baada ya dakika 5 safari inamalizwa yenyewe.
+ * Alama kwa ofisi: START_FAR (alianza mbali na abiria), ENDED_FAR (alimaliza mbali na unakoenda), TOO_SHORT, AUTO_TIMEOUT.
+ */
+const AUTO_ARRIVE_KM = 0.1;
+const ARRIVE_MAX_KM = 1;
+const START_LEAVE_KM = 0.3;
+const START_FAR_KM = 0.5;
+const DEST_NEAR_KM = 0.2;
+const END_FAR_KM = 0.5;
+export const AUTO_COMPLETE_MINUTES = 5;
+const MAX_TRIP_HOURS = 3;
+const GPS_FRESH_SECONDS = 120;
 export const PIN_MAX_ATTEMPTS = 5; // PIN ya safari ikikosewa mara hizi, dereva hawezi kuanza safari (wasiliana na ofisi)
 const CITY_SPEED_KMH = 22; // makadirio ya mwendo mjini (bodaboda/bajaji) kwa muda wa kufika
 const ROAD_FACTOR = 1.3;
@@ -86,6 +104,12 @@ interface RideRow {
   promotion_id: string | null;
   promo_discount: number;
   promo_title: string | null;
+  /** Migration 021: alama za ofisi, GPS ya kufika, na nani alimaliza safari. */
+  flags: string[];
+  near_dest_at: Date | null;
+  auto_arrived: boolean;
+  auto_started: boolean;
+  completed_by: 'DRIVER' | 'PASSENGER' | 'AUTO' | 'ADMIN' | null;
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
@@ -132,6 +156,7 @@ export async function dispatchPending(): Promise<void> {
   if (expired.length) await offlineDriversWhoMissOffers([...new Set(expired.map((o) => o.driver_id))]);
   const rides = await many<{ id: string }>(db, `SELECT id FROM naya.rides WHERE status = 'SEARCHING' ORDER BY requested_at LIMIT 50`);
   for (const ride of rides) await dispatchRide(ride.id);
+  await autoCompleteRides();
 }
 
 /** Madereva waliokosa kujibu maombi MISSED_OFFERS_OFFLINE mfululizo tangu waende online → offline, na wanajulishwa. */
@@ -217,7 +242,7 @@ export async function dispatchRide(rideId: string): Promise<void> {
       const everyone = await findCandidates(client, { ...base, exclude: [] });
       if (everyone.some((c) => c.km <= MAX_PICKUP_KM)) {
         // Hakuna dereva mwenye nafasi ya ofa karibu: safari inaendelea bila ofa (abiria anaambiwa, anaweza kughairi bure).
-        await client.query(`UPDATE naya.rides SET promotion_id = NULL, promo_discount = 0, promo_title = NULL, updated_at = now() WHERE id = $1`, [rideId]);
+        await client.query(`UPDATE naya.rides SET promotion_id = NULL, promo_discount = 0, promo_title = NULL, start_pin = NULL, updated_at = now() WHERE id = $1`, [rideId]);
         await history(client, rideId, 'SEARCHING', 'SEARCHING', null, `Ofa imeondolewa: madereva waliopo wamefikia kikomo cha ofa (${ride.promo_title ?? ''})`);
         promoDropped = { passengerId: ride.passenger_id, fare: ride.fare };
         ride.promotion_id = null;
@@ -344,6 +369,9 @@ function baseView(r: RideRow) {
     // Ofa: abiria analipa dereva passengerPays taslimu; NAYA inamlipa dereva promo.discount.
     passengerPays: r.fare - (r.promo_discount ?? 0),
     promo: r.promo_discount > 0 ? { title: r.promo_title, discount: r.promo_discount } : null,
+    completedBy: r.completed_by,
+    autoStarted: r.auto_started,
+    nearDestination: !!r.near_dest_at,
     currency: 'TZS' as const,
     paymentMethod: r.payment_method,
     cancelledBy: r.cancelled_by,
@@ -385,10 +413,11 @@ async function passengerView(client: Db, r: RideRow) {
 
 async function driverView(client: Db, r: RideRow) {
   const passenger = await one<{ full_name: string; phone: string }>(client, 'SELECT full_name, phone FROM naya.users WHERE id = $1', [r.passenger_id]);
+  const card = passenger ? await passengerCard(r.passenger_id) : null;
   return {
     ...baseView(r),
     ratingForPassenger: r.rating_for_passenger,
-    passenger: passenger && { name: passenger.full_name, phone: passenger.phone },
+    passenger: passenger && { name: passenger.full_name, phone: passenger.phone, hasPhoto: card?.hasPhoto ?? false, rating: card?.rating ?? null, trips: card?.trips ?? 0 },
     pinRequired: r.status === 'ARRIVED' && r.start_pin !== null,
     pinAttemptsLeft: Math.max(0, PIN_MAX_ATTEMPTS - r.pin_attempts),
     sosOpen: r.driver_id && WITH_DRIVER.includes(r.status) ? await openSosFor(client, r.driver_id, r.id) : false,
@@ -446,6 +475,7 @@ export async function requestRide(
   if (!option) throw conflict('Bei za chombo hiki bado hazijawekwa. Chagua chombo kingine.');
   // Ofa (punguzo) — server inaamua. Kama ofa ina kikomo cha dereva, lazima kuwe na dereva mwenye nafasi karibu.
   let promo = await bestPromotion(db, passengerId, input.vehicleType, option.fare);
+  let promoBlocked: string | null = null; // ofa ilimfaa, lakini madereva walio karibu wamemaliza nafasi zao
   if (promo) {
     const over = await driversOverPromoLimit(db, promo.promotionId);
     if (over.length) {
@@ -456,7 +486,10 @@ export async function requestRide(
       const any = nearby.some((c) => c.km <= MAX_PICKUP_KM);
       const others = any ? true : (await findCandidates(db, { rideId: null, lat: estimate.pickup.lat, lng: estimate.pickup.lng, vehicleType: input.vehicleType, passengerId, graceDays, limit: 3, exclude: [] })).some((c) => c.km <= MAX_PICKUP_KM);
       // Hakuna dereva mwenye nafasi ya ofa lakini wapo wengine → safari ya kawaida (bei kamili inaonyeshwa).
-      if (!any && others) promo = null;
+      if (!any && others) {
+        promoBlocked = promo.title;
+        promo = null;
+      }
     }
   }
 
@@ -482,13 +515,14 @@ export async function requestRide(
           estimate.destination.lng,
           option.distanceKm,
           option.fare,
-          newPin(),
+          promo ? newPin() : null, // PIN ni kwa safari za ofa tu
           promo?.promotionId ?? null,
           promo?.discount ?? 0,
           promo?.title ?? null,
         ],
       );
       await history(client, row!.id, null, 'SEARCHING', passengerId);
+      if (promoBlocked) await history(client, row!.id, 'SEARCHING', 'SEARCHING', null, `Ofa imeondolewa: madereva waliopo wamefikia kikomo cha ofa (${promoBlocked})`);
       return row!.id;
     });
   } catch (error) {
@@ -496,6 +530,16 @@ export async function requestRide(
     throw error;
   }
   await notifyAdmins(rideId);
+  if (promoBlocked) {
+    await notify({
+      userId: passengerId,
+      event: 'ride',
+      rideId,
+      kind: 'promo_dropped',
+      title: 'Ofa haipatikani kwa safari hii',
+      body: `Madereva walio karibu wamefikia kikomo cha safari za ofa. Tunakutafutia dereva kwa nauli ya kawaida ${tsh(option.fare)}. Unaweza kughairi bila gharama.`,
+    });
+  }
   await dispatchRide(rideId);
   return passengerView(db, (await findRide(db, rideId))!);
 }
@@ -664,9 +708,12 @@ export async function updateDriverLocation(driverId: string, point: { lat: numbe
   );
   if (updated) {
     // Abiria wa safari inayoendelea anaona pikipiki ikisogea kwenye ramani (yeye tu).
-    const ride = await one<{ id: string; passenger_id: string; status: RideStatus; pickup_lat: number; pickup_lng: number; dest_lat: number; dest_lng: number }>(
+    const ride = await one<{
+      id: string; driver_id: string; passenger_id: string; status: RideStatus; pickup_lat: number; pickup_lng: number; dest_lat: number; dest_lng: number;
+      start_pin: string | null; flags: string[]; near_dest_at: Date | null;
+    }>(
       db,
-      `SELECT id, passenger_id, status, pickup_lat, pickup_lng, dest_lat, dest_lng FROM naya.rides
+      `SELECT id, driver_id, passenger_id, status, pickup_lat, pickup_lng, dest_lat, dest_lng, start_pin, flags, near_dest_at FROM naya.rides
         WHERE driver_id = $1 AND status IN ('ACCEPTED', 'ARRIVED', 'IN_PROGRESS')`,
       [driverId],
     );
@@ -684,6 +731,7 @@ export async function updateDriverLocation(driverId: string, point: { lat: numbe
           distanceKm: ride.status === 'ACCEPTED' ? round1(km) : null,
         },
       });
+      await autoProgress(ride, point);
     }
   }
   return { updated: !!updated };
@@ -726,6 +774,8 @@ export async function driverState(driverId: string) {
       totalSeconds: offerRow.total_seconds || OFFER_SECONDS,
       distanceToPickupKm: offerRow.distance_km,
       ride: { ...baseView(ride) },
+      // Abiria ni nani: jina la kwanza, picha (kama ameweka) na nyota — namba ya simu inaonekana baada ya kukubali tu
+      passenger: await passengerCard(ride.passenger_id),
     };
   }
 
@@ -901,37 +951,172 @@ export async function startRide(driverId: string, rideId: string, pin: string | 
   return advanceRide(driverId, rideId, 'start');
 }
 
-/** Nimefika → Anza safari → Maliza safari (dereva wa safari hii tu, kwa mpangilio huo tu). */
-export async function advanceRide(driverId: string, rideId: string, step: keyof typeof STEP) {
+/** Mahali pa dereva kama GPS yake ni ya karibuni (dakika 2), vinginevyo null. */
+async function freshDriverPoint(client: Db, driverId: string) {
+  const row = await one<{ lat: number; lng: number }>(
+    client,
+    `SELECT last_lat::float8 AS lat, last_lng::float8 AS lng FROM naya.drivers
+      WHERE user_id = $1 AND last_lat IS NOT NULL AND last_seen_at > now() - make_interval(secs => $2::float8)`,
+    [driverId, GPS_FRESH_SECONDS],
+  );
+  return row;
+}
+
+type StepActor = 'DRIVER' | 'SYSTEM' | 'PASSENGER';
+
+/**
+ * Nimefika → Anza safari → Maliza safari, kwa mpangilio huo tu.
+ * by: DRIVER (amebonyeza), SYSTEM (GPS ya NAYA), PASSENGER (abiria amebonyeza "Nimefika" mwisho wa safari).
+ */
+export async function advanceRide(driverId: string, rideId: string, step: keyof typeof STEP, opts: { by?: StepActor; flags?: string[] } = {}) {
+  const by = opts.by ?? 'DRIVER';
   const { from, to, column } = STEP[step];
+  const before = await findRide(db, rideId);
+  if (!before || before.driver_id !== driverId) throw notFound('Safari haikupatikana');
+  const flags = [...(opts.flags ?? [])];
+  const here = await freshDriverPoint(db, driverId);
+  const pickup = { lat: Number(before.pickup_lat), lng: Number(before.pickup_lng) };
+  const dest = { lat: Number(before.dest_lat), lng: Number(before.dest_lng) };
+  if (step === 'arrive' && by === 'DRIVER' && here && straightLineKm(here, pickup) > ARRIVE_MAX_KM) {
+    throw conflict(`Bado hujafika kwa abiria (uko km ${round1(straightLineKm(here, pickup))}). Ukifika karibu, NAYA itaweka "Nimefika" yenyewe.`);
+  }
+  if (step === 'start' && by === 'DRIVER' && here && straightLineKm(here, pickup) > START_FAR_KM) flags.push('START_FAR');
+  if (step === 'complete' && by !== 'SYSTEM') {
+    if (here && straightLineKm(here, dest) > END_FAR_KM) flags.push('ENDED_FAR');
+    const seconds = before.started_at ? (Date.now() - new Date(before.started_at).getTime()) / 1000 : 0;
+    if (seconds < 60 && Number(before.distance_km) > 0.5) flags.push('TOO_SHORT');
+  }
+  const completedBy = step === 'complete' ? (by === 'SYSTEM' ? 'AUTO' : by) : null;
   await transaction(async (client) => {
     const updated = await one(
       client,
-      `UPDATE naya.rides SET status = $3, ${column} = now(), updated_at = now()
+      `UPDATE naya.rides SET status = $3, ${column} = now(), updated_at = now(),
+              flags = (SELECT array(SELECT DISTINCT unnest(flags || $5::text[]))),
+              auto_arrived = auto_arrived OR $6::boolean,
+              auto_started = auto_started OR $7::boolean,
+              completed_by = coalesce($8::varchar, completed_by)
         WHERE id = $1 AND driver_id = $2 AND status = $4 RETURNING id`,
-      [rideId, driverId, to, from],
+      [rideId, driverId, to, from, flags, by === 'SYSTEM' && step === 'arrive', by === 'SYSTEM' && step === 'start', completedBy],
     );
     if (!updated) {
       const ride = await findRide(client, rideId);
       if (!ride || ride.driver_id !== driverId) throw notFound('Safari haikupatikana');
       throw conflict(ride.status === 'CANCELLED' ? 'Abiria ameghairi safari hii.' : 'Hatua hii haiwezekani kwa sasa.');
     }
-    await history(client, rideId, from, to, driverId);
+    const note = by === 'SYSTEM' ? 'NAYA (GPS)' : by === 'PASSENGER' ? 'Abiria amethibitisha amefika' : undefined;
+    await history(client, rideId, from, to, by === 'DRIVER' ? driverId : by === 'PASSENGER' ? before.passenger_id : null, note);
   });
   const ride = (await findRide(db, rideId))!;
+  const pays = tsh(ride.fare - ride.promo_discount);
   const messages = {
     arrive: { title: 'Dereva amefika!', body: `Anakusubiri ${ride.pickup_name}.`, urgent: true },
     start: null,
     complete: {
       title: `Umefika ${ride.dest_name}`,
-      body: `Lipa dereva ${tsh(ride.fare - ride.promo_discount)} taslimu.${ride.promo_discount > 0 ? ` Ofa ya NAYA imelipa ${tsh(ride.promo_discount)}.` : ''} Asante kwa kusafiri na NAYA.`,
+      body: `Lipa dereva ${pays} taslimu.${ride.promo_discount > 0 ? ` Ofa ya NAYA imelipa ${tsh(ride.promo_discount)}.` : ''} Asante kwa kusafiri na NAYA.`,
       urgent: false,
     },
   } as const;
   const m = messages[step];
-  await notify({ userId: ride.passenger_id, event: 'ride', rideId, kind: `ride_${step}`, ...(m ?? {}) });
+  // Abiria akimaliza mwenyewe, hapati arifa ya "umefika" — tayari yuko kwenye skrini.
+  if (by === 'PASSENGER') await notify({ userId: ride.passenger_id, event: 'ride', rideId });
+  else await notify({ userId: ride.passenger_id, event: 'ride', rideId, kind: `ride_${step}`, ...(m ?? {}) });
+  if (by !== 'DRIVER') {
+    // Dereva hakubonyeza: mjulishe (skrini yake inajisasisha)
+    const driverMsg =
+      step === 'start'
+        ? { title: 'Safari imeanza', body: 'NAYA imeanza safari yenyewe — umeondoka na abiria. Ukifika, bonyeza Maliza safari.' }
+        : step === 'complete'
+          ? {
+              title: by === 'PASSENGER' ? 'Abiria amefika' : 'Safari imekamilika',
+              body: `${by === 'PASSENGER' ? 'Abiria amethibitisha amefika. ' : ''}Pokea ${pays} taslimu kutoka kwa abiria.`,
+            }
+          : null;
+    await notify({ userId: driverId, event: 'ride', rideId, ...(driverMsg ? { kind: `ride_auto_${step}`, ...driverMsg } : {}) });
+  }
   await notifyAdmins(rideId);
   return driverState(driverId);
+}
+
+/** Abiria: "Nimefika — maliza safari" (dereva akisahau kubonyeza Maliza). */
+export async function completeByPassenger(passengerId: string, rideId: string) {
+  const ride = await findRide(db, rideId);
+  if (!ride || ride.passenger_id !== passengerId) throw notFound('Safari haikupatikana');
+  if (ride.status !== 'IN_PROGRESS' || !ride.driver_id) throw conflict('Safari hii haiendelei kwa sasa.');
+  await advanceRide(ride.driver_id, rideId, 'complete', { by: 'PASSENGER' });
+  return passengerView(db, (await findRide(db, rideId))!);
+}
+
+/**
+ * GPS ya dereva (kila ping wakati wa safari): fika / anza / kumbusha kumaliza — yenyewe.
+ * Kosa lolote hapa halivunji ping (dereva anaendelea kuonekana kwenye ramani).
+ */
+async function autoProgress(
+  ride: { id: string; driver_id: string; status: RideStatus; pickup_lat: number; pickup_lng: number; dest_lat: number; dest_lng: number; start_pin: string | null; flags: string[]; near_dest_at: Date | null },
+  point: { lat: number; lng: number },
+) {
+  const pickup = { lat: Number(ride.pickup_lat), lng: Number(ride.pickup_lng) };
+  const dest = { lat: Number(ride.dest_lat), lng: Number(ride.dest_lng) };
+  try {
+    if (ride.status === 'ACCEPTED' && straightLineKm(point, pickup) <= AUTO_ARRIVE_KM) {
+      await advanceRide(ride.driver_id, ride.id, 'arrive', { by: 'SYSTEM' });
+      return;
+    }
+    if (ride.status === 'ARRIVED' && straightLineKm(point, pickup) > START_LEAVE_KM) {
+      const towardDest = straightLineKm(point, dest) < straightLineKm(pickup, dest) - 0.1;
+      if (ride.start_pin === null && towardDest) {
+        await advanceRide(ride.driver_id, ride.id, 'start', { by: 'SYSTEM' });
+      } else if (ride.start_pin !== null && !ride.flags.includes('PIN_REMINDED')) {
+        await db.query(`UPDATE naya.rides SET flags = array_append(flags, 'PIN_REMINDED') WHERE id = $1`, [ride.id]);
+        await notify({
+          userId: ride.driver_id,
+          event: 'ride',
+          rideId: ride.id,
+          kind: 'pin_reminder',
+          title: 'Ingiza PIN ya abiria',
+          body: 'Hii ni safari ya ofa: muulize abiria PIN yake na uianze kwenye NAYA ili NAYA ikulipe sehemu yake.',
+          urgent: true,
+        });
+      }
+      return;
+    }
+    if (ride.status === 'IN_PROGRESS' && !ride.near_dest_at && straightLineKm(point, dest) <= DEST_NEAR_KM) {
+      const set = await one(db, `UPDATE naya.rides SET near_dest_at = now() WHERE id = $1 AND near_dest_at IS NULL AND status = 'IN_PROGRESS' RETURNING id`, [ride.id]);
+      if (set) {
+        await notify({
+          userId: ride.driver_id,
+          event: 'ride',
+          rideId: ride.id,
+          kind: 'complete_reminder',
+          title: 'Umefika?',
+          body: `Bonyeza Maliza safari. Usipobonyeza, NAYA itamaliza safari yenyewe baada ya dakika ${AUTO_COMPLETE_MINUTES}.`,
+          urgent: true,
+        });
+      }
+    }
+  } catch (error) {
+    console.error(`[autoProgress] ${(error as Error).message}`);
+  }
+}
+
+/** Kila mzunguko wa dispatcher: safari zilizofika unakoenda (dakika 5) au zilizopitiliza saa 3 zinamalizwa. */
+export async function autoCompleteRides() {
+  const due = await many<{ id: string; driver_id: string; timeout: boolean }>(
+    db,
+    `SELECT id, driver_id, (near_dest_at IS NULL) AS timeout FROM naya.rides
+      WHERE status = 'IN_PROGRESS' AND driver_id IS NOT NULL
+        AND ((near_dest_at IS NOT NULL AND near_dest_at < now() - make_interval(mins => $1::int))
+             OR started_at < now() - make_interval(hours => $2::int))
+      LIMIT 20`,
+    [AUTO_COMPLETE_MINUTES, MAX_TRIP_HOURS],
+  );
+  for (const r of due) {
+    try {
+      await advanceRide(r.driver_id, r.id, 'complete', { by: 'SYSTEM', flags: r.timeout ? ['AUTO_TIMEOUT'] : [] });
+    } catch (error) {
+      console.error(`[autoComplete] ${(error as Error).message}`);
+    }
+  }
 }
 
 /** Dereva akighairi kabla ya safari kuanza: safari inarudi kutafuta dereva mwingine. */
@@ -1060,6 +1245,8 @@ export async function rideForAdmin(rideId: string) {
   );
   return {
     ...baseView(ride),
+    flags: ride.flags.filter((f) => f !== 'PIN_REMINDED'),
+    autoArrived: ride.auto_arrived,
     ratingForDriver: ride.rating_for_driver,
     ratingForPassenger: ride.rating_for_passenger,
     pinAttempts: ride.pin_attempts,
@@ -1226,7 +1413,7 @@ export async function completeByAdmin(adminId: string, rideId: string, note: str
     const r = await findRide(client, rideId, true);
     if (!r) throw notFound('Safari haikupatikana');
     if (r.status !== 'IN_PROGRESS') throw conflict('Ofisi inaweza kumaliza safari inayoendelea (imeanza) tu.');
-    await client.query(`UPDATE naya.rides SET status = 'COMPLETED', completed_at = now(), updated_at = now() WHERE id = $1`, [rideId]);
+    await client.query(`UPDATE naya.rides SET status = 'COMPLETED', completed_at = now(), completed_by = 'ADMIN', updated_at = now() WHERE id = $1`, [rideId]);
     await history(client, rideId, 'IN_PROGRESS', 'COMPLETED', adminId, note || 'Imemalizwa na ofisi');
     await writeAudit(client, { actorId: adminId, action: 'ride.completed_by_admin', targetType: 'ride', targetId: rideId, details: { note } });
     return r;

@@ -213,6 +213,7 @@ export async function requestsReport(opts: { days?: number; filter?: RequestFilt
     `SELECT r.id, r.requested_at AS "requestedAt", r.status::text AS status, r.vehicle_type::text AS "vehicleType",
             r.pickup_name AS "from", r.dest_name AS "to", r.distance_km::float8 AS km, r.fare,
             r.promo_discount AS "promoDiscount", r.promo_title AS "promoTitle",
+            array_remove(r.flags, 'PIN_REMINDED') AS flags, r.completed_by AS "completedBy", r.auto_started AS "autoStarted",
             p.id AS "passengerId", p.full_name AS "passengerName", p.phone AS "passengerPhone", p.app_client AS "passengerClient",
             r.driver_id AS "driverId", du.full_name AS "driverName", du.phone AS "driverPhone", dd.plate_number AS "driverPlate",
             CASE WHEN r.accepted_at IS NOT NULL THEN round(extract(epoch FROM r.accepted_at - r.requested_at))::int END AS "secondsToDriver",
@@ -365,17 +366,25 @@ export function passengersCsv(r: Awaited<ReturnType<typeof passengersReport>>) {
   );
 }
 
+const COMPLETED_BY_LABEL: Record<string, string> = { DRIVER: 'Dereva', PASSENGER: 'Abiria', AUTO: 'NAYA (GPS)', ADMIN: 'Ofisi' };
+const FLAG_LABEL: Record<string, string> = {
+  START_FAR: 'Ilianza mbali na abiria',
+  ENDED_FAR: 'Iliishia mbali na unakoenda',
+  TOO_SHORT: 'Fupi kupita kiasi',
+  AUTO_TIMEOUT: 'Ilijifunga baada ya saa 3',
+};
 type Offer = { name: string; plate: string | null; status: string; km: number | null; seconds: number | null };
 export function requestsCsv(r: Awaited<ReturnType<typeof requestsReport>>) {
   return toCsv(
     ['Muda', 'Hali', 'Chombo', 'Kutoka', 'Kwenda', 'Km', 'Nauli (TSh)', 'Abiria', 'Simu ya abiria', 'Abiria anatumia', 'Dereva aliyepokea',
-      'Plate', 'Simu ya dereva', 'Sekunde hadi kupata dereva', 'Aliyeghairi', 'Sababu', 'Madereva waliopewa ombi', 'Kila dereva alifanya nini'],
+      'Plate', 'Simu ya dereva', 'Sekunde hadi kupata dereva', 'Aliyeghairi', 'Sababu', 'Madereva waliopewa ombi', 'Kila dereva alifanya nini', 'Ilimalizwa na', 'Alama za GPS'],
     r.rows.map((x) => {
       const offers = (x.offers as Offer[]) ?? [];
       return [local(x.requestedAt), label('status', x.status), x.vehicleType, x.from, x.to, x.km, x.fare, x.passengerName, x.passengerPhone,
         clientLabel(x.passengerClient), x.driverName ?? '', x.driverPlate ?? '', x.driverPhone ?? '', x.secondsToDriver ?? '',
         label('cancelledBy', x.cancelledBy), x.cancelReason ?? '', offers.length,
-        offers.map((o) => `${o.name}${o.plate ? ` (${o.plate})` : ''}: ${label('offer', o.status)}`).join(' | ')];
+        offers.map((o) => `${o.name}${o.plate ? ` (${o.plate})` : ''}: ${label('offer', o.status)}`).join(' | '),
+        COMPLETED_BY_LABEL[x.completedBy as string] ?? '', ((x.flags as string[]) ?? []).map((f) => FLAG_LABEL[f] ?? f).join(' | ')];
     }),
   );
 }

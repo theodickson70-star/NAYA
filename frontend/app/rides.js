@@ -23,6 +23,7 @@ let gpsWatch = null;
 let lastPing = 0;
 let latestPos = null;
 let pingTimer = null;
+let finishOpen = false; // abiria: "Nimefika — maliza safari?"
 let cancelOpen = false;
 let standPicker = false;
 let onlineError = '';
@@ -78,6 +79,7 @@ export function reset() {
   driverData = null;
   lastKey = '';
   cancelOpen = false;
+  finishOpen = false;
   standPicker = false;
   sosSheet = false;
   shareUrl = '';
@@ -256,6 +258,19 @@ export function renderPassengerRide(ride) {
         : ''
     }
     ${
+      ride.status === 'IN_PROGRESS'
+        ? finishOpen
+          ? `<div class="card confirm">
+              <p><strong>Umefika ${esc(ride.destination.name)}?</strong></p>
+              <p class="muted">Safari itamalizwa na utamlipa dereva ${formatTsh(ride.passengerPays ?? ride.fare)} taslimu.</p>
+              <p class="alert alert-danger" id="finish-error" role="alert" hidden></p>
+              <div class="actions"><button class="btn btn-primary" type="button" data-ride="finish-confirm">Ndiyo, nimefika</button>
+              <button class="btn btn-ghost" type="button" data-ride="finish-keep">Bado sijafika</button></div>
+            </div>`
+          : '<button class="btn btn-ghost btn-block" type="button" data-ride="finish">Nimefika — maliza safari</button>'
+        : ''
+    }
+    ${
       canCancel
         ? cancelOpen
           ? `<div class="card confirm">
@@ -277,7 +292,7 @@ function pinCardHtml(pin) {
   return `<section class="card pin-card" aria-label="PIN ya safari">
     <span class="pin-label">PIN ya safari</span>
     <strong class="pin-digits">${esc(pin.split('').join(' '))}</strong>
-    <span class="muted">Mpe dereva PIN hii ukishapanda — kwanza hakikisha plate ni sahihi.</span>
+    <span class="muted">Safari ya ofa: mpe dereva PIN hii ukishapanda ili upate punguzo — kwanza hakikisha plate ni sahihi.</span>
   </section>`;
 }
 
@@ -291,6 +306,10 @@ function safetyHtml({ share, sosOpen }) {
         <button class="btn btn-danger btn-block btn-big" type="button" data-ride="sos-send"${sosSending ? ' disabled' : ''}>${
           sosSending ? 'Inatuma…' : 'Tuma dharura kwa ofisi ya NAYA'
         }</button>
+        ${(() => {
+          const e = ctx.emergency?.();
+          return e ? `<a class="btn btn-ghost btn-block" href="tel:+${esc(e.phone)}">${ICON.phone} Mpigie ${esc(e.name || 'mtu wako wa dharura')} · ${esc(formatPhone(e.phone))}</a>` : '';
+        })()}
         <a class="btn btn-ghost btn-block" href="tel:112">${ICON.phone} Piga Polisi · 112</a>
         <button class="btn btn-ghost btn-block btn-plain" type="button" data-ride="sos-close">Rudi</button>
       </section>`
@@ -346,6 +365,27 @@ function driverCardHtml(ride) {
     }
   </section>`;
 }
+
+/** Dereva: picha ya abiria (aliyepewa ombi / wa safari yake). */
+function loadPassengerPhoto(rideId) {
+  const key = `p:${rideId}`;
+  const place = (url) => {
+    const el = $('pax-photo');
+    if (el) el.innerHTML = `<img src="${url}" alt="">`;
+  };
+  if (photos.has(key)) return place(photos.get(key));
+  ctx.api
+    .blob(`/api/driver/rides/${rideId}/passenger-photo`)
+    .then((blob) => {
+      const url = URL.createObjectURL(blob);
+      photos.set(key, url);
+      place(url);
+    })
+    .catch(() => {});
+}
+
+const paxInitials = (name) => esc((name ?? '?').split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase());
+const paxMeta = (p) => (p?.rating ? `★ ${p.rating.average} · safari ${p.trips}` : p?.trips ? `Safari ${p.trips} na NAYA` : 'Abiria mpya');
 
 function loadDriverPhoto(rideId) {
   const place = (url) => {
@@ -504,6 +544,8 @@ function renderDriverDashboard() {
   </div>`;
 
   if (s.offer && !s.ride) startOfferCountdown(s.offer.secondsLeft, s.offer.totalSeconds || 60);
+  if (s.ride?.passenger?.hasPhoto) loadPassengerPhoto(s.ride.id);
+  else if (!s.ride && s.offer?.passenger?.hasPhoto) loadPassengerPhoto(s.offer.ride.id);
   fillBackgroundHint();
 }
 
@@ -575,6 +617,12 @@ function offerHtml(offer) {
   const r = offer.ride;
   return `<section class="offer" role="alertdialog" aria-labelledby="offer-title">
     <div class="offer-top"><h1 id="offer-title">Ombi jipya la safari</h1><span class="offer-timer" id="offer-seconds" style="--p:${offer.secondsLeft / (offer.totalSeconds || 60)}">${clock(offer.secondsLeft)}</span></div>
+    ${
+      offer.passenger
+        ? `<div class="offer-pax"><span class="driver-photo pax-photo" id="pax-photo">${paxInitials(offer.passenger.firstName)}</span>
+            <span><strong>${esc(offer.passenger.firstName)}</strong><span class="muted">${esc(paxMeta(offer.passenger))}</span></span></div>`
+        : ''
+    }
     <p class="offer-fare">${formatTsh(r.fare)}</p>
     ${r.promo ? `<p class="offer-promo"><strong>Safari ya ofa</strong> Abiria anakulipa ${formatTsh(r.passengerPays)} taslimu · NAYA inakutumia ${formatTsh(r.promo.discount)}</p>` : ''}
     <p class="muted">${esc(VEHICLE_TYPES[r.vehicleType])} · safari ya km ${r.distanceKm} · abiria yuko km ${offer.distanceToPickupKm} kutoka kwako</p>
@@ -638,9 +686,31 @@ function startOfferCountdown(seconds, total) {
 function driverRideHtml(ride) {
   const p = ride.passenger;
   const steps = {
-    ACCEPTED: { title: 'Nenda kwa abiria', sub: `Mahali pa kumchukua: ${ride.pickup.name}`, target: ride.pickup, action: 'arrive', label: 'Nimefika' },
-    ARRIVED: { title: 'Subiri abiria', sub: `Uko ${ride.pickup.name}. Abiria akipanda, anza safari.`, target: null, action: 'start', label: 'Anza safari' },
-    IN_PROGRESS: { title: `Mpeleke ${ride.destination.name}`, sub: 'Endesha kwa uangalifu.', target: ride.destination, action: 'complete', label: 'Maliza safari' },
+    ACCEPTED: {
+      title: 'Nenda kwa abiria',
+      sub: `Mahali pa kumchukua: ${ride.pickup.name}. Ukifika karibu, NAYA itaweka "Nimefika" yenyewe.`,
+      target: ride.pickup,
+      action: 'arrive',
+      label: 'Nimefika',
+    },
+    ARRIVED: {
+      title: 'Subiri abiria',
+      sub: ride.pinRequired
+        ? `Uko ${ride.pickup.name}. Hii ni safari ya ofa: abiria akipanda, ingiza PIN yake.`
+        : `Uko ${ride.pickup.name}. Abiria akipanda, bonyeza Anza safari. Ukisahau, NAYA itaanza safari yenyewe ukiondoka naye.`,
+      target: null,
+      action: 'start',
+      label: 'Abiria amepanda — Anza safari',
+    },
+    IN_PROGRESS: {
+      title: `Mpeleke ${ride.destination.name}`,
+      sub: ride.nearDestination
+        ? 'Umefika? Bonyeza Maliza safari. Usipobonyeza, NAYA itamaliza safari yenyewe baada ya dakika 5.'
+        : 'Endesha kwa uangalifu. Ukifika, bonyeza Maliza safari.',
+      target: ride.destination,
+      action: 'complete',
+      label: 'Maliza safari',
+    },
   };
   if (ride.status === 'COMPLETED') {
     return `<section class="ride-head ride-done" role="status"><span class="ride-pulse" aria-hidden="true"></span>
@@ -667,7 +737,7 @@ function driverRideHtml(ride) {
     ? `<form class="card pin-form" id="pin-form" novalidate>
         <label for="start-pin">PIN ya abiria</label>
         <input id="start-pin" class="pin-input" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="one-time-code" placeholder="• • • •">
-        <p class="muted">Muulize abiria PIN iliyo kwenye app yake, kisha anza safari.</p>
+        <p class="muted">Safari ya ofa: muulize abiria PIN iliyo kwenye app yake, kisha anza safari. Bila PIN, NAYA haiwezi kukulipa sehemu ya ofa.</p>
         <p class="alert alert-danger" id="step-error" role="alert" hidden></p>
         <button class="btn btn-primary btn-block btn-big" type="submit" id="start-button" data-id="${ride.id}" disabled>Anza safari</button>
       </form>`
@@ -676,8 +746,8 @@ function driverRideHtml(ride) {
   return `${ride.sosOpen ? sosSentHtml() : ''}<section class="ride-head ride-coming"><h1>${esc(step.title)}</h1><p>${esc(step.sub)}</p></section>
     <section class="card">
       <div class="driver-top">
-        <span class="driver-photo">${esc((p?.name ?? '?').split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase())}</span>
-        <span class="driver-who"><strong>${esc(p?.name ?? 'Abiria')}</strong><span class="muted">Abiria · ${formatTsh(ride.passengerPays ?? ride.fare)} taslimu</span></span>
+        <span class="driver-photo pax-photo" id="pax-photo">${paxInitials(p?.name)}</span>
+        <span class="driver-who"><strong>${esc(p?.name ?? 'Abiria')}</strong><span class="muted">${esc(paxMeta(p))}</span><span class="muted">Abiria · ${formatTsh(ride.passengerPays ?? ride.fare)} taslimu</span></span>
       </div>
       <div class="actions two">
         ${p ? `<a class="btn btn-ghost call" href="${tel(p.phone)}">${ICON.phone} Piga simu</a>` : ''}
@@ -817,6 +887,24 @@ async function onClick(event) {
     cancelOpen = action === 'cancel';
     lastKey = '';
     return passengerRide && ctx.isPassengerHome() ? renderPassengerRide(passengerRide) : renderDriverDashboard();
+  }
+  if (action === 'finish' || action === 'finish-keep') {
+    finishOpen = action === 'finish';
+    lastKey = '';
+    return renderPassengerRide(passengerRide);
+  }
+  if (action === 'finish-confirm') {
+    el.disabled = true;
+    try {
+      passengerRide = await ctx.api.post(`/api/rides/${passengerRide.id}/complete`, {});
+      finishOpen = false;
+      lastKey = '';
+      return renderPassengerRide(passengerRide);
+    } catch (err) {
+      if (ctx.handleError(err, 'finish-error')) return;
+      el.disabled = false;
+    }
+    return;
   }
   if (action === 'cancel-confirm') {
     el.disabled = true;

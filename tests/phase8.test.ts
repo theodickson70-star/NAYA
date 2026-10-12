@@ -234,7 +234,7 @@ describe('NAYA Phase 8 — usalama na ramani ya live', () => {
   let rideId = '';
   let pin = '';
 
-  it('safari inapata PIN; abiria anaiona, dereva haioni', async () => {
+  it('safari ya ofa inapata PIN; abiria anaiona, dereva haioni (ya kawaida haina PIN)', async () => {
     await call('POST', '/api/driver/online', { online: false }, 'expired');
     await call('POST', '/api/driver/online', { online: true, lat: A.lat - 0.002, lng: A.lng }, 'paid');
     const ride = await book('p1');
@@ -245,6 +245,9 @@ describe('NAYA Phase 8 — usalama na ramani ya live', () => {
     const accepted = await call('POST', `/api/driver/offers/${offer.id}/accept`, {}, 'paid');
     assert.equal(accepted.status, 200, accepted.json.message);
     assert.equal(accepted.json.data.ride.pin, undefined);
+    assert.equal((await call('GET', '/api/rides/current', undefined, 'p1')).json.data.pin, null); // ya kawaida: hakuna PIN
+    // PIN ni ya safari za ofa tu — iige hapa kwa kuweka PIN moja kwa moja
+    await db.query(`UPDATE naya.rides SET start_pin = '4821' WHERE id = $1`, [rideId]);
     const view = (await call('GET', '/api/rides/current', undefined, 'p1')).json.data;
     assert.match(view.pin, /^\d{4}$/);
     pin = view.pin;
@@ -326,6 +329,7 @@ describe('NAYA Phase 8 — usalama na ramani ya live', () => {
     const second = await book('p1');
     const offer = await offerFor('paid');
     await call('POST', `/api/driver/offers/${offer.id}/accept`, {}, 'paid');
+    await db.query(`UPDATE naya.rides SET start_pin = '7350' WHERE id = $1`, [second.json.data.id]);
     await call('POST', `/api/driver/rides/${second.json.data.id}/arrive`, {}, 'paid');
     const pin2 = (await call('GET', '/api/rides/current', undefined, 'p1')).json.data.pin;
     const bad2 = pin2 === '0000' ? '1111' : '0000';

@@ -1,7 +1,7 @@
 // Ofisi: ripoti kamili zilizotengana — Madereva, Wateja, APK na link, Maombi ya safari, Online sasa.
 // Kila ripoti: namba za muhtasari, vichujio, kutafuta, orodha nzima (safu 100 kwa mara, "Onyesha zaidi"), na CSV ya Excel.
 import { escapeHtml as esc } from '/shared/api.js';
-import { formatDate, formatPhone, formatTsh, VEHICLE_TYPES } from '/shared/labels.js';
+import { COMPLETED_BY, flagBadges, formatDate, formatPhone, formatTsh, VEHICLE_TYPES } from '/shared/labels.js';
 import { barChart, shortDay } from './charts.js';
 
 let ctx = null;
@@ -372,7 +372,7 @@ function requestRow(r) {
     <td class="rp-nowrap"><a href="#/safari/${esc(r.id)}">${esc(when(r.requestedAt))}</a></td>
     <td>${person(r.passengerName, r.passengerPhone, r.passengerId)}<span class="rp-sub">${r.passengerClient === 'apk' ? 'APK' : r.passengerClient === 'web' ? 'Link' : ''}</span></td>
     <td>${esc(r.from)} → ${esc(r.to)}<span class="rp-sub">${esc(VEHICLE_TYPES[r.vehicleType] ?? '')} · km ${r.km} · ${formatTsh(r.fare)}${r.promoDiscount ? ` · ofa −${formatTsh(r.promoDiscount)}` : ''}</span></td>
-    <td>${badge([label, tone])}</td>
+    <td>${badge([label, tone])}${r.status === 'COMPLETED' && r.completedBy && r.completedBy !== 'DRIVER' ? `<span class="rp-sub">Imemalizwa na ${esc(COMPLETED_BY[r.completedBy] ?? r.completedBy)}</span>` : ''}${(r.flags ?? []).length ? `<span class="rp-sub">${flagBadges(r.flags, esc)}</span>` : ''}</td>
     <td>${result}</td>
     <td>${offers}</td>
   </tr>`;

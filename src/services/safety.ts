@@ -133,7 +133,7 @@ export async function listSos(scope: 'open' | 'all') {
     db,
     `SELECT s.id, s.role, s.status, s.lat, s.lng, s.created_at AS "createdAt", s.resolved_at AS "resolvedAt",
             s.resolution_note AS "note", s.ride_id AS "rideId",
-            u.full_name AS "name", u.phone,
+            u.full_name AS "name", u.phone, u.emergency_name AS "emergencyName", u.emergency_phone AS "emergencyPhone",
             r.pickup_name AS "pickupName", r.dest_name AS "destinationName", r.status AS "rideStatus",
             other.full_name AS "otherName", other.phone AS "otherPhone", d.plate_number AS "plateNumber",
             dl.last_lat AS "driverLat", dl.last_lng AS "driverLng", dl.last_seen_at AS "driverSeenAt",

@@ -148,7 +148,11 @@ export async function withPromotions<T extends { options: { vehicleType: Vehicle
   const promos = await activePromotions();
   if (!promos.length) return estimate;
   const options = [];
-  for (const o of estimate.options) options.push({ ...o, promo: await bestPromotion(db, userId, o.vehicleType, o.fare, promos) });
+  const customer = await isCustomer(db, userId);
+  for (const o of estimate.options) {
+    const promo = await bestPromotion(db, userId, o.vehicleType, o.fare, promos);
+    options.push({ ...o, promo, promoNote: !promo && customer ? await promoNoteFor(userId, o.vehicleType, o.fare, promos) : null });
+  }
   return { ...estimate, options };
 }
 
@@ -257,7 +261,8 @@ export async function driverPromoWallet(driverId: string) {
     many(
       db,
       `SELECT id, completed_at AS "completedAt", pickup_name AS "from", dest_name AS "to", fare, promo_discount AS "nayaPays",
-              fare - promo_discount AS "passengerPaid", promo_title AS "promoTitle"
+              fare - promo_discount AS "passengerPaid", promo_title AS "promoTitle",
+              array_remove(flags, 'PIN_REMINDED') AS flags
          FROM naya.rides WHERE driver_id = $1 AND status = 'COMPLETED' AND promo_discount > 0
         ORDER BY completed_at DESC LIMIT 50`,
       [driverId],
@@ -606,4 +611,254 @@ export function payoutsCsv(r: Awaited<ReturnType<typeof driverPayoutsReport>>) {
   const lines = (r.rows as Record<string, any>[]).map((x) => [x.name, x.phone, x.plate, x.rides, x.weekRides, x.earned, x.paid, x.balance, x.networkLabel ?? 'HAJAWEKA NAMBA',
     x.payPhone ?? '', x.payName ?? '', x.lastPaidAt ? new Date(x.lastPaidAt as string).toISOString().slice(0, 10) : '']);
   return `﻿${[header, ...lines].map((l) => l.map(cell).join(',')).join('\r\n')}\r\n`;
+}
+
+// ------------------------------------------------------------------ uwazi: kwa nini mteja anaona / haoni ofa
+
+const tz = (d: Date) =>
+  new Intl.DateTimeFormat('sw-TZ', { timeZone: TZ, day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).format(d);
+const VEHICLE_WORD: Record<VehicleType, string> = { BODABODA: 'Bodaboda', BAJAJI: 'Bajaji' };
+
+export type PromoReason =
+  | 'ok' | 'paused' | 'ended' | 'not_started' | 'expired' | 'driver' | 'suspended' | 'vehicle' | 'fare_low' | 'fare_high'
+  | 'no_discount' | 'not_new' | 'used_up' | 'budget';
+
+interface ReasonResult {
+  ok: boolean;
+  code: PromoReason;
+  text: string;
+  discount: number;
+  ridesLeft: number | null;
+}
+
+/**
+ * Sababu moja iliyo wazi kwa nini ofa hii inamfaa / haimfai mteja huyu (kwa nauli na chombo fulani).
+ * Kanuni ni zile zile za bestPromotion — hii inaeleza tu.
+ */
+async function reasonFor(client: Db, p: PromoRow, userId: string, opts: { fare?: number; vehicleType?: VehicleType; driverStatus?: string | null; suspended?: boolean }): Promise<ReasonResult> {
+  const no = (code: PromoReason, text: string): ReasonResult => ({ ok: false, code, text, discount: 0, ridesLeft: null });
+  const now = new Date();
+  if (p.status === 'ENDED') return no('ended', 'Ofa imemalizwa.');
+  if (p.status === 'PAUSED') return no('paused', 'Ofa imesimamishwa — bonyeza "Washa ofa" ili wateja waione.');
+  if (p.starts_at > now) return no('not_started', `Ofa bado haijaanza — inaanza ${tz(p.starts_at)}.`);
+  if (p.ends_at && p.ends_at <= now) return no('expired', `Muda wa ofa uliisha ${tz(p.ends_at)}.`);
+  if (opts.suspended) return no('suspended', 'Akaunti ya mteja huyu imesimamishwa — hawezi kuagiza safari.');
+  if (opts.driverStatus) return no('driver', `Ni dereva (usajili wake wa dereva: ${DRIVER_STATUS_WORD[opts.driverStatus] ?? opts.driverStatus}). Ofa ni kwa wateja tu, ili dereva asijinufaishe.`);
+  if (opts.vehicleType && p.vehicle_types && !p.vehicle_types.includes(opts.vehicleType)) {
+    return no('vehicle', `Ofa ni kwa ${p.vehicle_types.map((v) => VEHICLE_WORD[v]).join(' na ')} tu — si ${VEHICLE_WORD[opts.vehicleType]}.`);
+  }
+  if (opts.fare !== undefined) {
+    if (p.min_fare !== null && opts.fare < p.min_fare) return no('fare_low', `Nauli ${tsh(opts.fare)} iko chini ya nauli ya chini ya ofa (${tsh(p.min_fare)}).`);
+    if (p.max_fare !== null && opts.fare > p.max_fare) return no('fare_high', `Nauli ${tsh(opts.fare)} iko juu ya nauli ya juu ya ofa (${tsh(p.max_fare)}).`);
+  }
+  const e = await eligibility(client, p, userId);
+  if (!e.ok) {
+    if (e.reason === 'not_new') return no('not_new', `Si mteja mpya — ameshamaliza safari ${e.usage.otherCompleted} na NAYA. Ofa hii ni kwa wateja wapya tu.`);
+    if (e.reason === 'used_up') return no('used_up', `Ameshatumia safari zake zote ${p.per_customer_limit} za ofa hii.`);
+    return no('budget', `Bajeti ya ofa imeisha (${tsh(e.usage.budgetUsed)} kati ya ${tsh(p.budget ?? 0)}).`);
+  }
+  let discount = opts.fare !== undefined ? discountFor(p, opts.fare) : 0;
+  if (opts.fare !== undefined && p.budget !== null) discount = Math.min(discount, Math.floor((p.budget - e.usage.budgetUsed) / 50) * 50);
+  if (opts.fare !== undefined && discount <= 0) return no('no_discount', `Punguzo la safari ya ${tsh(opts.fare)} ni chini ya TSh 50, kwa hiyo halitolewi.`);
+  const left = e.ridesLeft;
+  return {
+    ok: true,
+    code: 'ok',
+    text:
+      opts.fare !== undefined
+        ? `Inamfaa: safari ya ${tsh(opts.fare)} — analipa ${tsh(opts.fare - discount)}, NAYA inamlipa dereva ${tsh(discount)}.${left !== null ? ` Safari ${left} za ofa zimebaki.` : ''}`
+        : `Inamfaa.${left !== null ? ` Safari ${left} za ofa zimebaki.` : ''}`,
+    discount,
+    ridesLeft: left,
+  };
+}
+
+const DRIVER_STATUS_WORD: Record<string, string> = { APPROVED: 'amethibitishwa', PENDING: 'anasubiri kuthibitishwa', SUSPENDED: 'amesimamishwa' };
+const tsh = (v: number) => `TSh ${Math.round(v).toLocaleString('en-US')}`;
+
+/** Ofisi: "Kwa nini mteja huyu haoni ofa?" — namba ya simu → jibu la sentensi moja + kila ofa + safari zake za karibuni. */
+export async function checkCustomerOffers(phone: string, opts: { fare: number; vehicleType: VehicleType }) {
+  const user = await one<{ id: string; full_name: string; phone: string; role: string; status: string; phone_verified_at: Date | null; driver_status: string | null; completed: number }>(
+    db,
+    `SELECT u.id, u.full_name, u.phone, u.role, u.status, u.phone_verified_at, d.status::text AS driver_status,
+            (SELECT count(*) FROM naya.rides r WHERE r.passenger_id = u.id AND r.status = 'COMPLETED')::int AS completed
+       FROM naya.users u LEFT JOIN naya.drivers d ON d.user_id = u.id WHERE u.phone = $1`,
+    [phone],
+  );
+  if (!user) throw notFound('Hakuna mtumiaji mwenye namba hii kwenye NAYA.');
+  if (user.role !== 'USER') throw badRequest('Namba hii ni ya mfanyakazi wa ofisi, si mteja.');
+  const driverStatus = user.driver_status && ['APPROVED', 'PENDING', 'SUSPENDED'].includes(user.driver_status) ? user.driver_status : null;
+  const promos = (await many<PromoRow>(db, `SELECT * FROM naya.promotions WHERE status <> 'ENDED' ORDER BY priority DESC, created_at`)).map(normalize);
+  const offers = [];
+  for (const p of promos) {
+    const r = await reasonFor(db, p, user.id, { ...opts, driverStatus, suspended: user.status === 'SUSPENDED' });
+    offers.push({ id: p.id, name: p.name, title: p.title, status: p.status, audience: p.audience, ...r });
+  }
+  const best = offers.filter((o) => o.ok).sort((a, b) => b.discount - a.discount)[0];
+  const live = offers.filter((o) => !['paused', 'not_started', 'expired', 'ended'].includes(o.code));
+  let verdict: { ok: boolean; text: string };
+  if (best) verdict = { ok: true, text: `Anaona ofa “${best.title}”. ${best.text.replace(/^Inamfaa: /, '')}` };
+  else if (!live.length) verdict = { ok: false, text: offers.length ? 'Hakuna ofa inayoendelea sasa hivi — ofa zilizopo zimesimamishwa au muda wake haujafika / umeisha.' : 'Hakuna ofa yoyote iliyoundwa.' };
+  else verdict = { ok: false, text: live[0].text };
+  const notVerified = !user.phone_verified_at;
+  const rides = await many(
+    db,
+    `SELECT r.id, r.status, r.requested_at AS "requestedAt", r.pickup_name AS "from", r.dest_name AS "to", r.vehicle_type AS "vehicleType",
+            r.fare, r.promo_discount AS "promoDiscount", r.promo_title AS "promoTitle",
+            (SELECT h.note FROM naya.ride_status_history h WHERE h.ride_id = r.id AND h.note LIKE 'Ofa imeondolewa%' ORDER BY h.created_at LIMIT 1) AS "promoDropped"
+       FROM naya.rides r WHERE r.passenger_id = $1 ORDER BY r.requested_at DESC LIMIT 5`,
+    [user.id],
+  );
+  return {
+    user: {
+      id: user.id,
+      name: user.full_name,
+      phone: user.phone,
+      suspended: user.status === 'SUSPENDED',
+      phoneVerified: !notVerified,
+      driverStatus: user.driver_status,
+      completedRides: user.completed,
+    },
+    fare: opts.fare,
+    vehicleType: opts.vehicleType,
+    verdict,
+    notes: notVerified ? ['Namba yake bado haijathibitishwa kwa SMS — hawezi kuagiza safari mpaka athibitishe.'] : [],
+    offers,
+    rides,
+  };
+}
+
+/** Ofisi: kabla ya kuwasha / kuhifadhi ofa — wateja wangapi wanaweza kuipata sasa, na maonyo ya mipangilio inayozuia. */
+export async function previewPromotion(input: Omit<PromoInput, 'name' | 'title' | 'description'>, id?: string) {
+  const now = new Date();
+  const vehicles = input.vehicleTypes && input.vehicleTypes.length && input.vehicleTypes.length < 2 ? input.vehicleTypes : null;
+  const warnings: { level: 'warn' | 'info'; text: string }[] = [];
+  // Wateja: watumiaji wa kawaida, hawajasimamishwa, si madereva
+  const counts = await one<{ customers: number; eligible: number }>(
+    db,
+    `SELECT count(*)::int AS customers,
+            count(*) FILTER (WHERE ($1::text <> 'NEW_CUSTOMERS' OR NOT EXISTS (
+                SELECT 1 FROM naya.rides r WHERE r.passenger_id = u.id AND r.status = 'COMPLETED' AND ($2::uuid IS NULL OR r.promotion_id IS DISTINCT FROM $2::uuid)))
+              AND ($3::int IS NULL OR $2::uuid IS NULL OR (
+                SELECT count(*) FROM naya.rides r WHERE r.passenger_id = u.id AND r.promotion_id = $2::uuid AND r.status IN ${HOLDS}) < $3::int))::int AS eligible
+       FROM naya.users u
+      WHERE u.role = 'USER' AND u.status = 'ACTIVE'
+        AND NOT EXISTS (SELECT 1 FROM naya.drivers d WHERE d.user_id = u.id AND d.status IN ('APPROVED', 'PENDING', 'SUSPENDED'))`,
+    [input.audience, id ?? null, input.perCustomerLimit],
+  );
+  const customers = counts?.customers ?? 0;
+  const eligible = counts?.eligible ?? 0;
+  if (customers > 0 && eligible === 0) warnings.push({ level: 'warn', text: 'Hakuna mteja anayeweza kuipata ofa hii sasa hivi.' });
+
+  if (input.startsAt && input.startsAt > now) warnings.push({ level: 'info', text: `Ofa inaanza ${tz(input.startsAt)}. Kabla ya hapo wateja hawataiona, hata ukiiwasha.` });
+  if (input.endsAt && input.endsAt <= now) warnings.push({ level: 'warn', text: 'Tarehe ya kuisha imeshapita.' });
+  if (vehicles) warnings.push({ level: 'info', text: `Ni kwa ${VEHICLE_WORD[vehicles[0]]} tu — wateja wa ${VEHICLE_WORD[vehicles[0] === 'BODABODA' ? 'BAJAJI' : 'BODABODA']} hawataiona.` });
+  if (input.maxDiscount !== null && input.maxDiscount < 50) warnings.push({ level: 'warn', text: 'Punguzo la juu ni chini ya TSh 50. Punguzo linazungushwa kwa TSh 50, kwa hiyo hakuna mteja atakayepata punguzo.' });
+
+  // Nauli za safari za siku 30 zilizopita: ngapi zingepata ofa hii?
+  const fares = await many<{ fare: number }>(
+    db,
+    `SELECT fare FROM naya.rides WHERE requested_at >= now() - interval '30 days' AND ($1::text[] IS NULL OR vehicle_type::text = ANY($1::text[]))`,
+    [vehicles],
+  );
+  const shape = { discount_percent: input.discountPercent, max_discount: input.maxDiscount, min_fare: input.minFare, max_fare: input.maxFare };
+  const discounts = fares.map((f) => discountFor(shape, f.fare));
+  const inRange = discounts.filter((d) => d > 0);
+  const recent = { trips: fares.length, qualifying: inRange.length, avgDiscount: inRange.length ? Math.round(inRange.reduce((a, b) => a + b, 0) / inRange.length) : 0 };
+  if (fares.length >= 5) {
+    const pct = Math.round((inRange.length / fares.length) * 100);
+    if (pct === 0) warnings.push({ level: 'warn', text: `Hakuna hata safari moja kati ya ${fares.length} za siku 30 zilizopita ingepata ofa hii — angalia nauli ya chini/juu.` });
+    else if (pct < 50) warnings.push({ level: 'warn', text: `Ni ${pct}% tu ya safari za siku 30 zilizopita (${inRange.length} kati ya ${fares.length}) zingepata ofa hii, kwa sababu ya kiwango cha nauli ulichoweka.` });
+  }
+  if (input.budget !== null && recent.avgDiscount > 0) {
+    const used = id ? (await one<{ used: number }>(db, `SELECT coalesce(sum(promo_discount), 0)::int AS used FROM naya.rides WHERE promotion_id = $1 AND status IN ${HOLDS}`, [id]))?.used ?? 0 : 0;
+    const left = Math.max(0, input.budget - used);
+    const trips = Math.floor(left / recent.avgDiscount);
+    if (left <= 0) warnings.push({ level: 'warn', text: 'Bajeti ya ofa imeshaisha — wateja hawataiona. Ongeza bajeti.' });
+    else warnings.push({ level: trips < 10 ? 'warn' : 'info', text: `Bajeti iliyobaki (${tsh(left)}) inatosha takriban safari ${trips} (punguzo la wastani ${tsh(recent.avgDiscount)}).` });
+  }
+  if (input.perDriverLimit !== null) {
+    const drivers = (await one<{ n: number }>(db, `SELECT count(*)::int AS n FROM naya.drivers WHERE status = 'APPROVED'`))?.n ?? 0;
+    const period = { DAY: 'kwa siku', WEEK: 'kwa wiki', TOTAL: 'kwa ofa yote' }[input.perDriverPeriod];
+    warnings.push({
+      level: drivers === 0 ? 'warn' : 'info',
+      text: `Madereva ${drivers} waliothibitishwa × safari ${input.perDriverLimit} = nafasi ${drivers * input.perDriverLimit} za ofa ${period}. Madereva walio karibu wakimaliza nafasi zao, mteja anaagiza kwa bei kamili (anaambiwa).`,
+    });
+  }
+  const others = await many<{ id: string; name: string }>(
+    db,
+    `SELECT id, name FROM naya.promotions WHERE status = 'ACTIVE' AND starts_at <= now() AND (ends_at IS NULL OR ends_at > now()) AND ($1::uuid IS NULL OR id <> $1::uuid)`,
+    [id ?? null],
+  );
+  for (const o of others) warnings.push({ level: 'info', text: `Ofa “${o.name}” tayari inaendelea. Safari moja inapata ofa moja tu — yenye punguzo kubwa zaidi kwa mteja.` });
+  return { customers, eligible, recent, warnings };
+}
+
+export async function previewSavedPromotion(id: string) {
+  const p = await one<PromoRow>(db, 'SELECT * FROM naya.promotions WHERE id = $1', [id]);
+  if (!p) throw notFound('Ofa haikupatikana');
+  const r = normalize(p);
+  return previewPromotion(
+    {
+      audience: r.audience,
+      discountPercent: r.discount_percent,
+      maxDiscount: r.max_discount,
+      minFare: r.min_fare,
+      maxFare: r.max_fare,
+      vehicleTypes: r.vehicle_types,
+      perCustomerLimit: r.per_customer_limit,
+      perDriverLimit: r.per_driver_limit,
+      perDriverPeriod: r.per_driver_period,
+      budget: r.budget,
+      priority: r.priority,
+      startsAt: r.starts_at,
+      endsAt: r.ends_at,
+    },
+    id,
+  );
+}
+
+/**
+ * App ya mteja: ofa anazoweza kutumia + ujumbe mfupi pale ofa zipo lakini yeye hazimfai (ili asidhani app imeharibika).
+ * Hatumwambii "si mteja mpya" — ofa hiyo haikuwa kwake tangu mwanzo.
+ */
+export async function offersWithNotice(userId: string) {
+  const s = await one<{ rides: number; amount: number }>(
+    db,
+    `SELECT count(*)::int AS rides, coalesce(sum(promo_discount), 0)::int AS amount
+       FROM naya.rides WHERE passenger_id = $1 AND status = 'COMPLETED' AND promo_discount > 0`,
+    [userId],
+  );
+  const saved = { rides: s?.rides ?? 0, amount: s?.amount ?? 0 };
+  const r = await offersNotice(userId);
+  return { ...r, saved };
+}
+
+async function offersNotice(userId: string) {
+  const list = await offersForPassenger(userId);
+  if (list.length) return { offers: list, notice: null };
+  const promos = await activePromotions();
+  if (!promos.length) return { offers: [], notice: null };
+  if (!(await isCustomer(db, userId))) {
+    return { offers: [], notice: 'Ofa za NAYA ni kwa wateja tu. Akaunti hii imesajiliwa kama dereva, kwa hiyo haipati ofa.' };
+  }
+  const reasons = [];
+  for (const p of promos) reasons.push({ p, e: await eligibility(db, p, userId) });
+  const relevant = reasons.filter((r) => !(r.e.reason === 'not_new'));
+  if (relevant.length && relevant.every((r) => r.e.reason === 'used_up')) return { offers: [], notice: 'Umeshatumia safari zako zote za ofa. Asante kwa kusafiri na NAYA!' };
+  const full = relevant.find((r) => r.e.reason === 'budget');
+  if (full) return { offers: [], notice: `Ofa “${full.p.title}” imejaa. Endelea kufuatilia NAYA kwa ofa mpya.` };
+  return { offers: [], notice: null };
+}
+
+/** Bei kwenye app: kwa nini safari HII haipati ofa ingawa mteja ana ofa (nauli / chombo). */
+export async function promoNoteFor(userId: string, vehicleType: VehicleType, fare: number, promos: PromoRow[]) {
+  for (const p of promos) {
+    const e = await eligibility(db, p, userId);
+    if (!e.ok) continue;
+    if (p.vehicle_types && !p.vehicle_types.includes(vehicleType)) return `Ofa “${p.title}” ni kwa ${p.vehicle_types.map((v) => VEHICLE_WORD[v]).join(' na ')} tu`;
+    if (p.min_fare !== null && fare < p.min_fare) return `Ofa “${p.title}” ni kwa nauli kuanzia ${tsh(p.min_fare)}`;
+    if (p.max_fare !== null && fare > p.max_fare) return `Ofa “${p.title}” ni kwa nauli hadi ${tsh(p.max_fare)}`;
+  }
+  return null;
 }

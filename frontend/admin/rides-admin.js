@@ -1,6 +1,6 @@
 // Ofisi: safari zinazoendelea na zote, historia ya kila safari, na kughairi safari iliyokwama.
 import { escapeHtml as esc } from '/shared/api.js';
-import { formatDate, formatPhone, formatTsh, VEHICLE_TYPES } from '/shared/labels.js';
+import { COMPLETED_BY, flagBadges, formatDate, formatPhone, formatTsh, RIDE_FLAGS, VEHICLE_TYPES } from '/shared/labels.js';
 
 const $ = (id) => document.getElementById(id);
 let ctx = null; // { api, onAuthError }
@@ -104,6 +104,19 @@ function render(r) {
         : r.pinAttempts > 0
           ? `<p class="muted small">PIN imekosewa mara ${r.pinAttempts}.</p>`
           : ''
+    }
+    ${
+      (r.flags ?? []).some((f) => RIDE_FLAGS[f])
+        ? `<div class="alert alert-warn"><strong>Ya kutiliwa shaka:</strong> ${flagBadges(r.flags, esc)}<ul class="flag-list">${r.flags
+            .filter((f) => RIDE_FLAGS[f])
+            .map((f) => `<li>${esc(RIDE_FLAGS[f].hint)}</li>`)
+            .join('')}</ul>Mpigie abiria kuthibitisha kama safari ilifanyika kweli${r.promo ? ' kabla ya kumlipa dereva ofa' : ''}.</div>`
+        : ''
+    }
+    ${
+      r.status === 'COMPLETED' && r.completedBy
+        ? `<p class="muted small">Ilimalizwa na: <strong>${esc(COMPLETED_BY[r.completedBy] ?? r.completedBy)}</strong>${r.autoArrived ? ' · "Nimefika" iliwekwa na GPS' : ''}${r.autoStarted ? ' · Safari ilianzishwa na GPS' : ''}${r.promo ? ' · Safari ya ofa (PIN)' : ''}</p>`
+        : ''
     }
     ${r.shared ? '<p class="muted small">Abiria ameshiriki safari hii na ndugu/rafiki.</p>' : ''}
     <div class="people">

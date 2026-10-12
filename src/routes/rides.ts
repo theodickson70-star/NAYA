@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { ADMIN_ROLES, requireRole } from '../middleware/auth.js';
 import {
   acceptOffer,
+  completeByPassenger,
   advanceRide,
   cancelByAdmin,
   cancelByDriver,
@@ -89,6 +90,11 @@ export async function rideRoutes(app: FastifyInstance): Promise<void> {
     const { id } = idParam.parse(request.params);
     const { rating, comment } = ratingSchema.parse(request.body);
     return ok(await rateDriver(uid(request), id, rating, comment));
+  });
+  // Abiria: "Nimefika — maliza safari" (dereva akisahau kubonyeza Maliza)
+  app.post('/api/rides/:id/complete', user, async (request) => {
+    const { id } = idParam.parse(request.params);
+    return ok(await completeByPassenger(uid(request), id));
   });
   app.post('/api/rides/:id/close', user, async (request) => {
     const { id } = idParam.parse(request.params);

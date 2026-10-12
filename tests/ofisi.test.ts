@@ -236,8 +236,11 @@ describe('NAYA Phase 11 — ramani, kuingilia safari, matangazo, ripoti, utafuta
   it('safari iliyokwama: ofisi inaimaliza ikiwa imeanza tu', async () => {
     assert.equal((await call('POST', `/api/admin/rides/${rideId}/complete`, {}, 'admin')).status, 409);
     const pin = (await db.query('SELECT start_pin FROM naya.rides WHERE id = $1', [rideId])).rows[0].start_pin;
-    await call('POST', `/api/driver/rides/${rideId}/arrive`, {}, 'd2');
-    const started = await call('POST', `/api/driver/rides/${rideId}/start`, { pin }, 'd2');
+    // d2 yuko km ~15: "Nimefika" ya mkono inakataliwa mpaka GPS yake ionyeshe yuko karibu na abiria
+    assert.equal((await call('POST', `/api/driver/rides/${rideId}/arrive`, {}, 'd2')).status, 409);
+    await call('POST', '/api/driver/location', { lat: A.lat - 0.003, lng: A.lng }, 'd2');
+    assert.equal((await call('POST', `/api/driver/rides/${rideId}/arrive`, {}, 'd2')).status, 200);
+    const started = await call('POST', `/api/driver/rides/${rideId}/start`, pin ? { pin } : {}, 'd2');
     assert.equal(started.status, 200, started.json.message);
     const done = await call('POST', `/api/admin/rides/${rideId}/complete`, { note: 'Dereva alisahau kubonyeza Maliza' }, 'admin');
     assert.equal(done.status, 200, done.json.message);
