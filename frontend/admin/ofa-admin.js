@@ -361,9 +361,10 @@ async function loadAutoPay(v) {
   try {
     const [o, q] = await Promise.all([ctx.api.get('/api/admin/payments/overview'), ctx.api.get('/api/admin/payments/queue')]);
     if (!current(v) || !document.getElementById('auto-pay')) return;
+    const checkBox = `<div class="ap-check"><button class="btn btn-ghost btn-small" type="button" data-auto="check">Kagua muunganiko wa Abliner</button><div id="ap-check" aria-live="polite"></div></div>`;
     if (!o.config.enabled) {
       box.innerHTML = `<section class="panel auto-pay is-off"><h2>Malipo ya papo hapo</h2>
-        <p class="muted">Kampuni ya malipo bado haijaunganishwa (PAYMENT_PROVIDER kwenye Railway). Mpaka iunganishwe, lipa madereva kwa mkono hapa chini.</p></section>`;
+        <p class="muted">Kampuni ya malipo bado haijaunganishwa (PAYMENT_PROVIDER kwenye Railway). Mpaka iunganishwe, lipa madereva kwa mkono hapa chini.</p>${checkBox}</section>`;
       return;
     }
     const s = o.settings;
@@ -392,6 +393,8 @@ async function loadAutoPay(v) {
     const head = '<thead><tr><th>Ilikamilika</th><th>Dereva</th><th>Safari</th><th>Sababu</th><th class="num">Kiasi</th><th></th></tr></thead>';
     box.innerHTML = `<section class="panel auto-pay">
       <div class="panel-head"><h2>Malipo ya papo hapo</h2><span class="badge badge-${s.enabled ? 'ok' : 'muted'}">${s.enabled ? 'Yamewashwa' : 'Yamezimwa'}</span></div>
+      <p class="small">Kampuni ya malipo: <strong>${esc(o.config.provider === 'abliner' ? 'Abliner' : o.config.provider ?? '')}</strong></p>
+      ${checkBox}
       <p class="muted">Safari ya ofa ikikamilika, NAYA inatuma sehemu ya dereva kwenye namba yake kuu yenyewe — kama safari ni safi na ndani ya kikomo cha siku. Nyingine zinasubiri ukaguzi hapa.</p>
       <form class="auto-pay-form" id="auto-pay-form" novalidate>
         <label class="check"><input type="checkbox" id="ap-enabled"${s.enabled ? ' checked' : ''}> Tuma malipo ya ofa yenyewe</label>
@@ -708,6 +711,31 @@ async function onClick(event) {
     return;
   }
   const auto = event.target.closest('[data-auto]');
+  if (auto?.dataset.auto === 'check') {
+    const out = document.getElementById('ap-check');
+    auto.disabled = true;
+    out.innerHTML = '<p class="small muted">Inakagua…</p>';
+    try {
+      const r = await ctx.api.get('/api/admin/payments/provider-check');
+      const lines = [];
+      if (r.problem) lines.push(`<p class="alert alert-danger">${esc(r.problem)}</p>`);
+      if (r.check?.ok) {
+        lines.push(`<p class="alert alert-ok">Muunganiko uko sawa${r.check.balance != null ? ` — salio la Abliner: <strong>${esc(r.check.currency ?? 'TZS')} ${esc(Number(r.check.balance).toLocaleString('en-US'))}</strong>` : ''}.</p>`);
+      } else if (r.check) {
+        lines.push(`<p class="alert alert-danger">${esc(r.check.message)}</p>`);
+      } else if (!r.problem) {
+        lines.push('<p class="alert alert-warn">PAYMENT_PROVIDER haijawekwa — malipo ya simu yamezimwa.</p>');
+      }
+      lines.push(`<p class="small">Webhook URL ya kuweka Abliner → API Keys: <code>${esc(r.webhookUrl ?? `${location.origin}/api/payments/callback/abliner`)}</code></p>`);
+      out.innerHTML = lines.join('');
+    } catch (err) {
+      out.innerHTML = '';
+      fail(err);
+    } finally {
+      auto.disabled = false;
+    }
+    return;
+  }
   if (auto) {
     const id = auto.dataset.id;
     let body = {};

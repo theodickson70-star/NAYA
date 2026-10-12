@@ -750,3 +750,8 @@ a.kpi:hover { border-color: var(--naya-green); }
 .open-mode .alert { grid-column: 1 / -1; }
 @media (max-width: 560px) { .open-mode { grid-template-columns: 1fr; } }
 .open-mode.is-on .badge-ok { background: var(--white); }
+
+/* ---- Abliner: kagua muunganiko ---- */
+.ap-check { margin: 6px 0 12px; }
+.ap-check .alert { margin: 8px 0 0; }
+.ap-check code { overflow-wrap: anywhere; }

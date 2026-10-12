@@ -20,12 +20,13 @@ import {
   paymentsCsv,
   paymentsOverview,
   payoutQueue,
+  providerCheck,
   rejectPayout,
   saveAutoPayout,
   startSubscriptionPayment,
   applyResult,
 } from '../services/payments/index.js';
-import { getProvider, MOBILE_NETWORKS } from '../services/payments/provider.js';
+import { type CallbackResult, getProvider, MOBILE_NETWORKS } from '../services/payments/provider.js';
 import { simulator } from '../services/payments/simulator.js';
 import { notFound, ok } from '../utils/http.js';
 import { normalizeTzPhone } from '../utils/phone.js';
@@ -66,9 +67,20 @@ export async function paymentRoutes(app: FastifyInstance): Promise<void> {
   app.get('/api/payments/:id', user, async (request) => ok(await myPayment(uid(request), idParam.parse(request.params).id)));
 
   // Kampuni ya malipo → NAYA. Haina token ya mtumiaji; usalama ni saini inayokaguliwa na adapter.
-  app.post('/api/payments/callback/:provider', { config: { rateLimit: { max: 300, timeWindow: '1 minute' } } }, async (request) => {
-    const { provider } = z.object({ provider: z.string().min(2).max(30) }).parse(request.params);
-    return ok(await handleCallback(provider.toLowerCase(), request));
+  // Saini ya Abliner inahesabiwa juu ya mwili GHAFI (raw body) — kwa hiyo route hii ina parser yake (ndani ya plugin hii tu).
+  await app.register(async (hooks) => {
+    hooks.addContentTypeParser('application/json', { parseAs: 'string', bodyLimit: 256 * 1024 }, (request, body, done) => {
+      (request as typeof request & { rawBody?: string }).rawBody = body as string;
+      try {
+        done(null, body ? JSON.parse(body as string) : {});
+      } catch {
+        done(Object.assign(new Error('JSON si sahihi'), { statusCode: 400 }), undefined);
+      }
+    });
+    hooks.post('/api/payments/callback/:provider', { config: { rateLimit: { max: 300, timeWindow: '1 minute' } } }, async (request) => {
+      const { provider } = z.object({ provider: z.string().min(2).max(30) }).parse(request.params);
+      return ok(await handleCallback(provider.toLowerCase(), request));
+    });
   });
 
   // Majaribio: "mteja ameingiza PIN" / "amekataa" — kampuni bandia tu, kamwe production.
@@ -76,13 +88,14 @@ export async function paymentRoutes(app: FastifyInstance): Promise<void> {
     if (getProvider() !== simulator) throw notFound('Haipatikani');
     const { reference } = z.object({ reference: z.string().min(6).max(40) }).parse(request.params);
     const { success } = z.object({ success: z.boolean() }).parse(request.body);
-    const result = await simulator.parseCallback({ body: { reference, success } } as never);
+    const result = (await simulator.parseCallback({ body: { reference, success } } as never)) as CallbackResult;
     await applyResult(reference, result);
     return ok({ done: true });
   });
 
   // ---- Ofisi
   app.get('/api/admin/payments/overview', adminOnly, async () => ok(await paymentsOverview()));
+  app.get('/api/admin/payments/provider-check', { ...adminOnly, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async () => ok(await providerCheck()));
   app.get('/api/admin/payments/queue', adminOnly, async () => ok(await payoutQueue()));
   app.get('/api/admin/payments', adminOnly, async (request) => ok(await listPayments(listQuery.parse(request.query))));
   app.get('/api/admin/payments.csv', adminOnly, async (request, reply) =>

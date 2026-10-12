@@ -11,12 +11,13 @@
 import { randomBytes } from 'node:crypto';
 import type { FastifyRequest } from 'fastify';
 import { type Db, db, many, one, transaction } from '../../db/pool.js';
-import { badRequest, conflict, isUniqueViolation, notFound } from '../../utils/http.js';
+import { AppError, conflict, isUniqueViolation, notFound } from '../../utils/http.js';
 import { writeAudit } from '../audit.js';
 import { notify, notifyAdmins } from '../notify.js';
 import { NETWORK_LABEL, type Network, promoBalance } from '../promotions.js';
 import { creditSubscription, getSettings, subscriptionPaidMessage, type PaymentMethod } from '../subscriptions.js';
-import { getProvider, guessNetwork, MOBILE_NETWORKS, type MobileNetwork, type ProviderResult } from './provider.js';
+import { ablinerBalance, ablinerCallbackUrl } from './abliner.js';
+import { getProvider, guessNetwork, MOBILE_NETWORKS, type MobileNetwork, providerProblem, type ProviderResult } from './provider.js';
 
 const TZ = 'Africa/Dar_es_Salaam';
 const IN_TIMEOUT_MINUTES = 15; // ombi la kulipa lisilojibiwa → limeshindwa (likija baadaye SUCCESS bado linakubaliwa)
@@ -181,7 +182,7 @@ async function refresh(p: PaymentRow) {
   const provider = getProvider();
   if (!provider || provider.name !== p.provider) return;
   try {
-    const r = await provider.status(p.reference, p.direction);
+    const r = await provider.status(p.reference, p.direction, p.provider_ref);
     if (r.status !== 'PENDING') return applyResult(p.reference, r);
   } catch (error) {
     console.error(`[payments] status ${p.reference}: ${(error as Error).message}`);
@@ -267,7 +268,21 @@ export async function applyResult(reference: string, result: ProviderResult) {
   }
 }
 
-/** Callback ya kampuni ya malipo. Adapter inathibitisha saini; jibu lolote baya → 400 (kampuni itajaribu tena). */
+const WEBHOOK_BUDGET_MS = 6000; // Abliner inataka 2xx ndani ya sekunde 8
+
+async function recordWebhook(provider: string, eventId: string | null | undefined, row: { event?: string; reference?: string | null; status?: string | null; outcome: string }) {
+  if (!eventId) return;
+  await db.query(
+    `INSERT INTO naya.payment_webhook_events (provider, event_id, event, reference, status, outcome) VALUES ($1, $2, $3, $4, $5, $6)
+     ON CONFLICT (provider, event_id) DO NOTHING`,
+    [provider, eventId.slice(0, 100), row.event?.slice(0, 40) ?? null, row.reference?.slice(0, 40) ?? null, row.status ?? null, row.outcome],
+  );
+}
+
+/**
+ * Callback ya kampuni ya malipo. Adapter inathibitisha saini (si sahihi → 401, hakuna kinachobadilika).
+ * Tukio lililokwisha chakatwa (x-webhook-id) → 200 bila kurudia. Muamala usio wetu → 200 (ili kampuni isijaribu tena bure).
+ */
 export async function handleCallback(providerName: string, request: FastifyRequest) {
   const provider = getProvider();
   if (!provider || provider.name !== providerName) throw notFound('Haipatikani');
@@ -276,11 +291,37 @@ export async function handleCallback(providerName: string, request: FastifyReque
     result = await provider.parseCallback(request);
   } catch (error) {
     console.error(`[payments] callback ${providerName} imekataliwa: ${(error as Error).message}`);
-    throw badRequest('Callback si sahihi');
+    throw new AppError(401, 'Callback si sahihi');
   }
-  const exists = await one(db, 'SELECT 1 FROM naya.payments WHERE reference = $1', [result.reference]);
-  if (!exists) throw notFound('Muamala haukupatikana');
-  await applyResult(result.reference, result);
+  if (result.eventId) {
+    const seen = await one(db, 'SELECT 1 FROM naya.payment_webhook_events WHERE provider = $1 AND event_id = $2', [provider.name, result.eventId]);
+    if (seen) return { received: true, duplicate: true };
+  }
+  if (result.ignore) {
+    await recordWebhook(provider.name, result.eventId, { event: result.event, outcome: 'IGNORED' });
+    return { received: true, ignored: true };
+  }
+  const payment = await one<{ amount: number; status: string }>(db, 'SELECT amount, status FROM naya.payments WHERE reference = $1 AND provider = $2', [result.reference, provider.name]);
+  if (!payment) {
+    console.error(`[payments] callback ${providerName}: reference isiyojulikana ${result.reference}`);
+    await recordWebhook(provider.name, result.eventId, { event: result.event, reference: result.reference, status: result.status, outcome: 'UNKNOWN_REFERENCE' });
+    if (provider.name === 'simulator') throw notFound('Muamala haukupatikana');
+    return { received: true, ignored: true };
+  }
+  if (result.status === 'SUCCESS' && result.amount != null && result.amount !== payment.amount) {
+    // Kiasi kimepingana — hakuna kinachoandikwa "kimelipwa"; ofisi inajulishwa na kukagua kwenye Abliner.
+    console.error(`[payments] callback ${providerName} ${result.reference}: kiasi ${result.amount} ≠ ${payment.amount}`);
+    await recordWebhook(provider.name, result.eventId, { event: result.event, reference: result.reference, status: result.status, outcome: 'AMOUNT_MISMATCH' });
+    await notifyAdmins();
+    return { received: true, ignored: true };
+  }
+  const work = applyResult(result.reference, result).then(() =>
+    recordWebhook(provider.name, result.eventId, { event: result.event, reference: result.reference, status: result.status, outcome: 'APPLIED' }),
+  );
+  work.catch((error) => console.error(`[payments] callback ${providerName} ${result.reference}: ${(error as Error).message}`));
+  let timer: NodeJS.Timeout | undefined;
+  await Promise.race([work, new Promise((resolve) => (timer = setTimeout(resolve, WEBHOOK_BUDGET_MS)))]);
+  clearTimeout(timer);
   return { received: true };
 }
 
@@ -298,16 +339,22 @@ async function holdReason(
   if (ride.completed_by === 'ADMIN') return 'Safari ilimalizwa na ofisi — ikague kwanza.';
   if (!account) return 'Dereva hajaweka namba ya kupokea pesa.';
   if (!(MOBILE_NETWORKS as string[]).includes(account.network)) return 'Namba kuu ya dereva si ya pesa ya simu (benki / T-Pesa) — tuma kwa mkono.';
+  void limit; // kikomo cha siku kinakaguliwa ndani ya preparePayout (baada ya kufunga safu ya dereva)
+  return null;
+}
+
+/** Kiasi ambacho NAYA imeshamtumia / inamtumia dereva LEO (saa za Dar es Salaam) kwa simu. */
+async function paidToday(client: Db, driverId: string) {
   const today = await one<{ sum: number }>(
     client,
     `SELECT coalesce(sum(amount), 0)::int AS sum FROM naya.payments
       WHERE user_id = $1 AND kind = 'PROMO_PAYOUT' AND status IN ('PENDING', 'SUCCESS')
         AND created_at >= (date_trunc('day', now() AT TIME ZONE '${TZ}') AT TIME ZONE '${TZ}')`,
-    [ride.driver_id],
+    [driverId],
   );
-  if ((today?.sum ?? 0) + ride.promo_discount > limit) return `Kikomo cha malipo ya moja kwa moja kwa siku (${tsh(limit)}) kimefika.`;
-  return null;
+  return today?.sum ?? 0;
 }
+const limitReason = (limit: number) => `Kikomo cha malipo ya simu kwa dereva kwa siku (${tsh(limit)}) kimefika — yatatumwa ofisi ikiruhusu kesho, au lipa kwa mkono.`;
 
 interface PayoutRide {
   id: string;
@@ -344,7 +391,12 @@ export async function onPromoRideCompleted(rideId: string) {
       await client.query(`UPDATE naya.rides SET promo_payout_state = 'HELD', promo_payout_note = $2 WHERE id = $1`, [rideId, reason]);
       return { held: reason, ride };
     }
-    return preparePayout(client, ride, account!, provider.name, null, 1);
+    const prepared = await preparePayout(client, ride, account!, provider.name, null, 1, settings.dailyLimit);
+    if (prepared && 'overLimit' in prepared) {
+      await client.query(`UPDATE naya.rides SET promo_payout_state = 'HELD', promo_payout_note = $2 WHERE id = $1`, [rideId, prepared.overLimit]);
+      return { held: prepared.overLimit, ride };
+    }
+    return prepared;
   });
   if (!plan) return;
   if ('held' in plan) {
@@ -362,7 +414,16 @@ export async function onPromoRideCompleted(rideId: string) {
 }
 
 /** Ndani ya transaction: muamala wa kutuma (kiasi kisizidi deni la NAYA kwa dereva, ukiondoa yanayotumwa sasa). */
-async function preparePayout(client: Db, ride: PayoutRide, account: { network: string; phone: string }, providerName: string, createdBy: string | null, attempt: number) {
+async function preparePayout(
+  client: Db,
+  ride: PayoutRide,
+  account: { network: string; phone: string },
+  providerName: string,
+  createdBy: string | null,
+  attempt: number,
+  dailyLimit: number,
+): Promise<{ payment: PaymentRow } | { overLimit: string } | null> {
+  // Safu ya dereva imefungwa: malipo mawili ya dereva mmoja hayawezi kupita kikomo kwa pamoja.
   await client.query('SELECT 1 FROM naya.drivers WHERE user_id = $1 FOR UPDATE', [ride.driver_id]);
   const { balance } = await promoBalance(client, ride.driver_id);
   const pending = await one<{ sum: number }>(
@@ -376,6 +437,8 @@ async function preparePayout(client: Db, ride: PayoutRide, account: { network: s
     await client.query(`UPDATE naya.rides SET promo_payout_state = 'PAID', promo_payout_note = 'Ilishalipwa kwa mkono' WHERE id = $1`, [ride.id]);
     return null;
   }
+  // Kikomo cha siku (Africa/Dar_es_Salaam) — kwa KILA malipo ya simu, ya moja kwa moja na ya ofisi.
+  if ((await paidToday(client, ride.driver_id)) + amount > dailyLimit) return { overLimit: limitReason(dailyLimit) };
   const payment = await insertPayment(client, {
     kind: 'PROMO_PAYOUT',
     direction: 'OUT',
@@ -437,11 +500,13 @@ export async function approvePayout(adminId: string, rideId: string) {
     if (!account) throw conflict('Dereva hajaweka namba ya kupokea pesa.');
     if (!(MOBILE_NETWORKS as string[]).includes(account.network)) throw conflict('Namba kuu ya dereva si ya pesa ya simu — tuma kwa mkono.');
     const attempt = ride.promo_payment_id ? ((await one<{ attempt: number }>(client, 'SELECT attempt FROM naya.payments WHERE id = $1', [ride.promo_payment_id]))?.attempt ?? 0) + 1 : 1;
-    const prepared = await preparePayout(client, ride, account, provider.name, adminId, attempt);
+    const { dailyLimit } = await getAutoPayout(client);
+    const prepared = await preparePayout(client, ride, account, provider.name, adminId, attempt, dailyLimit);
+    if (prepared && 'overLimit' in prepared) throw conflict(prepared.overLimit);
     await writeAudit(client, { actorId: adminId, action: 'promo_payout.approved', targetType: 'ride', targetId: rideId, details: { amount: prepared?.payment.amount ?? 0 } });
     return prepared;
   });
-  if (plan) await sendPayout(plan.payment);
+  if (plan && 'payment' in plan) await sendPayout(plan.payment);
   return payoutQueue();
 }
 
@@ -565,6 +630,19 @@ export function paymentsCsv(rows: Awaited<ReturnType<typeof listPayments>>) {
       .join(','),
   );
   return `﻿${[head.join(','), ...lines].join('\r\n')}\r\n`;
+}
+
+/**
+ * Ofisi: "Kagua muunganiko" — kampuni inayotumika, tatizo la mipangilio (majina ya variables tu), webhook URL,
+ * na salio la Abliner (GET /api/v1/balance — haigusi pesa). Kamwe haionyeshi funguo zenyewe.
+ */
+export async function providerCheck() {
+  const provider = getProvider();
+  const configured = (process.env.PAYMENT_PROVIDER ?? '').trim().toLowerCase() || null;
+  const webhookUrl = ablinerCallbackUrl();
+  const base = { configured, active: provider?.name ?? null, problem: providerProblem(), webhookUrl };
+  if (configured === 'abliner' || provider?.name === 'abliner') return { ...base, check: await ablinerBalance() };
+  return { ...base, check: provider ? { ok: true as const, balance: null, currency: null } : null };
 }
 
 export { guessNetwork };

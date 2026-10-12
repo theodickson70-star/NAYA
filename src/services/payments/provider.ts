@@ -6,6 +6,7 @@
 //    au swali la hali ya muamala). Jibu la "nimepokea ombi" ni PENDING tu.
 //  - Funguo za siri zinasomwa kutoka mazingira (Railway → Variables) tu; kamwe hazichapishwi kwenye log.
 import type { FastifyRequest } from 'fastify';
+import { abliner, ablinerConfig } from './abliner.js';
 import { simulator } from './simulator.js';
 
 export type MobileNetwork = 'MPESA' | 'MIXX' | 'AIRTEL' | 'HALOPESA';
@@ -30,7 +31,14 @@ export interface ProviderResult {
 
 export interface CallbackResult extends ProviderResult {
   reference: string;
+  /** Kiasi kilichothibitishwa na kampuni (TZS) — kikipingana na chetu, muamala haubadilishwi. */
+  amount?: number | null;
 }
+
+/** Webhook iliyothibitishwa: matokeo ya muamala wetu, au tukio lisilotuhusu (mf. SMS top-up) → 200 bila kubadilisha kitu. */
+export type WebhookResult =
+  | (CallbackResult & { eventId?: string | null; event?: string; ignore?: false })
+  | { ignore: true; eventId?: string | null; event?: string };
 
 export interface PaymentProvider {
   readonly name: string;
@@ -41,9 +49,9 @@ export interface PaymentProvider {
   /** Kutuma pesa kwenda kwenye simu (B2C / disbursement). */
   disburse(req: PaymentRequest): Promise<ProviderResult>;
   /** Hali ya muamala kwa reference yetu (kwa kuhakiki tusipopata callback). */
-  status(reference: string, direction: 'IN' | 'OUT'): Promise<ProviderResult>;
+  status(reference: string, direction: 'IN' | 'OUT', providerRef?: string | null): Promise<ProviderResult>;
   /** Callback kutoka kampuni ya malipo — lazima ithibitishe saini/siri; ikishindwa → throw. */
-  parseCallback(request: FastifyRequest): Promise<CallbackResult>;
+  parseCallback(request: FastifyRequest): Promise<WebhookResult>;
 }
 
 /**
@@ -57,7 +65,19 @@ export function getProvider(): PaymentProvider | null {
     if ((process.env.NODE_ENV ?? '').trim() === 'production') return null; // kamwe malipo bandia production
     return simulator;
   }
-  // Adapters za kampuni halisi zinaongezwa hapa (mf. if (name === 'selcom') return selcom;).
+  if (name === 'abliner') {
+    // Bila funguo zote mbili, malipo ya simu yanabaki yamezimwa (server haisimami — ofisi inaona onyo).
+    return ablinerConfig() ? abliner : null;
+  }
+  return null;
+}
+
+/** Kwa ofisi: PAYMENT_PROVIDER imewekwa lakini funguo hazipo? (jina la variable tu — kamwe thamani) */
+export function providerProblem(): string | null {
+  const name = (process.env.PAYMENT_PROVIDER ?? '').trim().toLowerCase();
+  if (name === 'abliner' && !ablinerConfig()) return 'PAYMENT_PROVIDER=abliner lakini ABLINER_API_KEY au ABLINER_WEBHOOK_SECRET haipo kwenye Railway → Variables.';
+  if (name && !['none', 'simulator', 'abliner'].includes(name)) return `PAYMENT_PROVIDER "${name}" haijulikani. Tumia "abliner".`;
+  if (name === 'simulator' && (process.env.NODE_ENV ?? '').trim() === 'production') return 'PAYMENT_PROVIDER=simulator haifanyi kazi production.';
   return null;
 }
 

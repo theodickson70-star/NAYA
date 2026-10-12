@@ -284,7 +284,8 @@ describe('NAYA Phase 8 — usalama na ramani ya live', () => {
     assert.equal(view.json.data.driver.plateNumber, `MC ${s.slice(-3)} PAI`);
     assert.ok(view.json.data.driver.location);
     const text = JSON.stringify(view.json.data);
-    assert.equal(text.includes('255'), false, 'namba ya simu haipaswi kuonekana');
+    // namba ya simu (255 + tarakimu 9) — si '255' popote (inaweza kutokea kwenye muda/mahali kwa bahati)
+    assert.equal(/255[67]\d{8}/.test(text), false, 'namba ya simu haipaswi kuonekana');
     assert.equal((await call('POST', '/api/share', { token: 'x'.repeat(32) })).status, 404);
     // link mpya inaua ya zamani
     await call('POST', `/api/rides/${rideId}/share`, {}, 'p1');

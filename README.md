@@ -115,6 +115,32 @@ Alama za kutiliwa shaka (`rides.flags`), zinaonekana kwa ofisi kwenye safari, Ri
 DRIVER, PASSENGER, AUTO au ADMIN. Migration `021_safari_rahisi.sql` inaongeza safu tu (haifuti data); safari zinazoendelea zisizo
 za ofa zinaondolewa PIN ili zisikwame.
 
+## Abliner — malipo halisi ya simu (0.17.0)
+
+Imejengwa kwa nyaraka za https://abliner.net/docs tu (hakuna endpoint iliyobuniwa):
+
+| Kazi | Abliner |
+|---|---|
+| Ada ya mwezi (dereva → NAYA, USSD push) | `POST /api/v1/deposits` `{amount, method:"mobile", currency:"TZS", phone, reference, callback_url}` + `Idempotency-Key` + `x-abliner-timestamp` / `x-abliner-signature` (hex HMAC-SHA256 ya `ts.body`, `ABLINER_WEBHOOK_SECRET`) |
+| Malipo ya ofa (NAYA → bodaboda) | `POST /api/v1/withdrawals` `{amount, method:"mobile", currency:"TZS", recipient, reference}` |
+| Hali ya muamala (callback ikichelewa) | `GET /api/v1/transactions?customer_reference=<reference yetu>` |
+| "Kagua muunganiko" (ofisi) | `GET /api/v1/balance` — haigusi pesa |
+| Webhook | `POST /api/payments/callback/abliner` — `x-webhook-signature` (hex HMAC-SHA256 ya `x-webhook-timestamp.rawBody`), timestamp ≤ sekunde 300, `x-webhook-id` inazuia marudio |
+
+Usalama wa pesa:
+
+- Hakuna kinachoandikwa "kimelipwa" bila webhook iliyothibitishwa au `/transactions` kusema `completed`; hali nyingine yoyote = inasubiri.
+- Kiasi cha webhook kikipingana na chetu → hakitumiki (ofisi inajulishwa).
+- Withdrawals hazina idempotency iliyoandikwa na Abliner → NAYA **hairudii kutuma yenyewe**. Jibu likipotea, muamala unabaki
+  "haujathibitishwa" mpaka Abliner iseme `completed`/`failed`; ofisi inaweza "Jaribu tena" baada ya `failed` tu.
+- Kikomo cha malipo ya simu kwa dereva: TSh 10,000 kwa siku (Africa/Dar_es_Salaam) — kwa malipo ya moja kwa moja NA "Tuma" ya ofisi,
+  ndani ya transaction yenye lock ya dereva.
+- Migration `025_abliner.sql` inaongeza jedwali `payment_webhook_events` tu.
+
+Kuwasha (Railway → Variables): `ABLINER_API_KEY`, `ABLINER_WEBHOOK_SECRET`, kisha `PAYMENT_PROVIDER=abliner`.
+Webhook URL ya kuweka Abliner → Dashboard → API Keys: `https://naya-production-e5cf.up.railway.app/api/payments/callback/abliner`
+(NAYA pia inaituma kama `callback_url` kwenye kila deposit, kupitia `RAILWAY_PUBLIC_DOMAIN`).
+
 ## Mfumo huru — madereva wachache (0.16.2)
 
 Migration `024_mfumo_huru.sql` inaongeza mpangilio `settings.dispatch = {"openMode": true}` (haifuti data). Ukiwa umewashwa:
