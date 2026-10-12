@@ -48,7 +48,7 @@ function startMock() {
       const url = new URL(req.url ?? '/', 'http://x');
       seen.push({ method: req.method ?? '', path: url.pathname, headers: req.headers, body });
       if (req.headers.authorization !== `Bearer ${KEY}`) return send(res, 401, { status: 'error', code: 'unauthorized', message: 'Invalid API key' });
-      if (req.method === 'GET' && url.pathname === '/api/v1/balance') return send(res, 200, { balance: 250000, currency: 'TZS', balances: { TZS: 250000 } });
+      if (req.method === 'GET' && url.pathname === '/api/v1/balance') return send(res, 200, { status: 'success', data: { balance: 250000, currency: 'TZS', balances: { TZS: 250000, USD: 0, KES: 0, UGX: 0 } } }); // umbo la nyaraka
       if (req.method === 'GET' && url.pathname === '/api/v1/transactions') {
         const ref = url.searchParams.get('customer_reference');
         const id = url.searchParams.get('id');
@@ -64,7 +64,7 @@ function startMock() {
         const b = JSON.parse(body);
         const tx = { id: `dep-${++counter}`, type: 'deposit', flow: 'push', status: 'pending', amount: b.amount, currency: b.currency, method: b.method, payment_url: null, reference: `ABL${counter}`, customer_reference: b.reference, message: 'USSD push sent' };
         txs.set(b.reference, tx);
-        return send(res, 200, tx);
+        return send(res, 200, { status: 'success', data: tx });
       }
       if (req.method === 'POST' && url.pathname === '/api/v1/withdrawals') {
         if (mode.withdrawal === 'drop') return req.socket.destroy(); // jibu limepotea — hatujui kama pesa imetoka

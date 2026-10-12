@@ -133,6 +133,9 @@ export function mapStatus(status: unknown): ProviderStatus {
   return 'PENDING';
 }
 
+/** Abliner inafunga majibu ndani ya `data` ({ status: "success", data: {...} }) — tunakubali yote mawili. */
+export const unwrap = (json: Json): Json => (json.data && typeof json.data === 'object' && !Array.isArray(json.data) ? (json.data as Json) : json);
+
 const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, 100) : null);
 
 /** Kumbukumbu ya kuonyesha: ya mtandao (mf. muamala wa M-Pesa) kama ipo, vinginevyo id ya Abliner. */
@@ -176,7 +179,8 @@ export const abliner: PaymentProvider = {
         body,
         headers: { 'idempotency-key': req.reference, 'x-abliner-timestamp': ts, 'x-abliner-signature': sign(cfg.webhookSecret, ts, bodyText) },
       });
-      return { status: mapStatus(json.status), providerRef: str(json.id), message: mapStatus(json.status) === 'FAILED' ? str(json.message) : null };
+      const data = unwrap(json);
+      return { status: mapStatus(data.status), providerRef: str(data.id), message: mapStatus(data.status) === 'FAILED' ? str(data.message) : null };
     } catch (error) {
       if (error instanceof AblinerError && error.definite) return { status: 'FAILED', message: friendly(error, 'IN') };
       // Mtandao / 5xx / 409 request_in_progress: hatujui kama push imetumwa → PENDING; worker inauliza hali kwa reference yetu.
@@ -192,7 +196,7 @@ export const abliner: PaymentProvider = {
       const json = await call(cfg, 'POST', '/api/v1/withdrawals', {
         body: { amount: req.amount, method: 'mobile', currency: 'TZS', recipient: req.phone, reference: req.reference },
       });
-      const data = (json.data && typeof json.data === 'object' ? json.data : json) as Json;
+      const data = unwrap(json);
       return { status: mapStatus(data.status), providerRef: str(data.id), message: mapStatus(data.status) === 'FAILED' ? str(data.message) : null };
     } catch (error) {
       if (error instanceof AblinerError && error.definite) return { status: 'FAILED', message: friendly(error, 'OUT') };
@@ -254,8 +258,13 @@ export async function ablinerBalance() {
   if (!cfg) return { ok: false as const, message: 'ABLINER_API_KEY na ABLINER_WEBHOOK_SECRET hazijawekwa kwenye Railway → Variables.' };
   try {
     const json = await call(cfg, 'GET', '/api/v1/balance');
-    const balance = typeof json.balance === 'number' ? json.balance : Number(json.balance);
-    return { ok: true as const, balance: Number.isFinite(balance) ? balance : null, currency: str(json.currency) ?? 'TZS' };
+    // Nyaraka: { status: "success", data: { balance, currency: "TZS", balances: { TZS, USD, KES, UGX } } }
+    const data = unwrap(json);
+    const tzs = data.balances && typeof data.balances === 'object' ? (data.balances as Json).TZS : undefined;
+    const raw = data.balance ?? tzs;
+    const balance = raw === null || raw === undefined || raw === '' ? Number.NaN : Number(raw);
+    if (!Number.isFinite(balance)) return { ok: false as const, message: 'Abliner ilijibu bila salio linalosomeka.', httpStatus: null };
+    return { ok: true as const, balance, currency: str(data.currency) ?? 'TZS' };
   } catch (error) {
     const message = error instanceof AblinerError ? friendly(error, 'OUT') : 'Abliner haikupatikana (mtandao).';
     return { ok: false as const, message, httpStatus: error instanceof AblinerError ? error.httpStatus : null };
