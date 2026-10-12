@@ -537,6 +537,11 @@ a.kpi:hover { border-color: var(--naya-green); }
 .cand-list { display: grid; gap: 8px; margin-top: 10px; }
 .cand { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 12px; background: var(--white); border: 1px solid var(--line); }
 .cand small { display: block; color: var(--muted); }
+.cand.is-blocked { background: #FBFAF6; }
+.cand-why { display: block; margin-top: 3px; color: var(--danger); font-size: 14px; font-weight: 600; }
+.cand-sum { margin: 0 0 4px; }
+.cand-head { margin: 10px 0 0; font-size: 16px; }
+@media (max-width: 560px) { .cand { grid-template-columns: 1fr auto; } .cand > span:first-child { grid-column: 1 / -1; } }
 
 /* ---- Maoni ---- */
 .fb-list { display: grid; gap: 10px; }

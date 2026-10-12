@@ -168,7 +168,7 @@ function render(r) {
       r.status === 'SEARCHING'
         ? `<section class="intervene" aria-labelledby="iv-title">
             <h2 id="iv-title">Mpe dereva maalum</h2>
-            <p class="muted">Safari hii bado inatafuta dereva. Chagua dereva aliye online — simu yake italia kama ombi la kawaida (sekunde 30 kukubali).</p>
+            <p class="muted">Safari hii bado inatafuta dereva. Hapa chini ni madereva wote walio online. Wenye kitufe cha <strong>Mtumie ombi</strong> wanaweza kupewa safari hii — simu yake italia kama ombi la kawaida (sekunde 30 kukubali). Wengine wanaonyesha kwa nini mfumo hauwapi maombi.</p>
             <div id="cand-list" class="cand-list"><p class="muted">Inatafuta madereva…</p></div>
             <p class="alert alert-danger" id="cand-error" role="alert" hidden></p>
           </section>`
@@ -228,17 +228,24 @@ async function loadCandidates(rideId) {
   try {
     const list = await ctx.api.get(`/api/admin/rides/${rideId}/candidates`);
     if (!$('cand-list')) return;
-    box.innerHTML = list.length
-      ? list
-          .map(
-            (c) => `<div class="cand">
-              <span><strong>${esc(c.name)}</strong> · ${esc(c.plateNumber ?? '')}<small>km ${c.km} kutoka kwa abiria${c.stale ? ' · hajaonekana dakika 2+' : ''}${c.busy ? ' · ana ombi jingine' : ''}</small></span>
-              <a class="btn btn-ghost btn-small" href="#/wateja/${esc(c.id)}">Wasifu</a>
-              <button class="btn btn-primary btn-small" type="button" data-offer="${esc(c.id)}" ${c.busy ? 'disabled' : ''}>Mtumie ombi</button>
-            </div>`,
-          )
-          .join('')
-      : '<p class="muted">Hakuna dereva wa chombo hiki aliye online sasa. Wapigie madereva waende online, au tuma tangazo.</p>';
+    const ready = list.filter((c) => c.canOffer);
+    const blocked = list.filter((c) => !c.canOffer);
+    const card = (c) => `<div class="cand${c.canOffer ? '' : ' is-blocked'}">
+        <span><strong>${esc(c.name)}</strong>${c.plateNumber ? ` · ${esc(c.plateNumber)}` : ''}<small>${
+          c.km == null ? 'Mahali hapajulikani' : `km ${c.km} kutoka kwa abiria`
+        }${c.notes.map((n) => ` · ${esc(n)}`).join('')}</small>${
+          c.reasons.length ? `<span class="cand-why">${c.reasons.map((r) => esc(r)).join(' · ')}</span>` : ''
+        }</span>
+        <a class="btn btn-ghost btn-small" href="#/wateja/${esc(c.id)}">Wasifu</a>
+        ${c.canOffer ? `<button class="btn btn-primary btn-small" type="button" data-offer="${esc(c.id)}">Mtumie ombi</button>` : '<span></span>'}
+      </div>`;
+    box.innerHTML = !list.length
+      ? '<p class="muted">Hakuna dereva yeyote aliye online sasa. Wapigie madereva waende online, au tuma tangazo.</p>'
+      : `<p class="cand-sum"><strong>${list.length}</strong> online · <strong>${ready.length}</strong> wanaweza kupewa safari hii${
+          blocked.length ? ` · <strong>${blocked.length}</strong> hawawezi (sababu chini ya jina)` : ''
+        }</p>
+        ${ready.length ? ready.map(card).join('') : '<p class="alert alert-warn">Hakuna dereva aliye tayari kwa safari hii. Angalia sababu za madereva walio online hapa chini.</p>'}
+        ${blocked.length ? `<h3 class="cand-head">Online lakini hawapati maombi</h3>${blocked.map(card).join('')}` : ''}`;
     box.onclick = async (event) => {
       const button = event.target.closest('[data-offer]');
       if (!button) return;

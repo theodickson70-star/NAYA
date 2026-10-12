@@ -1,5 +1,5 @@
 // Kosa #2: kumpata dereva haraka kwa MAWIMBI.
-//   Wimbi 1: aliye karibu zaidi peke yake (sekunde 20). Wimbi 2+: madereva 3 wanaofuata pamoja (sekunde 30) —
+//   Wimbi 1: madereva 2 walio karibu zaidi (sekunde 15). Wimbi 2+: madereva 4 wanaofuata pamoja (sekunde 20) —
 //   wa kwanza kukubali anapata safari, wengine wanaambiwa "mwingine amewahi".
 // Database ya MAJARIBIO tu.
 import assert from 'node:assert/strict';
@@ -9,7 +9,7 @@ import { buildApp } from '../src/app.js';
 import { db } from '../src/db/pool.js';
 import { runMigrations } from '../src/db/migrate.js';
 import { hashPassword } from '../src/services/auth.js';
-import { dispatchPending } from '../src/services/rides.js';
+import { candidatesForRide, dispatchPending, offlineUnseenDrivers } from '../src/services/rides.js';
 
 let app: FastifyInstance;
 const s = String(Date.now()).slice(-6);
@@ -35,8 +35,10 @@ async function call(method: 'GET' | 'POST', url: string, body?: unknown, who?: s
 const A = { lat: -5.4, lng: 32.6 };
 const B = { lat: -5.415, lng: 32.61 };
 // d1 karibu zaidi … d5 mbali zaidi (wote ndani ya km 10)
-const SPOTS = [0.0004, 0.004, 0.008, 0.012, 0.016].map((d) => ({ lat: A.lat - d, lng: A.lng }));
-const D = ['d1', 'd2', 'd3', 'd4', 'd5'];
+const SPOTS = [0.0004, 0.004, 0.008, 0.012, 0.016, 0.02, 0.024].map((d) => ({ lat: A.lat - d, lng: A.lng }));
+const D = ['d1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7'];
+// x1: bajaji (chombo tofauti), x2: ada itaisha — wako online lakini hawapewi maombi ya bodaboda
+const X = [{ key: 'x1', vehicle: 'BAJAJI', spot: { lat: A.lat - 0.001, lng: A.lng } }, { key: 'x2', vehicle: 'BODABODA', spot: { lat: A.lat - 0.002, lng: A.lng } }];
 
 async function makeUser(key: string, phone: string, name: string, mode: string) {
   const row = await db.query(
@@ -84,6 +86,17 @@ before(async () => {
     );
     assert.equal((await call('POST', '/api/driver/online', { online: true, ...SPOTS[i] }, d)).status, 200);
   }
+  for (const [i, x] of X.entries()) {
+    await makeUser(x.key, `0759${i}${s.slice(1)}`, `Dereva Online ${x.key}`, 'DRIVER');
+    await db.query(
+      `INSERT INTO naya.drivers (user_id, status, vehicle_type, plate_number, vehicle_make, vehicle_color, license_number, paid_until)
+       VALUES ($1, 'APPROVED', $2, $3, 'Boxer', 'Nyekundu', 'DL123456', now() + interval '30 days')`,
+      [ids[x.key], x.vehicle, `MC ${s.slice(-3)} X${i + 1}`],
+    );
+    assert.equal((await call('POST', '/api/driver/online', { online: true, ...x.spot }, x.key)).status, 200);
+  }
+  // x2 yuko online, lakini ada yake imeisha zamani (zaidi ya siku za neema)
+  await db.query(`UPDATE naya.drivers SET paid_until = now() - interval '90 days' WHERE user_id = $1`, [ids.x2]);
 });
 
 after(async () => {
@@ -100,80 +113,118 @@ after(async () => {
 describe('Kosa #2 — mawimbi ya maombi', () => {
   let rideId = '';
 
-  it('wimbi la 1: aliye karibu zaidi PEKE YAKE, sekunde 20', async () => {
+  it('wimbi la 1: madereva 2 walio karibu zaidi KWA PAMOJA, sekunde 15', async () => {
     rideId = await order();
-    assert.deepEqual(await offered(), ['d1']);
+    assert.deepEqual(await offered(), ['d1', 'd2']);
     const o = (await state('d1')).offer;
-    assert.equal(o.totalSeconds, 20);
-    assert.ok(o.secondsLeft > 15 && o.secondsLeft <= 20);
+    assert.equal(o.totalSeconds, 15);
+    assert.ok(o.secondsLeft > 10 && o.secondsLeft <= 15);
   });
 
-  it('akikataa: madereva 3 wanaofuata wanapata ombi KWA PAMOJA, sekunde 30', async () => {
-    const o = (await state('d1')).offer;
-    await call('POST', `/api/driver/offers/${o.id}/decline`, {}, 'd1');
-    assert.deepEqual(await offered(), ['d2', 'd3', 'd4']);
-    const o3 = (await state('d3')).offer;
-    assert.equal(o3.totalSeconds, 30);
-    assert.equal(o3.ride.id, rideId);
+  it('wote wawili wakikataa: madereva 4 wanaofuata wanapata ombi KWA PAMOJA, sekunde 20', async () => {
+    const o1 = (await state('d1')).offer;
+    await call('POST', `/api/driver/offers/${o1.id}/decline`, {}, 'd1');
+    assert.deepEqual(await offered(), ['d2']); // d2 bado anaweza kukubali — wimbi jipya halianzi
+    const o2 = (await state('d2')).offer;
+    await call('POST', `/api/driver/offers/${o2.id}/decline`, {}, 'd2');
+    assert.deepEqual(await offered(), ['d3', 'd4', 'd5', 'd6']);
+    const o4 = (await state('d4')).offer;
+    assert.equal(o4.totalSeconds, 20);
+    assert.equal(o4.ride.id, rideId);
+  });
+
+  it('ofisi inaona madereva WOTE walio online na sababu za wasioweza kupewa safari', async () => {
+    const list = (await candidatesForRide(rideId)) as any[];
+    const by = (key: string) => list.find((c) => c.id === ids[key]);
+    assert.ok(!list.some((c) => c.id === ids.p1)); // abiria mwenyewe haonekani
+    // x1 (bajaji) na x2 (ada imeisha) wako karibu, lakini hawawezi kupewa
+    assert.equal(by('x1').canOffer, false);
+    assert.match(by('x1').reasons.join(' '), /Ana bajaji — abiria ameomba bodaboda/);
+    assert.equal(by('x2').canOffer, false);
+    assert.match(by('x2').reasons.join(' '), /Ada ya mwezi imeisha/);
+    // d1 alikataa: bado anaweza kutumiwa na ofisi, na ofisi inaona alikataa
+    assert.equal(by('d1').canOffer, true);
+    assert.match(by('d1').notes.join(' '), /Alikataa safari hii/);
+    // d3 ana ombi la safari hii linalomsubiri
+    assert.equal(by('d3').canOffer, false);
+    assert.match(by('d3').notes.join(' '), /linamsubiri sasa/);
+    // walio tayari wanakuja kwanza
+    const firstBlocked = list.findIndex((c) => !c.canOffer);
+    assert.ok(list.slice(firstBlocked).every((c) => !c.canOffer));
   });
 
   it('mmoja akikataa ndani ya wimbi, wengine bado wanaweza kukubali (wimbi jipya halianzi)', async () => {
-    const o2 = (await state('d2')).offer;
-    await call('POST', `/api/driver/offers/${o2.id}/decline`, {}, 'd2');
-    assert.deepEqual(await offered(), ['d3', 'd4']);
+    const o3 = (await state('d3')).offer;
+    await call('POST', `/api/driver/offers/${o3.id}/decline`, {}, 'd3');
+    assert.deepEqual(await offered(), ['d4', 'd5', 'd6']);
   });
 
   it('wa kwanza kukubali anapata safari; mwingine anaambiwa "dereva mwingine amewahi"', async () => {
+    const o5 = (await state('d5')).offer;
     const o4 = (await state('d4')).offer;
-    const o3 = (await state('d3')).offer;
-    const acc = await call('POST', `/api/driver/offers/${o3.id}/accept`, {}, 'd3');
+    const acc = await call('POST', `/api/driver/offers/${o4.id}/accept`, {}, 'd4');
     assert.equal(acc.status, 200, acc.json.message);
     const ride = (await call('GET', '/api/rides/current', undefined, 'p1')).json.data;
     assert.equal(ride.status, 'ACCEPTED');
-    assert.equal(ride.driver.name, 'Dereva Wimbi 3');
-    const s4 = await state('d4');
-    assert.equal(s4.offer, null);
-    assert.equal(s4.lastOffer?.id, o4.id);
-    assert.equal(s4.lastOffer?.status, 'TAKEN');
-    const late = await call('POST', `/api/driver/offers/${o4.id}/accept`, {}, 'd4');
+    assert.equal(ride.driver.name, 'Dereva Wimbi 4');
+    const s5 = await state('d5');
+    assert.equal(s5.offer, null);
+    assert.equal(s5.lastOffer?.id, o5.id);
+    assert.equal(s5.lastOffer?.status, 'TAKEN');
+    const late = await call('POST', `/api/driver/offers/${o5.id}/accept`, {}, 'd5');
     assert.equal(late.status, 409);
     assert.match(late.json.message, /Dereva mwingine amewahi/);
     // "mwingine amewahi" haihesabiwi kama kukosa kujibu
-    assert.equal((await db.query('SELECT is_online FROM naya.drivers WHERE user_id = $1', [ids.d4])).rows[0].is_online, true);
+    assert.equal((await db.query('SELECT is_online FROM naya.drivers WHERE user_id = $1', [ids.d5])).rows[0].is_online, true);
     await call('POST', `/api/rides/${rideId}/cancel`, { reason: 'jaribio' }, 'p1');
     await call('POST', `/api/rides/${rideId}/close`, {}, 'p1');
   });
 
   it('wimbi likiisha muda bila jibu → wimbi linalofuata (madereva wapya tu)', async () => {
-    // d3 ameachiwa (safari imeghairiwa) — yuko huru tena
+    // d4 ameachiwa (safari imeghairiwa) — yuko huru tena
     rideId = await order();
-    assert.deepEqual(await offered(), ['d1']);
+    assert.deepEqual(await offered(), ['d1', 'd2']);
     await expireOffers(rideId);
     await dispatchPending();
-    assert.deepEqual(await offered(), ['d2', 'd3', 'd4']);
+    assert.deepEqual(await offered(), ['d3', 'd4', 'd5', 'd6']);
     await expireOffers(rideId);
     await dispatchPending();
-    assert.deepEqual(await offered(), ['d5']);
+    assert.deepEqual(await offered(), ['d7']);
   });
 
   it('abiria akighairi wakati wa wimbi: ombi linaondoka ("abiria ameghairi"), dereva hawekwi offline', async () => {
-    const o5 = (await state('d5')).offer;
+    const o7 = (await state('d7')).offer;
     assert.equal((await call('POST', `/api/rides/${rideId}/cancel`, { reason: 'jaribio' }, 'p1')).status, 200);
-    const s5 = await state('d5');
-    assert.equal(s5.offer, null);
-    assert.equal(s5.lastOffer?.id, o5.id);
-    assert.equal(s5.lastOffer?.status, 'CANCELLED');
+    const s7 = await state('d7');
+    assert.equal(s7.offer, null);
+    assert.equal(s7.lastOffer?.id, o7.id);
+    assert.equal(s7.lastOffer?.status, 'CANCELLED');
     await call('POST', `/api/rides/${rideId}/close`, {}, 'p1');
-    // d5: ombi 1 limeghairiwa (si "hakujibu"). Ombi jingine likiisha muda bado ni 1 tu → anabaki online.
+    // d7: ombi 1 limeghairiwa (si "hakujibu"). Ombi jingine likiisha muda bado ni 1 tu → anabaki online.
     rideId = await order();
     await db.query(`UPDATE naya.ride_offers SET status = 'DECLINED' WHERE ride_id = $1 AND status = 'PENDING'`, [rideId]);
-    await dispatchPending(); // d2,d3,d4
+    await dispatchPending(); // d3..d6
     await db.query(`UPDATE naya.ride_offers SET status = 'DECLINED' WHERE ride_id = $1 AND status = 'PENDING'`, [rideId]);
-    await dispatchPending(); // d5
-    assert.deepEqual(await offered(), ['d5']);
+    await dispatchPending(); // d7
+    assert.deepEqual(await offered(), ['d7']);
     await expireOffers(rideId);
     await dispatchPending();
-    assert.equal((await db.query('SELECT is_online FROM naya.drivers WHERE user_id = $1', [ids.d5])).rows[0].is_online, true);
+    assert.equal((await db.query('SELECT is_online FROM naya.drivers WHERE user_id = $1', [ids.d7])).rows[0].is_online, true);
     await call('POST', `/api/rides/${rideId}/cancel`, { reason: 'jaribio' }, 'p1');
+  });
+
+  it('dereva "online" ambaye simu haijaonekana dakika 20+ anawekwa offline na kujulishwa', async () => {
+    await db.query(`UPDATE naya.drivers SET last_seen_at = now() - interval '25 minutes' WHERE user_id = $1`, [ids.x1]);
+    await db.query(`UPDATE naya.drivers SET last_seen_at = now() - interval '5 minutes' WHERE user_id = $1`, [ids.x2]);
+    const off = await offlineUnseenDrivers(true);
+    assert.ok(off.includes(ids.x1));
+    assert.ok(!off.includes(ids.x2)); // dakika 5 tu — anabaki online
+    const online = async (key: string) => (await db.query('SELECT is_online FROM naya.drivers WHERE user_id = $1', [ids[key]])).rows[0].is_online;
+    assert.equal(await online('x1'), false);
+    assert.equal(await online('x2'), true);
+    assert.equal(await online('d1'), true);
+    const n = await db.query(`SELECT title, body FROM naya.notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`, [ids.x1]);
+    assert.equal(n.rows[0]?.title, 'Umewekwa offline');
+    assert.match(n.rows[0].body, /haijaona simu yako kwa dakika 20/);
   });
 });

@@ -115,6 +115,22 @@ Alama za kutiliwa shaka (`rides.flags`), zinaonekana kwa ofisi kwenye safari, Ri
 DRIVER, PASSENGER, AUTO au ADMIN. Migration `021_safari_rahisi.sql` inaongeza safu tu (haifuti data); safari zinazoendelea zisizo
 za ofa zinaondolewa PIN ili zisikwame.
 
+## Kumpata dereva haraka (0.16.1)
+
+| Kipengele | Thamani |
+|---|---|
+| Wimbi la 1 | madereva 2 walio karibu zaidi kwa pamoja, sekunde 15 |
+| Wimbi la 2+ | madereva 4 wanaofuata kwa pamoja, sekunde 20 |
+| Mpangilio | simu zilizoonekana hivi karibuni kwanza, kisha aliye karibu |
+| Dereva wa app (APK) | anapewa maombi hadi dakika 10 tangu simu ilipoonekana mara ya mwisho |
+| Online bila kuonekana | simu isipoonekana dakika 20 (na hana safari) → offline + arifa |
+| Ombi la ofisi | sekunde 30 |
+
+Dereva ambaye ombi lake liliondolewa kwa sababu mwingine aliwahi (TAKEN) anapewa tena safari ile ikirudi kutafuta dereva.
+Ofisi → safari inayotafuta dereva → **Mpe dereva maalum**: madereva WOTE walio online, kila mmoja na sababu kama hapewi maombi
+(chombo tofauti, ada imeisha, hajaidhinishwa, hana GPS, yuko kwenye safari, anajibu ombi jingine, simu haijaonekana, yuko mbali).
+Hakuna migration.
+
 ## Malipo ya simu (0.16.0)
 
 Pesa ya simu (M-Pesa, Mixx by Yas, Airtel Money, HaloPesa) kupitia kampuni ya malipo (`PAYMENT_PROVIDER`).

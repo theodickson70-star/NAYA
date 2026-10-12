@@ -166,10 +166,10 @@ describe('NAYA Phase 5+6 — safari', () => {
     const s1 = await state('d1');
     assert.ok(s1.offer, 'd1 hakupata ombi');
     assert.equal(s1.offer.ride.id, rideId);
-    // Wimbi la kwanza: aliye karibu zaidi peke yake, sekunde 20
-    assert.ok(s1.offer.secondsLeft > 15 && s1.offer.secondsLeft <= 20, `secondsLeft ${s1.offer.secondsLeft}`);
-    assert.equal(s1.offer.totalSeconds, 20);
-    assert.equal((await state('d2')).offer, null);
+    // Wimbi la kwanza: madereva 2 walio karibu zaidi kwa pamoja, sekunde 15
+    assert.ok(s1.offer.secondsLeft > 10 && s1.offer.secondsLeft <= 15, `secondsLeft ${s1.offer.secondsLeft}`);
+    assert.equal(s1.offer.totalSeconds, 15);
+    assert.equal((await state('d2')).offer?.ride.id, rideId);
     assert.equal((await state('d3')).offer, null); // bajaji haipewi ombi la bodaboda
   });
 

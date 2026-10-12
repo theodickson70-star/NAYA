@@ -169,9 +169,9 @@ describe('NAYA Phase 10 — app ya Android (FCM)', () => {
     assert.equal(offer.data.title, 'Ombi jipya la safari');
     assert.match(offer.data.body, /TSh/);
     assert.equal(offer.android.priority, 'HIGH');
-    assert.equal(offer.android.ttl, '20s'); // wimbi la kwanza: dereva aliye karibu zaidi, sekunde 20
+    assert.equal(offer.android.ttl, '15s'); // wimbi la kwanza: madereva 2 walio karibu zaidi, sekunde 15
     const expires = Number(offer.data.expiresAt);
-    assert.ok(expires >= before + 19_000 && expires <= Date.now() + 21_000, `expiresAt ${expires}`);
+    assert.ok(expires >= before + 14_000 && expires <= Date.now() + 16_000, `expiresAt ${expires}`);
     assert.equal(oauthCalls, 1);
 
     // Abiria akighairi → simu ya dereva inyamaze.
