@@ -470,6 +470,7 @@ function driverKey(s) {
     s.ride?.id,
     s.ride?.status,
     s.ride?.sosOpen,
+    s.ride?.promoPayout?.state,
     s.earnings.today.total,
     s.subscription?.state,
     s.subscription?.daysLeft,
@@ -608,8 +609,9 @@ function subscriptionBlockHtml(sub) {
     <h1>Ada ya mwezi imeisha</h1>
     <p>Lipa <strong>${formatTsh(sub.monthlyFee)}</strong> kwa mwezi ili uendelee kupokea safari za NAYA.</p>
     <p class="sub-how">${esc(sub.paymentInstructions)}</p>
-    <p class="muted">Ofisi ikishapokea malipo yako, utaweza kwenda online mara moja.</p>
-    <button class="btn btn-primary btn-block" type="button" data-ride="reload">Nimeshalipa — angalia tena</button>
+    <p class="muted">Malipo yakishapokelewa, utaweza kwenda online mara moja.</p>
+    <a class="btn btn-primary btn-block" href="#/akaunti/ada">Lipa ada</a>
+    <button class="btn btn-ghost btn-block" type="button" data-ride="reload">Nimeshalipa — angalia tena</button>
   </section>`;
 }
 
@@ -683,6 +685,17 @@ function startOfferCountdown(seconds, total) {
   }, 1000);
 }
 
+/** Dereva, safari ya ofa imekamilika: sehemu ya NAYA inatumwa vipi? */
+function payoutLine(ride) {
+  const amt = formatTsh(ride.promo.discount);
+  const st = ride.promoPayout?.state;
+  if (st === 'PENDING') return `NAYA inakutumia ${amt} sasa hivi kwenye namba yako kuu ya malipo.`;
+  if (st === 'PAID') return `NAYA imekutumia ${amt} kwenye namba yako kuu ya malipo.`;
+  if (st === 'HELD') return `NAYA itakutumia ${amt} baada ya ukaguzi wa ofisi.`;
+  if (st === 'FAILED') return `Kutuma ${amt} kumeshindwa — ofisi itakutumia tena.`;
+  return `NAYA itakutumia ${amt} kwenye namba yako ya malipo (Akaunti → Malipo ya ofa).`;
+}
+
 function driverRideHtml(ride) {
   const p = ride.passenger;
   const steps = {
@@ -715,7 +728,7 @@ function driverRideHtml(ride) {
   if (ride.status === 'COMPLETED') {
     return `<section class="ride-head ride-done" role="status"><span class="ride-pulse" aria-hidden="true"></span>
         <h1>Pokea ${formatTsh(ride.passengerPays ?? ride.fare)}</h1><p>Taslimu kutoka kwa ${esc(p?.name ?? 'abiria')}.${
-          ride.promo ? ` NAYA itakutumia ${formatTsh(ride.promo.discount)} kwenye namba yako ya malipo (Akaunti → Malipo ya ofa).` : ''
+          ride.promo ? ` ${payoutLine(ride)}` : ''
         }</p></section>
       <form class="card" id="rate-passenger-form">
         ${stars('rating', `Mpe ${esc(p?.name.split(' ')[0] ?? 'abiria')} nyota`)}

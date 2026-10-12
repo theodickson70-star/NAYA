@@ -115,6 +115,30 @@ Alama za kutiliwa shaka (`rides.flags`), zinaonekana kwa ofisi kwenye safari, Ri
 DRIVER, PASSENGER, AUTO au ADMIN. Migration `021_safari_rahisi.sql` inaongeza safu tu (haifuti data); safari zinazoendelea zisizo
 za ofa zinaondolewa PIN ili zisikwame.
 
+## Malipo ya simu (0.16.0)
+
+Pesa ya simu (M-Pesa, Mixx by Yas, Airtel Money, HaloPesa) kupitia kampuni ya malipo (`PAYMENT_PROVIDER`).
+Bila `PAYMENT_PROVIDER` kila kitu kinabaki cha mkono kama zamani.
+
+**1. Ada ya mwezi** — Akaunti → Ada ya mwezi → "Lipa kwa simu sasa" (miezi 1–3, mtandao unachaguliwa kutoka namba).
+`POST /api/driver/subscription/pay` → ombi la PIN (USSD push) → app inasubiri (`GET /api/payments/:id`) → kampuni ikithibitisha
+(callback `POST /api/payments/callback/:provider` au swali la hali kila dakika) → siku zinaongezwa zenyewe, risiti + SMS.
+Ombi lisilojibiwa dakika 15 → "limeshindwa"; uthibitisho ukifika baadaye bado unaongeza siku.
+
+**2. Malipo ya ofa ya papo hapo** — safari ya ofa ikikamilika, NAYA inatuma sehemu ya dereva kwenye namba yake kuu
+(M-Pesa / Mixx / Airtel / HaloPesa) yenyewe, kama: hakuna alama ya kutiliwa shaka, haikumalizwa na ofisi, na jumla ya leo ≤ kikomo
+(chaguo-msingi TSh 10,000 kwa dereva kwa siku; ofisi inabadilisha). Vinginevyo → **inasubiri ukaguzi** (Ofisi → Ofa → Malipo kwa madereva):
+"Tuma" au "Kataa" (iliyokataliwa haidaiwi tena). Kutuma kukishindwa → "Jaribu tena". Hali ya safari: `rides.promo_payout_state`.
+
+**Kinga:** muamala unaandikwa "Imefaulu" tu kampuni ya malipo ikithibitisha; callback mara mbili haiongezi mara mbili (row lock +
+unique `payment_id`); malipo ya kutoka hayaandikwi "yameshindwa" kwa kukosa jibu (yanaonekana "Hayajathibitishwa" ofisini);
+kiasi hakizidi deni la NAYA kwa dereva. Ofisi inaweza kuzima malipo ya papo hapo wakati wowote. Miamala yote: Ofisi → Ofa → Miamala ya simu (+ CSV).
+
+**Kuunganisha kampuni ya malipo:** adapter moja inayotimiza `PaymentProvider` (`src/services/payments/provider.ts`) —
+`collect`, `disburse`, `status`, `parseCallback` (lazima ithibitishe saini) — na kuisajili kwenye `getProvider()`.
+Kampuni bandia ya majaribio: `src/services/payments/simulator.ts` (haiwezi kuwashwa production).
+Migration `023_malipo.sql` inaongeza jedwali na safu tu.
+
 ## Akaunti mpya (0.15.0)
 
 App → **Akaunti** sasa ni menyu (kama Bolt/Uber), si orodha ndefu ya kadi:

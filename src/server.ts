@@ -6,6 +6,7 @@ import { runMigrations } from './db/migrate.js';
 import { startListener, stopListener } from './realtime/hub.js';
 import { dispatchPending } from './services/rides.js';
 import { runSubscriptionChecks } from './services/subscriptions.js';
+import { checkPendingPayments } from './services/payments/index.js';
 
 const app = await buildApp();
 
@@ -43,8 +44,23 @@ const checkSubscriptions = () =>
 const subscriptionTimer = setInterval(checkSubscriptions, 5 * 60_000);
 void checkSubscriptions();
 
+// Malipo ya simu: uliza hali ya miamala inayosubiri (kama callback ya kampuni ya malipo imechelewa au kupotea).
+let checkingPayments = false;
+const paymentTimer = setInterval(async () => {
+  if (checkingPayments) return;
+  checkingPayments = true;
+  try {
+    await checkPendingPayments();
+  } catch (error) {
+    app.log.error({ err: error }, 'ukaguzi wa malipo umeshindwa');
+  } finally {
+    checkingPayments = false;
+  }
+}, 60_000);
+
 const shutdown = async () => {
   clearInterval(dispatcher);
+  clearInterval(paymentTimer);
   clearInterval(subscriptionTimer);
   await stopListener();
   await app.close();

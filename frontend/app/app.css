@@ -1155,3 +1155,37 @@ input, select, textarea { font-size: 17px; padding: 13px 14px; border-radius: va
 /* Dharura: aikoni za simu zilikuwa kubwa mno (hazikuwa na ukubwa) */
 .sos-sheet a.btn { display: block; text-decoration: none; text-align: center; }
 .sos-sheet a.btn svg { width: 20px; height: 20px; vertical-align: -4px; margin-right: 6px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ==== Malipo ya simu (0.16.0) ==== */
+.pay-form { margin-top: 14px; padding: 16px; border-radius: 18px; background: var(--bg); }
+.pay-form h3 { margin: 0; font-size: 19px; }
+.pay-form .muted.small { margin-top: 4px; line-height: 1.45; }
+.pay-months { border: 0; padding: 0; margin: 12px 0 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.pay-months legend { font-weight: 700; padding: 0; margin-bottom: 6px; }
+.pay-months label { position: relative; display: block; cursor: pointer; }
+.pay-months input { position: absolute; opacity: 0; }
+.pay-months label > span { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 14px; background: var(--white); border: 2px solid transparent; }
+.pay-months strong { font-size: 15.5px; }
+.pay-months .muted { font-size: 14px; font-variant-numeric: tabular-nums; }
+.pay-months input:checked + span { border-color: var(--g700); box-shadow: 0 0 0 3px var(--g100); }
+.pay-months input:focus-visible + span { outline: 3px solid var(--gold); outline-offset: 2px; }
+.pay-form .btn-big { margin-top: 14px; }
+.pay-wait, .pay-done, .pay-fail { margin-top: 14px; padding: 20px 16px; border-radius: 18px; text-align: center; }
+.pay-wait { background: #FFFBEA; border: 1.5px solid #F4D36B; }
+.pay-wait h3, .pay-done h3, .pay-fail h3 { margin: 10px 0 4px; font-size: 20px; }
+.pay-wait p, .pay-done p, .pay-fail p { line-height: 1.45; }
+.pay-wait-phone { position: relative; display: inline-grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; background: var(--gold); color: var(--ink); }
+.pay-wait-phone svg { width: 30px; height: 30px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.pay-wait-phone i { position: absolute; inset: -6px; border-radius: 50%; border: 3px solid var(--gold); animation: pay-ring 1.6s ease-out infinite; }
+@keyframes pay-ring { from { transform: scale(0.85); opacity: 1; } to { transform: scale(1.35); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .pay-wait-phone i { animation: none; } }
+.pay-done { background: var(--g100); }
+.pay-done h3 { color: var(--g800); }
+.pay-fail { background: var(--danger-bg); }
+.pay-fail h3 { color: var(--danger); }
+.pay-fail .btn { margin-top: 12px; }
+.wallet-auto { display: flex; gap: 10px; align-items: flex-start; margin: 12px 0 0; padding: 10px 12px; border-radius: 14px; background: var(--g100); font-size: 14.5px; line-height: 1.45; }
+.wallet-auto svg { flex: none; width: 20px; height: 20px; margin-top: 2px; fill: var(--gold); stroke: var(--g800); stroke-width: 1.4; stroke-linejoin: round; }
+.wallet-auto strong { display: block; color: var(--g800); }
+.wallet-state { display: block; margin-top: 4px; }
+.wallet-state .badge { font-size: 12.5px; padding: 2px 8px; }

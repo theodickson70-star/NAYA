@@ -893,9 +893,82 @@
     "Bajaji tu": "Bajaji only",
     "Piga": "Call",
     "‹ Msaada": "‹ Support",
-    "Mpigie mtu wako wa dharura": "Call your emergency contact"
+    "Mpigie mtu wako wa dharura": "Call your emergency contact",
+    "Lipa kwa simu sasa": "Pay by phone now",
+    "Utapokea ombi kwenye simu yako — ingiza PIN yako ya pesa ya simu kuthibitisha. Siku zinaongezwa papo hapo.": "You will get a prompt on your phone — enter your mobile money PIN to confirm. Days are added instantly.",
+    "Miezi": "Months",
+    "Mwezi 1": "1 month",
+    "Namba ya kulipia": "Number to pay from",
+    "Inatuma ombi…": "Sending request…",
+    "Angalia simu yako": "Check your phone",
+    "Ombi halijafika? Hakikisha simu iko hewani. Linaweza kuchukua sekunde chache.": "Prompt not here yet? Make sure your phone has network. It can take a few seconds.",
+    "Malipo hayakukamilika": "The payment didn't go through",
+    "Au lipa ofisini:": "Or pay at the office:",
+    "Lipa ada": "Pay fee",
+    "Malipo yakishapokelewa, utaweza kwenda online mara moja.": "Once payment is received, you can go online straight away.",
+    "Malipo ya papo hapo": "Instant payouts",
+    "Inatumwa…": "Sending…",
+    "Imetumwa": "Sent",
+    "Inasubiri ukaguzi": "Awaiting review",
+    "Imeshindwa — ofisi itatuma tena": "Failed — the office will resend",
+    "Imekataliwa": "Rejected",
+    "Malipo ya papo hapo yanaenda kwa M-Pesa, Mixx, Airtel au HaloPesa tu. Weka mojawapo kuwa namba kuu.": "Instant payouts go to M-Pesa, Mixx, Airtel or HaloPesa only. Make one of them your main number.",
+    "Ada imepokelewa": "Fee received",
+    "Malipo ya ofa yanasubiri ukaguzi": "Offer payout awaiting review",
+    "Malipo ya ofa yamekataliwa": "Offer payout rejected",
+    "Muda wa kuthibitisha umeisha — hukuingiza PIN au mtandao haukujibu.": "Time to confirm ran out — the PIN wasn't entered or the network didn't respond.",
+    "Mteja amekataa au hakuingiza PIN.": "The payment was declined or the PIN was not entered.",
+    "Namba hii haina akaunti ya pesa ya simu.": "This number has no mobile money account.",
+    "Malipo kwa simu bado hayajawashwa. Lipa ofisini kwa NAYA.": "Phone payments are not switched on yet. Pay at the NAYA office.",
+    "Ada inalipwa baada ya ofisi kukuthibitisha kuwa dereva.": "The fee is paid after the office approves you as a driver.",
+    "Una ombi la kulipa linalosubiri. Angalia simu yako na uingize PIN, au subiri dakika 2 ujaribu tena.": "You have a payment request waiting. Check your phone and enter your PIN, or wait 2 minutes and try again.",
+    "Kampuni ya malipo haikupatikana. Jaribu tena baada ya muda mfupi.": "The payment provider couldn't be reached. Try again shortly."
   },
   "patterns": [
+    [
+      "Ingiza PIN yako ya {} kwenye {} kuthibitisha kulipa {} kwa NAYA.",
+      "Enter your {} PIN on {} to confirm paying {} to NAYA."
+    ],
+    [
+      "{} kutoka {} {}. Kumbukumbu: {}.",
+      "{} from {} {}. Reference: {}."
+    ],
+    [
+      "NAYA inakutumia {} sasa hivi kwenye namba yako kuu ya malipo.",
+      "NAYA is sending you {} now to your main payout number."
+    ],
+    [
+      "NAYA imekutumia {} kwenye namba yako kuu ya malipo.",
+      "NAYA has sent you {} to your main payout number."
+    ],
+    [
+      "NAYA itakutumia {} baada ya ukaguzi wa ofisi.",
+      "NAYA will send you {} after the office review."
+    ],
+    [
+      "Kutuma {} kumeshindwa — ofisi itakutumia tena.",
+      "Sending {} failed — the office will send it again."
+    ],
+    [
+      "NAYA itakutumia {} kwenye namba yako ya malipo (Akaunti → Malipo ya ofa).",
+      "NAYA will send you {} to your payout number (Account → Offer payments)."
+    ],
+    [
+      "Safari ya ofa ikikamilika, NAYA inatuma sehemu yake kwenye namba yako kuu ya pesa ya simu yenyewe (hadi {} kwa siku; zaidi ya hapo ofisi inakagua kwanza).",
+      "When an offer trip is completed, NAYA automatically sends its share to your main mobile money number (up to {} a day; above that the office reviews first)."
+    ],
+    [
+      "NAYA imekutumia {} kwenye {} {} (malipo ya safari ya ofa). Kumbukumbu: {}.",
+      "NAYA has sent you {} to {} {} (offer trip payment). Reference: {}."
+    ],
+    [
+      "NAYA imekutumia {} kwenye {} {} (malipo ya safari ya ofa).",
+      "NAYA has sent you {} to {} {} (offer trip payment)."
+    ],
+    [
+      "NAYA itakutumia {} baada ya ofisi kukagua safari hii. {}",
+      "NAYA will send you {} after the office reviews this trip. {}"
+    ],
     [
       "Safari: {}",
       "Trips: {}"
@@ -1559,6 +1632,18 @@
     [
       "Pokea {} taslimu kutoka kwa abiria.",
       "Collect {} in cash from the passenger."
+    ],
+    [
+      "Lipa TSh {}",
+      "Pay TSh {}"
+    ],
+    [
+      "Miezi {}",
+      "{} months"
+    ],
+    [
+      "{} · moja kwa moja",
+      "{} · automatic"
     ]
   ]
 }

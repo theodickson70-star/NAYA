@@ -21,6 +21,7 @@ import * as support from './support.js';
 import * as feedback from './feedback.js';
 import * as wallet from './wallet.js';
 import * as akaunti from './akaunti.js';
+import * as malipo from './malipo.js';
 import * as appUpdate from './update.js';
 import * as terms from './terms.js';
 import { initI18n, langSwitchHtml, onLangChange } from '/shared/i18n.js';
@@ -31,7 +32,7 @@ const api = createApi('naya_app_token');
 const $ = (id) => document.getElementById(id);
 const views = ['view-loading', 'view-intro', 'view-auth', 'view-verify', 'view-role', 'view-offline', 'view-app'];
 const MAX_BYTES = 3 * 1024 * 1024;
-const VERSION = '0.15.0';
+const VERSION = '0.16.0';
 
 let account = null; // { user, activeMode, driverStatus, canDrive }
 let driver = null; // wasifu wa udereva (mode ya Dereva)
@@ -486,6 +487,7 @@ function startRealtime() {
 function route() {
   if (!account) return;
   rides.stopPolling();
+  malipo.stop();
   stopNearby();
   tab = location.hash.startsWith('#/akaunti') ? 'account' : location.hash.startsWith('#/maoni') ? 'feedback' : 'home';
   const picker = location.hash.match(/^#\/chagua\/(kwenda|kutoka)/)?.[1] ?? null;
@@ -1060,18 +1062,20 @@ async function loadSubscriptionSection() {
     $('sub-body').innerHTML = `
       <div class="mode-row"><span><span class="muted">Ada</span><br><strong>${formatTsh(sub.monthlyFee)} kwa siku 30</strong></span><span class="badge badge-${tone}">${label}</span></div>
       <p>${line}</p>
-      <p class="sub-how"><strong>Jinsi ya kulipa:</strong> ${esc(sub.paymentInstructions)}</p>
+      ${malipo.sectionHtml(sub)}
+      <p class="sub-how"><strong>${sub.online?.enabled ? 'Au lipa ofisini:' : 'Jinsi ya kulipa:'}</strong> ${esc(sub.paymentInstructions)}</p>
       ${
         sub.payments.length
           ? `<h3 class="small-title">Malipo yako</h3><ul class="notes">${sub.payments
               .map(
-                (p) => `<li><strong>${formatTsh(p.amount)}</strong> · miezi ${p.months} · ${esc(PAY_METHODS[p.method] ?? p.method)}${
+                (p) => `<li><strong>${formatTsh(p.amount)}</strong> · ${p.months === 1 ? 'mwezi 1' : `miezi ${p.months}`} · ${esc(PAY_METHODS[p.method] ?? p.method)}${
                   p.reference ? ` · ${esc(p.reference)}` : ''
                 }<br><span class="muted">${esc(formatDate(p.createdAt))} → mpaka ${esc(formatDate(p.periodEnd))}</span></li>`,
               )
               .join('')}</ul>`
           : '<p class="muted">Bado hujalipa ada. Malipo yako yataonekana hapa.</p>'
       }`;
+    malipo.afterRender(sub);
   } catch (err) {
     if (handleError(err)) return;
     if ($('sub-body')) $('sub-body').innerHTML = `<p class="alert alert-danger" role="alert">${esc(err.message)}</p>`;
@@ -1555,6 +1559,14 @@ feedback.init({
   },
 });
 wallet.init({ api, handleError, toast });
+malipo.init({
+  api,
+  handleError,
+  toast,
+  phone: () => account?.user.phone ?? '',
+  onPaid: () => setTimeout(() => location.hash === '#/akaunti/ada' && loadSubscriptionSection(), 2500),
+  reload: () => renderSubscriptionPage(),
+});
 akaunti.init({
   api,
   handleError,

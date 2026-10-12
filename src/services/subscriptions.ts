@@ -127,10 +127,10 @@ export async function subscriptionForAdmin(driverId: string) {
   const payments = await many(
     db,
     `SELECT p.id, p.months, p.amount, p.method, p.reference, p.note, p.period_start AS "periodStart", p.period_end AS "periodEnd",
-            p.created_at AS "createdAt", r.full_name AS "recordedBy",
+            p.created_at AS "createdAt", coalesce(r.full_name, 'Kwa simu (NAYA)') AS "recordedBy", (p.payment_id IS NOT NULL) AS online,
             p.voided_at AS "voidedAt", v.full_name AS "voidedBy", p.void_reason AS "voidReason"
        FROM naya.subscription_payments p
-       JOIN naya.users r ON r.id = p.recorded_by
+       LEFT JOIN naya.users r ON r.id = p.recorded_by
        LEFT JOIN naya.users v ON v.id = p.voided_by
       WHERE p.driver_id = $1 ORDER BY p.created_at DESC LIMIT 50`,
     [driverId],
@@ -138,6 +138,47 @@ export async function subscriptionForAdmin(driverId: string) {
   const latest = payments.find((p) => !(p as { voidedAt: Date | null }).voidedAt) as { id: string } | undefined;
   return { ...describeSubscription(row.paid_until, settings), graceDays: settings.graceDays, payments, voidableId: latest?.id ?? null };
 }
+
+/**
+ * Kuongeza siku za ada (ndani ya transaction). Inatumiwa na ofisi (recordPayment) na malipo ya simu (payments.ts).
+ * recordedBy = null → mfumo (malipo ya simu yaliyothibitishwa na kampuni ya malipo).
+ */
+export async function creditSubscription(
+  client: Db,
+  driverId: string,
+  input: { months: number; method: PaymentMethod; reference: string | null; note: string | null; recordedBy: string | null; amount?: number; paymentId?: string | null },
+) {
+  const settings = await getSettings(client);
+  const driver = await one<{ status: string; paid_until: Date | null }>(
+    client,
+    'SELECT status, paid_until FROM naya.drivers WHERE user_id = $1 FOR UPDATE',
+    [driverId],
+  );
+  if (!driver) throw notFound('Dereva hajapatikana');
+  if (!['APPROVED', 'SUSPENDED'].includes(driver.status)) throw conflict('Dereva huyu bado hajathibitishwa.');
+  const amount = input.amount ?? settings.monthlyFee * input.months;
+  const row = await one<{ period_end: Date }>(
+    client,
+    `INSERT INTO naya.subscription_payments
+       (driver_id, months, amount, method, reference, note, previous_paid_until, period_start, period_end, recorded_by, payment_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, greatest(now(), coalesce($7, now())),
+             greatest(now(), coalesce($7, now())) + make_interval(secs => $8::float8 * 86400), $9, $10)
+     RETURNING period_end`,
+    [driverId, input.months, amount, input.method, input.reference, input.note, driver.paid_until, PERIOD_DAYS * input.months, input.recordedBy, input.paymentId ?? null],
+  );
+  await client.query('UPDATE naya.drivers SET paid_until = $2, updated_at = now() WHERE user_id = $1', [driverId, row!.period_end]);
+  await writeAudit(client, {
+    actorId: input.recordedBy,
+    action: input.recordedBy ? 'subscription.paid' : 'subscription.paid_online',
+    targetType: 'driver',
+    targetId: driverId,
+    details: { months: input.months, amount, method: input.method, reference: input.reference, paidUntil: row!.period_end },
+  });
+  return { paidUntil: row!.period_end, amount };
+}
+
+export const subscriptionPaidMessage = (amount: number, paidUntil: Date) =>
+  `TSh ${amount.toLocaleString('en-US')} imerekodiwa. Ada yako iko hai mpaka ${formatDay(paidUntil)}.`;
 
 export async function recordPayment(
   adminId: string,
@@ -148,35 +189,7 @@ export async function recordPayment(
   let paidUntil: Date;
   let amount: number;
   try {
-    ({ paidUntil, amount } = await transaction(async (client) => {
-      const settings = await getSettings(client);
-      const driver = await one<{ status: string; paid_until: Date | null }>(
-        client,
-        'SELECT status, paid_until FROM naya.drivers WHERE user_id = $1 FOR UPDATE',
-        [driverId],
-      );
-      if (!driver) throw notFound('Dereva hajapatikana');
-      if (!['APPROVED', 'SUSPENDED'].includes(driver.status)) throw conflict('Dereva huyu bado hajathibitishwa.');
-      const amount = settings.monthlyFee * input.months;
-      const row = await one<{ period_end: Date }>(
-        client,
-        `INSERT INTO naya.subscription_payments
-           (driver_id, months, amount, method, reference, note, previous_paid_until, period_start, period_end, recorded_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, greatest(now(), coalesce($7, now())),
-                 greatest(now(), coalesce($7, now())) + make_interval(secs => $8::float8 * 86400), $9)
-         RETURNING period_end`,
-        [driverId, input.months, amount, input.method, input.reference, input.note, driver.paid_until, PERIOD_DAYS * input.months, adminId],
-      );
-      await client.query('UPDATE naya.drivers SET paid_until = $2, updated_at = now() WHERE user_id = $1', [driverId, row!.period_end]);
-      await writeAudit(client, {
-        actorId: adminId,
-        action: 'subscription.paid',
-        targetType: 'driver',
-        targetId: driverId,
-        details: { months: input.months, amount, method: input.method, reference: input.reference, paidUntil: row!.period_end },
-      });
-      return { paidUntil: row!.period_end, amount };
-    }));
+    ({ paidUntil, amount } = await transaction((client) => creditSubscription(client, driverId, { ...input, recordedBy: adminId })));
   } catch (error) {
     if (isUniqueViolation(error)) throw conflict('Namba hii ya muamala imeshatumika kwa malipo mengine.');
     throw error;
@@ -186,7 +199,7 @@ export async function recordPayment(
     event: 'account',
     kind: 'subscription_paid',
     title: 'Ada imepokelewa — asante!',
-    body: `TSh ${amount.toLocaleString('en-US')} imerekodiwa. Ada yako iko hai mpaka ${formatDay(paidUntil)}.`,
+    body: subscriptionPaidMessage(amount, paidUntil),
   });
   await notifyAdmins();
   return subscriptionForAdmin(driverId);

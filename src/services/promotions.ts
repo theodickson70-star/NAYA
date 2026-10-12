@@ -242,8 +242,8 @@ export async function payoutAccounts(client: Db, driverId: string) {
 export async function promoBalance(client: Db, driverId: string) {
   const row = await one<{ rides: number; earned: number; paid: number; last_paid_at: Date | null }>(
     client,
-    `SELECT (SELECT count(*) FROM naya.rides WHERE driver_id = $1 AND status = 'COMPLETED' AND promo_discount > 0)::int AS rides,
-            (SELECT coalesce(sum(promo_discount), 0) FROM naya.rides WHERE driver_id = $1 AND status = 'COMPLETED')::int AS earned,
+    `SELECT (SELECT count(*) FROM naya.rides WHERE driver_id = $1 AND status = 'COMPLETED' AND promo_discount > 0 AND coalesce(promo_payout_state, '') <> 'REJECTED')::int AS rides,
+            (SELECT coalesce(sum(promo_discount), 0) FROM naya.rides WHERE driver_id = $1 AND status = 'COMPLETED' AND coalesce(promo_payout_state, '') <> 'REJECTED')::int AS earned,
             (SELECT coalesce(sum(amount), 0) FROM naya.promo_payouts WHERE driver_id = $1 AND voided_at IS NULL)::int AS paid,
             (SELECT max(paid_at) FROM naya.promo_payouts WHERE driver_id = $1 AND voided_at IS NULL) AS last_paid_at`,
     [driverId],
@@ -262,14 +262,15 @@ export async function driverPromoWallet(driverId: string) {
       db,
       `SELECT id, completed_at AS "completedAt", pickup_name AS "from", dest_name AS "to", fare, promo_discount AS "nayaPays",
               fare - promo_discount AS "passengerPaid", promo_title AS "promoTitle",
-              array_remove(flags, 'PIN_REMINDED') AS flags
+              array_remove(flags, 'PIN_REMINDED') AS flags,
+              promo_payout_state AS "payoutState", promo_payout_note AS "payoutNote"
          FROM naya.rides WHERE driver_id = $1 AND status = 'COMPLETED' AND promo_discount > 0
         ORDER BY completed_at DESC LIMIT 50`,
       [driverId],
     ),
     many(
       db,
-      `SELECT id, amount, network, phone, reference, paid_at AS "paidAt" FROM naya.promo_payouts
+      `SELECT id, amount, network, phone, reference, paid_at AS "paidAt", (payment_id IS NOT NULL) AS automatic FROM naya.promo_payouts
         WHERE driver_id = $1 AND voided_at IS NULL ORDER BY paid_at DESC LIMIT 50`,
       [driverId],
     ),
@@ -496,7 +497,7 @@ export async function driverPayoutsReport(opts: { q?: string; onlyOwed?: boolean
     `WITH earned AS (
        SELECT driver_id, count(*)::int AS rides, sum(promo_discount)::int AS earned,
               count(*) FILTER (WHERE completed_at >= (date_trunc('week', now() AT TIME ZONE '${TZ}') AT TIME ZONE '${TZ}'))::int AS "weekRides"
-         FROM naya.rides WHERE status = 'COMPLETED' AND promo_discount > 0 GROUP BY driver_id
+         FROM naya.rides WHERE status = 'COMPLETED' AND promo_discount > 0 AND coalesce(promo_payout_state, '') <> 'REJECTED' GROUP BY driver_id
      ), paid AS (
        SELECT driver_id, sum(amount)::int AS paid, max(paid_at) AS last_paid_at FROM naya.promo_payouts WHERE voided_at IS NULL GROUP BY driver_id
      )
@@ -539,8 +540,9 @@ export async function driverPayoutDetail(driverId: string) {
   const allPayouts = await many(
     db,
     `SELECT p.id, p.amount, p.network, p.phone, p.account_name AS "accountName", p.reference, p.note, p.paid_at AS "paidAt",
-            u.full_name AS "paidBy", p.voided_at AS "voidedAt", p.void_reason AS "voidReason"
-       FROM naya.promo_payouts p JOIN naya.users u ON u.id = p.paid_by WHERE p.driver_id = $1 ORDER BY p.paid_at DESC`,
+            coalesce(u.full_name, 'Moja kwa moja (NAYA)') AS "paidBy", (p.payment_id IS NOT NULL) AS automatic,
+            p.voided_at AS "voidedAt", p.void_reason AS "voidReason"
+       FROM naya.promo_payouts p LEFT JOIN naya.users u ON u.id = p.paid_by WHERE p.driver_id = $1 ORDER BY p.paid_at DESC`,
     [driverId],
   );
   return { driver: { id: driverId, ...driver }, ...wallet, payouts: allPayouts };

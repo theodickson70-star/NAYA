@@ -13,6 +13,7 @@ import { badRequest, conflict, forbidden, isUniqueViolation, notFound } from '..
 import { writeAudit } from './audit.js';
 import { readDocument } from './drivers.js';
 import { passengerCard } from './profile.js';
+import { onPromoRideCompleted } from './payments/index.js';
 import { straightLineKm } from './fare-engine.js';
 import { notify, notifyAdmins } from './notify.js';
 import { estimateTrip, findLocation, nearestServicePoint, SERVICE_RADIUS_KM } from './places.js';
@@ -104,6 +105,8 @@ interface RideRow {
   promotion_id: string | null;
   promo_discount: number;
   promo_title: string | null;
+  promo_payout_state?: string | null;
+  promo_payout_note?: string | null;
   /** Migration 021: alama za ofisi, GPS ya kufika, na nani alimaliza safari. */
   flags: string[];
   near_dest_at: Date | null;
@@ -419,6 +422,8 @@ async function driverView(client: Db, r: RideRow) {
     ratingForPassenger: r.rating_for_passenger,
     passenger: passenger && { name: passenger.full_name, phone: passenger.phone, hasPhoto: card?.hasPhoto ?? false, rating: card?.rating ?? null, trips: card?.trips ?? 0 },
     pinRequired: r.status === 'ARRIVED' && r.start_pin !== null,
+    // Malipo ya ofa ya moja kwa moja: PENDING (inatumwa) · PAID · HELD (inasubiri ukaguzi) · FAILED · REJECTED · null (ya mkono)
+    promoPayout: r.promo_discount > 0 ? { state: r.promo_payout_state ?? null, note: r.promo_payout_note ?? null } : null,
     pinAttemptsLeft: Math.max(0, PIN_MAX_ATTEMPTS - r.pin_attempts),
     sosOpen: r.driver_id && WITH_DRIVER.includes(r.status) ? await openSosFor(client, r.driver_id, r.id) : false,
   };
@@ -1007,6 +1012,11 @@ export async function advanceRide(driverId: string, rideId: string, step: keyof 
     await history(client, rideId, from, to, by === 'DRIVER' ? driverId : by === 'PASSENGER' ? before.passenger_id : null, note);
   });
   const ride = (await findRide(db, rideId))!;
+  // Safari ya ofa imekamilika: malipo ya dereva yanatumwa yenyewe (kama malipo ya simu yamewashwa na safari ni safi).
+  if (step === 'complete' && ride.promo_discount > 0) {
+    // Bila kusubiri (kampuni ya malipo inaweza kuchelewa sekunde kadhaa) — dereva haoni kuchelewa kwa "Maliza safari".
+    void onPromoRideCompleted(rideId).catch((error) => console.error(`[payments] ofa ${rideId}: ${(error as Error).message}`));
+  }
   const pays = tsh(ride.fare - ride.promo_discount);
   const messages = {
     arrive: { title: 'Dereva amefika!', body: `Anakusubiri ${ride.pickup_name}.`, urgent: true },
@@ -1420,6 +1430,7 @@ export async function completeByAdmin(adminId: string, rideId: string, note: str
   });
   await notify({ userId: ride.passenger_id, event: 'ride', rideId, kind: 'ride_complete', title: `Umefika ${ride.dest_name}`, body: 'Safari imekamilishwa na ofisi ya NAYA.' });
   if (ride.driver_id) await notify({ userId: ride.driver_id, event: 'ride', rideId });
+  await onPromoRideCompleted(rideId).catch((error) => console.error(`[payments] ofa ${rideId}: ${(error as Error).message}`));
   await notifyAdmins(rideId);
   return rideForAdmin(rideId);
 }

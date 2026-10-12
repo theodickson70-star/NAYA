@@ -2,6 +2,7 @@
 //   Dereva: GET /api/driver/subscription
 //   Ofisi:  /api/admin/settings/subscription, /api/admin/subscriptions, /api/admin/drivers/:id/subscription…
 import type { FastifyInstance } from 'fastify';
+import { guessNetwork, paymentsConfig, pendingSubscriptionPayment } from '../services/payments/index.js';
 import { z } from 'zod';
 import { ADMIN_ROLES, requireRole } from '../middleware/auth.js';
 import {
@@ -60,7 +61,13 @@ export async function subscriptionRoutes(app: FastifyInstance): Promise<void> {
   const user = { preHandler: requireRole('USER') };
   const adminOnly = { preHandler: requireRole(...ADMIN_ROLES) };
 
-  app.get('/api/driver/subscription', user, async (request) => ok(await subscriptionForDriver(request.currentUser.id)));
+  app.get('/api/driver/subscription', user, async (request) => {
+    const sub = await subscriptionForDriver(request.currentUser.id);
+    // Malipo kwa simu: yamewashwa? + ombi linalosubiri (app ikifunguliwa upya inaendelea kusubiri PIN)
+    const config = paymentsConfig();
+    const pending = config.enabled ? await pendingSubscriptionPayment(request.currentUser.id) : null;
+    return ok({ ...sub, online: { enabled: config.enabled, networks: config.networks, suggestedNetwork: guessNetwork(request.currentUser.phone), pending } });
+  });
 
   app.get('/api/admin/settings/subscription', adminOnly, async () => ok(await getSettings()));
   app.put('/api/admin/settings/subscription', adminOnly, async (request) =>

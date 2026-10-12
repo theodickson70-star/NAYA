@@ -33,6 +33,7 @@ import {
 } from '../services/promotions.js';
 import { ok } from '../utils/http.js';
 import { normalizeTzPhone } from '../utils/phone.js';
+import { getAutoPayout, paymentsConfig, releaseHeldForAccount } from '../services/payments/index.js';
 
 const idParam = z.object({ id: z.uuid({ error: 'Haikupatikana' }) });
 const driverParam = z.object({ driverId: z.uuid({ error: 'Haikupatikana' }) });
@@ -121,10 +122,18 @@ export async function ofaRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // ---- Dereva
-  app.get('/api/driver/promo-wallet', user, async (request) => ok(await driverPromoWallet(uid(request))));
-  app.post('/api/driver/payout-accounts', { ...user, config: { rateLimit: { max: 20, timeWindow: '10 minutes' } } }, async (request) =>
-    ok(await savePayoutAccount(uid(request), accountSchema.parse(request.body))),
-  );
+  app.get('/api/driver/promo-wallet', user, async (request) => {
+    const config = paymentsConfig();
+    const settings = await getAutoPayout();
+    // auto = malipo ya papo hapo yamewashwa (kampuni ya malipo inaruhusu kutuma + ofisi imewasha)
+    return ok({ ...(await driverPromoWallet(uid(request))), auto: { enabled: config.canDisburse && settings.enabled, dailyLimit: settings.dailyLimit } });
+  });
+  app.post('/api/driver/payout-accounts', { ...user, config: { rateLimit: { max: 20, timeWindow: '10 minutes' } } }, async (request) => {
+    const saved = await savePayoutAccount(uid(request), accountSchema.parse(request.body));
+    // Safari zilizosubiri malipo kwa kukosa namba: zitumwe sasa (malipo ya simu yakiwa yamewashwa)
+    await releaseHeldForAccount(uid(request)).catch(() => {});
+    return ok(saved);
+  });
   app.post('/api/driver/payout-accounts/:id/delete', user, async (request) => ok(await deletePayoutAccount(uid(request), idParam.parse(request.params).id)));
 
   // ---- Ofisi: ofa
