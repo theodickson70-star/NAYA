@@ -16,6 +16,7 @@ import {
   subscriptionStats,
   voidPayment,
 } from '../services/subscriptions.js';
+import { getDispatchSettings, saveDispatchSettings } from '../services/dispatch-rules.js';
 import { ok } from '../utils/http.js';
 
 const driverParam = z.object({ id: z.uuid({ error: 'Dereva hajapatikana' }) });
@@ -70,6 +71,11 @@ export async function subscriptionRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.get('/api/admin/settings/subscription', adminOnly, async () => ok(await getSettings()));
+  // Mfumo huru (madereva wachache): ada haitozwi, hakuna kuwekwa offline na mfumo, ombi kwa madereva wote walio karibu.
+  app.get('/api/admin/settings/dispatch', adminOnly, async () => ok(await getDispatchSettings()));
+  app.put('/api/admin/settings/dispatch', adminOnly, async (request) =>
+    ok(await saveDispatchSettings(request.currentUser.id, z.object({ openMode: z.boolean({ error: 'Chagua kuwasha au kuzima' }) }).parse(request.body))),
+  );
   app.put('/api/admin/settings/subscription', adminOnly, async (request) =>
     ok(await saveSettings(request.currentUser.id, settingsSchema.parse(request.body))),
   );

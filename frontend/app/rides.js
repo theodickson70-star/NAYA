@@ -474,6 +474,7 @@ function driverKey(s) {
     s.earnings.today.total,
     s.subscription?.state,
     s.subscription?.daysLeft,
+    s.subscription?.waived,
     standPicker,
     cancelOpen,
     sosSheet,
@@ -560,7 +561,7 @@ function onlineHtml(s) {
     </section>`;
   }
   const sub = s.subscription;
-  if (!s.online && sub?.state === 'EXPIRED') return subscriptionBlockHtml(sub);
+  if (!s.online && sub?.state === 'EXPIRED' && !sub.waived) return subscriptionBlockHtml(sub);
   if (!s.online) {
     return `<section class="go-online">
       <h1>Habari, ${ctx.firstName()}</h1>
@@ -591,6 +592,7 @@ function onlineHtml(s) {
 // ---- Ada ya mwezi
 function subscriptionNoteHtml(sub) {
   if (!sub || sub.state === 'NONE') return '';
+  if (sub.waived) return '';
   if (sub.state === 'GRACE' || sub.state === 'EXPIRED') {
     return `<p class="alert alert-warn sub-note" role="note"><strong>Ada yako ya mwezi imeisha.</strong> Lipa ${formatTsh(sub.monthlyFee)} kabla ya ${esc(
       formatDate(sub.graceEndsAt, true),

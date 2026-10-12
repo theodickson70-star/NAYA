@@ -9,6 +9,7 @@ import { db, many, one } from '../db/pool.js';
 import { downloadStats } from '../routes/pakua.js';
 import { DRIVER_STALE_SECONDS, FRESH_SQL } from './rides.js';
 import { getSettings, SUBSCRIPTION_OK_SQL } from './subscriptions.js';
+import { dispatchRules } from './dispatch-rules.js';
 
 const TZ = 'Africa/Dar_es_Salaam';
 export const PAGE_SIZE = 100;
@@ -272,7 +273,8 @@ export async function requestsReport(opts: { days?: number; filter?: RequestFilt
 export type Readiness = 'READY' | 'OFFER' | 'ON_RIDE' | 'NOT_SEEN' | 'FEE' | 'NO_GPS';
 
 export async function onlineReport() {
-  const { graceDays } = await getSettings();
+  // Mfumo huru: ada na simu "iliyolala" havizuii maombi — ripoti inaonyesha hali ile ile mfumo unayotumia.
+  const { graceDays, staleSeconds, open } = await dispatchRules(db, DRIVER_STALE_SECONDS);
   const rows = await many<Record<string, unknown> & { readiness: Readiness }>(
     db,
     `SELECT u.id, u.full_name AS name, u.phone, d.plate_number AS plate, d.vehicle_type::text AS "vehicleType",
@@ -299,11 +301,12 @@ export async function onlineReport() {
           ORDER BY power(l.lat - d.last_lat, 2) + power((l.lng - d.last_lng) * cos(radians(d.last_lat::float8)), 2) LIMIT 1) near ON true
       WHERE d.status = 'APPROVED' AND d.is_online AND u.status = 'ACTIVE'
       ORDER BY CASE WHEN active.status IS NULL THEN 0 ELSE 1 END, d.last_seen_at DESC NULLS LAST`,
-    [DRIVER_STALE_SECONDS, graceDays],
+    [staleSeconds, graceDays],
   );
   const count = (r: Readiness, v?: string) => rows.filter((x) => x.readiness === r && (!v || x.vehicleType === v)).length;
   return {
     at: new Date(),
+    openMode: open,
     summary: {
       online: rows.length,
       ready: count('READY'),

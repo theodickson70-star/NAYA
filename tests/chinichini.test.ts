@@ -70,6 +70,8 @@ const expireOffers = (rideId: string) =>
 
 before(async () => {
   await runMigrations(() => {});
+  // Majaribio haya ni ya sheria za KAWAIDA (mfumo huru umezimwa); mfumo huru una majaribio yake (mfumo-huru.test.ts).
+  await db.query(`INSERT INTO naya.settings (key, value) VALUES ('dispatch', '{"openMode": false}') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`);
   app = await buildApp({ logger: false });
   for (const [name, p] of [[`Pickup C${s}`, A], [`Dest C${s}`, B]] as const) {
     const row = await db.query(`INSERT INTO naya.locations (name, category, lat, lng) VALUES ($1, 'OTHER', $2, $3) RETURNING id`, [name, p.lat, p.lng]);
@@ -95,6 +97,7 @@ after(async () => {
   await db.query('DELETE FROM naya.locations WHERE id = ANY($1::uuid[])', [locationIds]);
   await db.query('DELETE FROM naya.fare_rules');
   await app.close();
+  await db.query(`UPDATE naya.settings SET value = '{"openMode": true}' WHERE key = 'dispatch'`);
   await db.end();
 });
 

@@ -109,6 +109,8 @@ async function waitFor(pred: () => Sent | undefined, what: string) {
 
 before(async () => {
   await runMigrations(() => {});
+  // Majaribio haya ni ya sheria za KAWAIDA (mfumo huru umezimwa); mfumo huru una majaribio yake (mfumo-huru.test.ts).
+  await db.query(`INSERT INTO naya.settings (key, value) VALUES ('dispatch', '{"openMode": false}') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`);
   app = await buildApp({ logger: false });
   for (const [name, lat, lng] of [[`FCM Pickup ${s}`, -5.07, 32.05], [`FCM Dest ${s}`, -5.085, 32.06]] as const) {
     const row = await db.query(`INSERT INTO naya.locations (name, lat, lng) VALUES ($1, $2, $3) RETURNING id`, [name, lat, lng]);
@@ -134,6 +136,7 @@ after(async () => {
   await db.query('DELETE FROM naya.locations WHERE id = ANY($1::uuid[])', [locationIds]);
   await db.query('DELETE FROM naya.fare_rules');
   await app.close();
+  await db.query(`UPDATE naya.settings SET value = '{"openMode": true}' WHERE key = 'dispatch'`);
   await db.end();
 });
 

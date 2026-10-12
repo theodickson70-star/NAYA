@@ -20,7 +20,8 @@ import { estimateTrip, findLocation, nearestServicePoint, SERVICE_RADIUS_KM } fr
 import { openSosFor } from './safety.js';
 import { assertPhoneVerified } from './verification.js';
 import { bestPromotion, driverLimitMessage, driverPromoUsage, driversOverPromoLimit } from './promotions.js';
-import { assertSubscriptionOk, describeSubscription, getSettings, SUBSCRIPTION_OK_SQL } from './subscriptions.js';
+import { assertSubscriptionOk, describeSubscription, feeWaived, getSettings, SUBSCRIPTION_OK_SQL } from './subscriptions.js';
+import { dispatchRules } from './dispatch-rules.js';
 
 export type RideStatus = 'SEARCHING' | 'ACCEPTED' | 'ARRIVED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'NO_DRIVER';
 type VehicleType = 'BODABODA' | 'BAJAJI';
@@ -38,6 +39,8 @@ export const FIRST_OFFER_SECONDS = 15;
 export const OFFER_SECONDS = 20; // kila wimbi baada ya la kwanza
 export const ADMIN_OFFER_SECONDS = 30; // ombi la ofisi kwa dereva maalum (ofisi imeshampigia simu)
 export const WAVE_SIZE = 4;
+/** Mfumo huru (madereva wachache): ombi linaenda kwa madereva WOTE walio karibu kwa pamoja (hadi hawa), sekunde OFFER_SECONDS. */
+export const OPEN_WAVE_SIZE = 10;
 export const SEARCH_TIMEOUT_SECONDS = 600; // dakika 10 bila dereva → NO_DRIVER
 export const NEARBY_LIMIT = 3; // "NAYA karibu nawe": madereva wangapi wa kila chombo abiria anawaona
 export const MAX_PICKUP_KM = 10; // dereva awe ndani ya umbali huu kutoka kwa abiria
@@ -176,6 +179,7 @@ let lastUnseenCheck = 0;
 export async function offlineUnseenDrivers(force = false): Promise<string[]> {
   if (!force && Date.now() - lastUnseenCheck < 60_000) return [];
   lastUnseenCheck = Date.now();
+  if ((await dispatchRules()).open) return []; // mfumo huru: dereva anaenda offline mwenyewe tu
   const off = await many<{ user_id: string }>(
     db,
     `UPDATE naya.drivers d SET is_online = false, updated_at = now()
@@ -199,6 +203,7 @@ export async function offlineUnseenDrivers(force = false): Promise<string[]> {
 
 /** Madereva waliokosa kujibu maombi MISSED_OFFERS_OFFLINE mfululizo tangu waende online → offline, na wanajulishwa. */
 async function offlineDriversWhoMissOffers(driverIds: string[]) {
+  if ((await dispatchRules()).open) return; // mfumo huru: dereva anaenda offline mwenyewe tu
   const off = await many<{ user_id: string }>(
     db,
     `UPDATE naya.drivers d SET is_online = false, updated_at = now()
@@ -228,7 +233,7 @@ async function offlineDriversWhoMissOffers(driverIds: string[]) {
 /** Madereva wanaoweza kupewa ombi la safari hii sasa, aliye karibu zaidi kwanza. */
 async function findCandidates(
   client: Db,
-  p: { rideId: string | null; lat: number; lng: number; vehicleType: VehicleType; passengerId: string; graceDays: number; limit: number; exclude: string[] },
+  p: { rideId: string | null; lat: number; lng: number; vehicleType: VehicleType; passengerId: string; graceDays: number; staleSeconds: number; limit: number; exclude: string[] },
 ) {
   return many<{ user_id: string; km: number }>(
     client,
@@ -246,9 +251,9 @@ async function findCandidates(
         -- au ofisi/mfumo uliliondoa (CANCELLED): safari ikirudi kutafuta dereva, anaweza kupewa tena.
         AND NOT EXISTS (SELECT 1 FROM naya.ride_offers o WHERE o.ride_id = $1::uuid AND o.driver_id = d.user_id AND o.status NOT IN ('TAKEN', 'CANCELLED'))
       -- Simu iliyoonekana dakika 2 zilizopita kwanza (atajibu haraka), kisha aliye karibu zaidi
-      ORDER BY (d.last_seen_at > now() - make_interval(secs => $5::float8)) DESC, km ASC
+      ORDER BY (d.last_seen_at > now() - make_interval(secs => ${DRIVER_STALE_SECONDS}::float8)) DESC, km ASC
       LIMIT $8`,
-    [p.rideId, p.lat, p.lng, p.vehicleType, DRIVER_STALE_SECONDS, p.passengerId, p.graceDays, p.limit, p.exclude],
+    [p.rideId, p.lat, p.lng, p.vehicleType, p.staleSeconds, p.passengerId, p.graceDays, p.limit, p.exclude],
   );
 }
 
@@ -272,11 +277,14 @@ export async function dispatchRide(rideId: string): Promise<void> {
     if (waiting) return {};
     const tried = await one<{ n: number }>(client, `SELECT count(*)::int AS n FROM naya.ride_offers WHERE ride_id = $1`, [rideId]);
     const firstWave = (tried?.n ?? 0) === 0;
-    const waveSize = firstWave ? FIRST_WAVE_SIZE : WAVE_SIZE;
-    const seconds = firstWave ? FIRST_OFFER_SECONDS : OFFER_SECONDS;
+    const rules = await dispatchRules(client, DRIVER_STALE_SECONDS);
+    const waveSize = rules.open ? OPEN_WAVE_SIZE : firstWave ? FIRST_WAVE_SIZE : WAVE_SIZE;
+    const seconds = rules.open ? OFFER_SECONDS : firstWave ? FIRST_OFFER_SECONDS : OFFER_SECONDS;
 
-    const { graceDays } = await getSettings(client);
-    const base = { rideId, lat: ride.pickup_lat, lng: ride.pickup_lng, vehicleType: ride.vehicle_type, passengerId: ride.passenger_id, graceDays, limit: waveSize + 5 };
+    const base = {
+      rideId, lat: ride.pickup_lat, lng: ride.pickup_lng, vehicleType: ride.vehicle_type, passengerId: ride.passenger_id,
+      graceDays: rules.graceDays, staleSeconds: rules.staleSeconds, limit: waveSize + 5,
+    };
     // Safari ya ofa yenye kikomo cha dereva: madereva waliofikia kikomo hawapewi.
     let candidates = await findCandidates(client, { ...base, exclude: ride.promotion_id ? await driversOverPromoLimit(client, ride.promotion_id) : [] });
     if (ride.promotion_id && !candidates.some((c) => c.km <= MAX_PICKUP_KM)) {
@@ -483,7 +491,7 @@ const findRide = (client: Db, id: string, lock = false) =>
  * Faragha ya dereva: hakuna jina wala namba; mahali panazungushwa hadi ~mita 100, na kila dereva ana namba ya muda tu.
  */
 export async function nearbyDrivers(userId: string, point: { lat: number; lng: number }) {
-  const { graceDays } = await getSettings();
+  const { graceDays, staleSeconds } = await dispatchRules(db, DRIVER_STALE_SECONDS);
   const rows = await many<{ vehicle_type: VehicleType; lat: number; lng: number; km: number; rank: number }>(
     db,
     `WITH c AS (
@@ -498,7 +506,7 @@ export async function nearbyDrivers(userId: string, point: { lat: number; lng: n
      SELECT * FROM (
        SELECT c.*, row_number() OVER (PARTITION BY vehicle_type ORDER BY km) AS rank FROM c WHERE km <= $6
      ) x WHERE rank <= $7 ORDER BY vehicle_type, km`,
-    [point.lat, point.lng, DRIVER_STALE_SECONDS, userId, graceDays, MAX_PICKUP_KM, NEARBY_LIMIT],
+    [point.lat, point.lng, staleSeconds, userId, graceDays, MAX_PICKUP_KM, NEARBY_LIMIT],
   );
   const round3 = (n: number) => Math.round(n * 1000) / 1000;
   const group = (type: VehicleType) =>
@@ -528,12 +536,12 @@ export async function requestRide(
   if (promo) {
     const over = await driversOverPromoLimit(db, promo.promotionId);
     if (over.length) {
-      const { graceDays } = await getSettings();
+      const { graceDays, staleSeconds } = await dispatchRules(db, DRIVER_STALE_SECONDS);
       const nearby = await findCandidates(db, {
-        rideId: null, lat: estimate.pickup.lat, lng: estimate.pickup.lng, vehicleType: input.vehicleType, passengerId, graceDays, limit: 3, exclude: over,
+        rideId: null, lat: estimate.pickup.lat, lng: estimate.pickup.lng, vehicleType: input.vehicleType, passengerId, graceDays, staleSeconds, limit: 3, exclude: over,
       });
       const any = nearby.some((c) => c.km <= MAX_PICKUP_KM);
-      const others = any ? true : (await findCandidates(db, { rideId: null, lat: estimate.pickup.lat, lng: estimate.pickup.lng, vehicleType: input.vehicleType, passengerId, graceDays, limit: 3, exclude: [] })).some((c) => c.km <= MAX_PICKUP_KM);
+      const others = any ? true : (await findCandidates(db, { rideId: null, lat: estimate.pickup.lat, lng: estimate.pickup.lng, vehicleType: input.vehicleType, passengerId, graceDays, staleSeconds, limit: 3, exclude: [] })).some((c) => c.km <= MAX_PICKUP_KM);
       // Hakuna dereva mwenye nafasi ya ofa lakini wapo wengine → safari ya kawaida (bei kamili inaonyeshwa).
       if (!any && others) {
         promoBlocked = promo.title;
@@ -868,7 +876,7 @@ export async function driverState(driverId: string) {
     online: d.is_online,
     lastOffer,
     serviceArea,
-    subscription: { ...describeSubscription(d.paid_until, settings), paymentInstructions: settings.paymentInstructions },
+    subscription: { ...describeSubscription(d.paid_until, settings), paymentInstructions: settings.paymentInstructions, waived: await feeWaived() },
     offer,
     ride: rideRow ? await driverView(db, rideRow) : null,
     earnings: {
@@ -1399,7 +1407,7 @@ export async function candidatesForRide(rideId: string) {
   const ride = await findRide(db, rideId);
   if (!ride) throw notFound('Safari haikupatikana');
   if (ride.status !== 'SEARCHING') return [];
-  const { graceDays } = await getSettings();
+  const { graceDays, open } = await dispatchRules(db, DRIVER_STALE_SECONDS);
   const rows = await many<{
     id: string; name: string; plateNumber: string | null; vehicleType: VehicleType; km: number | null; userOk: boolean; approved: boolean;
     feeOk: boolean; hasGps: boolean; fresh: boolean; seenSeconds: number | null; onRide: boolean; busy: boolean; offerHere: string | null;
@@ -1440,7 +1448,7 @@ export async function candidatesForRide(rideId: string) {
     return {
       id: r.id, name: r.name, plateNumber: r.plateNumber, vehicleType: r.vehicleType,
       km: r.km == null ? null : round1(r.km),
-      ready: canOffer && r.fresh, canOffer, stale: !r.fresh, busy: r.busy, reasons, notes,
+      ready: canOffer && (open || r.fresh), canOffer, stale: !r.fresh, busy: r.busy, reasons, notes,
     };
   }).sort((a, b) => Number(b.ready) - Number(a.ready) || Number(b.canOffer) - Number(a.canOffer) || (a.km ?? 1e9) - (b.km ?? 1e9));
 }
@@ -1451,7 +1459,7 @@ export async function offerRideToDriver(adminId: string, rideId: string, driverI
     const r = await one<RideRow>(client, `SELECT * FROM naya.rides WHERE id = $1 FOR UPDATE`, [rideId]);
     if (!r) throw notFound('Safari haikupatikana');
     if (r.status !== 'SEARCHING') throw conflict('Safari hii haitafuti dereva tena.');
-    const { graceDays } = await getSettings(client);
+    const { graceDays } = await dispatchRules(client, DRIVER_STALE_SECONDS);
     const driver = await one<{ km: number }>(
       client,
       `SELECT ${DISTANCE_SQL('d.last_lat', 'd.last_lng', '$2', '$3')}::float8 AS km

@@ -32,7 +32,7 @@ const api = createApi('naya_app_token');
 const $ = (id) => document.getElementById(id);
 const views = ['view-loading', 'view-intro', 'view-auth', 'view-verify', 'view-role', 'view-offline', 'view-app'];
 const MAX_BYTES = 3 * 1024 * 1024;
-const VERSION = '0.16.1';
+const VERSION = '0.16.2';
 
 let account = null; // { user, activeMode, driverStatus, canDrive }
 let driver = null; // wasifu wa udereva (mode ya Dereva)
@@ -1062,6 +1062,7 @@ async function loadSubscriptionSection() {
     $('sub-body').innerHTML = `
       <div class="mode-row"><span><span class="muted">Ada</span><br><strong>${formatTsh(sub.monthlyFee)} kwa siku 30</strong></span><span class="badge badge-${tone}">${label}</span></div>
       <p>${line}</p>
+      ${sub.waived ? '<p class="alert alert-ok sub-waived" role="note"><strong>Kwa sasa ada haitozwi.</strong> Unapokea safari kama kawaida hata ada ikiwa imeisha. NAYA itakujulisha kabla ada haijaanza kutozwa tena.</p>' : ''}
       ${malipo.sectionHtml(sub)}
       <p class="sub-how"><strong>${sub.online?.enabled ? 'Au lipa ofisini:' : 'Jinsi ya kulipa:'}</strong> ${esc(sub.paymentInstructions)}</p>
       ${

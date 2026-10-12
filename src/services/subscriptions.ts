@@ -72,9 +72,19 @@ export function describeSubscription(paidUntil: Date | null, settings: Subscript
   };
 }
 
+/** "Siku za kuvumiliwa" zinazomaanisha ada haiangaliwi kabisa (mfumo huru — angalia dispatch-rules.ts). */
+export const FEE_WAIVED_GRACE_DAYS = 36500;
+
 /** SQL: dereva bado anaruhusiwa kupokea safari (ada iko hai au ndani ya siku za kuvumiliwa). $graceParam = siku. */
 export const SUBSCRIPTION_OK_SQL = (alias: string, graceParam: string) =>
-  `(${alias}.paid_until IS NOT NULL AND ${alias}.paid_until + make_interval(secs => ${graceParam}::float8 * 86400) > now())`;
+  `(${graceParam}::float8 >= ${FEE_WAIVED_GRACE_DAYS}
+    OR (${alias}.paid_until IS NOT NULL AND ${alias}.paid_until + make_interval(secs => ${graceParam}::float8 * 86400) > now()))`;
+
+/** Mfumo huru umewashwa? (ada haitozwi kwa sasa — angalia dispatch-rules.ts; inasomwa hapa moja kwa moja ili kuepuka mzunguko wa imports.) */
+export async function feeWaived(client: Db = db): Promise<boolean> {
+  const row = await one<{ value: { openMode?: boolean } }>(client, `SELECT value FROM naya.settings WHERE key = 'dispatch'`);
+  return row?.value?.openMode ?? true;
+}
 
 /** Dereva anayethibitishwa kwa mara ya kwanza anapata siku za bure (inaitwa ndani ya transaction ya kuthibitisha). */
 export async function startTrialIfNeeded(client: Db, driverId: string) {
@@ -87,6 +97,7 @@ export async function startTrialIfNeeded(client: Db, driverId: string) {
 
 /** Kosa la wazi kwa dereva ambaye ada yake imeisha (kwa kwenda online). */
 export async function assertSubscriptionOk(client: Db, driverId: string) {
+  if (await feeWaived(client)) return;
   const settings = await getSettings(client);
   const row = await one<{ paid_until: Date | null }>(client, 'SELECT paid_until FROM naya.drivers WHERE user_id = $1', [driverId]);
   const sub = describeSubscription(row?.paid_until ?? null, settings);
@@ -112,6 +123,7 @@ export async function subscriptionForDriver(driverId: string) {
   );
   return {
     ...describeSubscription(row.paid_until, settings),
+    waived: await feeWaived(),
     graceDays: settings.graceDays,
     paymentInstructions: settings.paymentInstructions,
     payments,
@@ -276,6 +288,7 @@ export async function subscriptionStats() {
     monthPayments: row?.month_count ?? 0,
     expiredDrivers: row?.expired ?? 0,
     dueSoonDrivers: row?.due ?? 0,
+    feeWaived: await feeWaived(), // mfumo huru: ada iliyoisha haimzuii dereva
   };
 }
 
@@ -289,6 +302,8 @@ const REMIND_DAYS = 3;
  * Kila hatua "inajichukulia" safu kwa UPDATE … RETURNING, kwa hiyo servers mbili hazitumi arifa mara mbili.
  */
 export async function runSubscriptionChecks(): Promise<void> {
+  // Mfumo huru: ada haitozwi — hakuna ukumbusho, arifa za "imeisha", wala kuwekwa offline kwa sababu ya ada.
+  if (await feeWaived()) return;
   const settings = await getSettings();
   const fee = `TSh ${settings.monthlyFee.toLocaleString('en-US')}`;
 

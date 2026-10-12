@@ -40,13 +40,58 @@ export function setup(context) {
     loadList();
   });
   $('sub-settings-form').addEventListener('submit', saveSettings);
+  $('om-toggle').addEventListener('click', toggleOpenMode);
 }
 
 // ------------------------------------------------------------------ Ukurasa wa "Ada"
 
 export async function loadPage() {
   $('sub-error').hidden = true;
-  await Promise.all([loadList(), loadSettings()]);
+  await Promise.all([loadList(), loadSettings(), loadOpenMode()]);
+}
+
+// ------------------------------------------------------------------ Mfumo huru (madereva wachache)
+
+let openMode = null;
+
+function renderOpenMode() {
+  const box = $('open-mode');
+  box.hidden = false;
+  box.classList.toggle('is-on', openMode);
+  $('om-badge').className = `badge badge-${openMode ? 'ok' : 'muted'}`;
+  $('om-badge').textContent = openMode ? 'Umewashwa' : 'Umezimwa';
+  $('om-text').textContent = openMode
+    ? 'Kila dereva aliyeidhinishwa na yuko online anapokea maombi bila vikwazo: ada ya mwezi haitozwi, mfumo haumweki offline, na ombi linaenda kwa madereva wote walio karibu kwa pamoja. Zima ukiwa na madereva wa kutosha.'
+    : 'Sheria za kawaida: ada ya mwezi lazima iwe hai, dereva asiyejibu au ambaye simu yake haionekani anawekwa offline, na maombi yanaenda kwa mawimbi (2, kisha 4).';
+  const button = $('om-toggle');
+  button.textContent = openMode ? 'Zima mfumo huru' : 'Washa mfumo huru';
+  button.className = `btn btn-small ${openMode ? 'btn-ghost' : 'btn-primary'}`;
+}
+
+async function loadOpenMode() {
+  try {
+    openMode = (await ctx.api.get('/api/admin/settings/dispatch')).openMode;
+    renderOpenMode();
+  } catch (err) {
+    fail(err, 'sub-error');
+  }
+}
+
+async function toggleOpenMode() {
+  const next = !openMode;
+  if (!next && !confirm('Kuzima mfumo huru: madereva wenye ada iliyoisha wataacha kupokea maombi na kuwekwa offline. Endelea?')) return;
+  const button = $('om-toggle');
+  button.disabled = true;
+  $('om-error').hidden = true;
+  try {
+    openMode = (await ctx.api.put('/api/admin/settings/dispatch', { openMode: next })).openMode;
+    renderOpenMode();
+    loadList();
+  } catch (err) {
+    fail(err, 'om-error');
+  } finally {
+    button.disabled = false;
+  }
 }
 
 export async function loadList() {

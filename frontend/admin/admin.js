@@ -383,7 +383,7 @@ async function renderQueue(data) {
     [data.supportOpen, 'warn', 'Maombi ya msaada yanasubiri jibu', 'Malalamiko na maswali kutoka kwenye app', '#/msaada?hali=OPEN', 'Jibu'],
     [data.feedbackNew, 'warn', 'Maoni mapya ya wateja na madereva', 'Yasome na uyafanyie kazi — mtoaji anajulishwa', '#/maoni', 'Soma'],
     [data.drivers.PENDING, 'warn', 'Madereva wanasubiri uthibitisho', 'Kagua nyaraka, kisha thibitisha au kataa', '#/madereva?hali=PENDING', 'Kagua'],
-    [data.subscriptions.expiredDrivers, 'warn', 'Madereva wenye ada iliyoisha', 'Hawapokei safari mpaka walipe', '#/ada', 'Angalia'],
+    [data.subscriptions.feeWaived ? 0 : data.subscriptions.expiredDrivers, 'warn', 'Madereva wenye ada iliyoisha', 'Hawapokei safari mpaka walipe', '#/ada', 'Angalia'],
     [data.rides.noDriverToday, 'warn', 'Safari zilizokosa dereva leo', 'Waombe madereva zaidi waende online saa za shughuli', '#/ripoti', 'Ripoti'],
   ].filter(([count]) => count > 0);
   $('queue-list').innerHTML = items.length

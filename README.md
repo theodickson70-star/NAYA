@@ -115,7 +115,20 @@ Alama za kutiliwa shaka (`rides.flags`), zinaonekana kwa ofisi kwenye safari, Ri
 DRIVER, PASSENGER, AUTO au ADMIN. Migration `021_safari_rahisi.sql` inaongeza safu tu (haifuti data); safari zinazoendelea zisizo
 za ofa zinaondolewa PIN ili zisikwame.
 
-## Kumpata dereva haraka (0.16.1)
+## Mfumo huru — madereva wachache (0.16.2)
+
+Migration `024_mfumo_huru.sql` inaongeza mpangilio `settings.dispatch = {"openMode": true}` (haifuti data). Ukiwa umewashwa:
+
+- ada ya mwezi haitozwi: dereva anaenda online na kupewa safari hata ada/siku za bure zimeisha (app haimzuii; ukumbusho na
+  arifa za "ada imeisha" hazitumwi);
+- mfumo haumweki dereva offline (kukosa kujibu, simu kutoonekana, ada) — anaenda offline mwenyewe tu;
+- simu "iliyolala" (app imefungwa) bado inapewa maombi;
+- ombi linaenda kwa madereva WOTE wa chombo hicho walio ndani ya km 10 kwa pamoja (hadi 10), sekunde 20; wa kwanza kukubali anapata safari.
+
+Vinavyobaki: kuidhinishwa na ofisi, akaunti hai, namba ya simu iliyothibitishwa, chombo sahihi, GPS, km 10, kutokuwa kwenye safari.
+Ofisi → **Ada ya mwezi** → "Mfumo huru" → Zima, sheria za kawaida (hapa chini) zinarudi. API: `GET/PUT /api/admin/settings/dispatch`.
+
+## Kumpata dereva haraka (0.16.1) — sheria za kawaida (mfumo huru ukizimwa)
 
 | Kipengele | Thamani |
 |---|---|

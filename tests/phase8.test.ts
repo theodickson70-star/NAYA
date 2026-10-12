@@ -64,6 +64,8 @@ const offerFor = async (who: string) => (await call('GET', '/api/driver/state', 
 
 before(async () => {
   await runMigrations(() => {});
+  // Majaribio haya ni ya sheria za KAWAIDA (mfumo huru umezimwa); mfumo huru una majaribio yake (mfumo-huru.test.ts).
+  await db.query(`INSERT INTO naya.settings (key, value) VALUES ('dispatch', '{"openMode": false}') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`);
   app = await buildApp({ logger: false });
   savedSettings = (await db.query(`SELECT value FROM naya.settings WHERE key = 'subscription'`)).rows[0]?.value ?? null;
   await db.query(
@@ -101,6 +103,7 @@ after(async () => {
   await db.query('DELETE FROM naya.fare_rules');
   if (savedSettings) await db.query(`UPDATE naya.settings SET value = $1 WHERE key = 'subscription'`, [JSON.stringify(savedSettings)]);
   await app.close();
+  await db.query(`UPDATE naya.settings SET value = '{"openMode": true}' WHERE key = 'dispatch'`);
   await db.end();
 });
 

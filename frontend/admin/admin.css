@@ -741,3 +741,12 @@ a.kpi:hover { border-color: var(--naya-green); }
 .auto-pay-form .check { margin: 0 8px 8px 0; }
 .auto-pay-form .alert { flex-basis: 100%; }
 .auto-unconfirmed { margin: 6px 0 0; padding-left: 18px; font-size: 14px; display: grid; gap: 4px; }
+
+/* ---- Mfumo huru (Ada ya mwezi) ---- */
+.open-mode { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; align-items: center; margin: 4px 0 14px; padding: 16px 18px; border-radius: 14px; background: var(--white); border: 1px solid var(--line); }
+.open-mode.is-on { background: var(--naya-mint); border-color: var(--naya-green); }
+.open-mode h2 { margin: 0 0 4px; font-size: 18px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.open-mode p { margin: 0; }
+.open-mode .alert { grid-column: 1 / -1; }
+@media (max-width: 560px) { .open-mode { grid-template-columns: 1fr; } }
+.open-mode.is-on .badge-ok { background: var(--white); }
