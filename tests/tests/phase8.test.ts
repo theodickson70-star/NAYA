@@ -226,7 +226,9 @@ describe('NAYA Phase 8 — ada ya mwezi', () => {
   it('ofisi: orodha ya ada na takwimu halisi za mwezi', async () => {
     const res = (await call('GET', '/api/admin/subscriptions?filter=all', undefined, 'admin')).json.data;
     assert.ok(res.stats.monthTotal >= 15000);
-    assert.ok(res.drivers.some((d: any) => d.id === ids.paid && d.state === 'ACTIVE'));
+    assert.ok(res.drivers.length > 0);
+    // (orodha ina kikomo cha 200 — database ya majaribio inaweza kuwa na madereva wengi; dereva huyu anakaguliwa moja kwa moja)
+    assert.equal((await call('GET', `/api/admin/drivers/${ids.paid}/subscription`, undefined, 'admin')).json.data.state, 'ACTIVE');
     const dash = (await call('GET', '/api/admin/dashboard', undefined, 'admin')).json.data;
     assert.ok(dash.subscriptions.monthTotal >= 15000);
     assert.equal(typeof dash.sosOpen, 'number');

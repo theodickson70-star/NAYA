@@ -913,6 +913,8 @@
     "Inatumwa…": "Sending…",
     "Imetumwa": "Sent",
     "Inasubiri ukaguzi": "Awaiting review",
+    "Inakusanywa": "Collecting",
+    "Malipo ya ofa yanakusanywa": "Offer payments are being collected",
     "Imeshindwa — ofisi itatuma tena": "Failed — the office will resend",
     "Imekataliwa": "Rejected",
     "Malipo ya papo hapo yanaenda kwa M-Pesa, Mixx, Airtel au HaloPesa tu. Weka mojawapo kuwa namba kuu.": "Instant payouts go to M-Pesa, Mixx, Airtel or HaloPesa only. Make one of them your main number.",
@@ -947,6 +949,10 @@
     [
       "NAYA itakutumia {} baada ya ukaguzi wa ofisi.",
       "NAYA will send you {} after the office review."
+    ],
+    [
+      "NAYA itakutumia {} pamoja na safari zako zijazo za ofa (kiasi kidogo hakitumwi peke yake).",
+      "NAYA will send you {} together with your next offer rides (small amounts are not sent on their own)."
     ],
     [
       "Kutuma {} kumeshindwa — ofisi itakutumia tena.",

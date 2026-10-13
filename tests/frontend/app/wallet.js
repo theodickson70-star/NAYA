@@ -91,6 +91,7 @@ function render() {
     PENDING: ['warn', 'Inatumwa…'],
     PAID: ['ok', 'Imetumwa'],
     HELD: ['warn', 'Inasubiri ukaguzi'],
+    WAITING: ['muted', 'Inakusanywa'],
     FAILED: ['bad', 'Imeshindwa — ofisi itatuma tena'],
     REJECTED: ['muted', 'Imekataliwa'],
   };

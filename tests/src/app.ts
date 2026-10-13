@@ -25,6 +25,7 @@ import { ripotiRoutes } from './routes/ripoti.js';
 import { pakuaRoutes } from './routes/pakua.js';
 import { profileRoutes } from './routes/profile.js';
 import { paymentRoutes } from './routes/payments.js';
+import { staffRoutes } from './routes/staff.js';
 import { safetyRoutes } from './routes/safety.js';
 import { subscriptionRoutes } from './routes/subscriptions.js';
 import { streamRoutes } from './routes/stream.js';
@@ -93,6 +94,7 @@ export async function buildApp(options: { logger?: boolean } = {}): Promise<Fast
   await app.register(accountRoutes);
   await app.register(profileRoutes);
   await app.register(paymentRoutes);
+  await app.register(staffRoutes);
   await app.register(driverRoutes);
   await app.register(placeRoutes);
   await app.register(rideRoutes);

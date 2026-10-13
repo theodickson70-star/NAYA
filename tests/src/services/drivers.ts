@@ -246,7 +246,8 @@ export async function listDrivers(filter: { status: DriverStatus | 'ALL'; q?: st
       `SELECT d.user_id AS id, u.full_name AS "fullName", u.phone, u.status AS "accountStatus", d.status,
               d.vehicle_type AS "vehicleType", d.plate_number AS "plateNumber",
               d.submitted_at AS "submittedAt", d.created_at AS "createdAt",
-              (SELECT count(*)::int FROM naya.driver_documents x WHERE x.driver_id = d.user_id) AS "documentCount"
+              (SELECT count(*)::int FROM naya.driver_documents x WHERE x.driver_id = d.user_id) AS "documentCount",
+              (SELECT s.full_name FROM naya.users s WHERE s.id = d.registered_by) AS "registeredBy"
          FROM naya.drivers d JOIN naya.users u ON u.id = d.user_id
         WHERE ${where}
         ORDER BY (d.status = 'PENDING') DESC, d.submitted_at ASC NULLS LAST, d.created_at DESC
@@ -280,8 +281,17 @@ export async function getDriverForAdmin(driverId: string) {
     [driverId],
   );
   if (!user) throw notFound('Dereva hajapatikana');
-  const [details, history] = await Promise.all([profile(db, driverId), auditFor(db, 'driver', driverId)]);
-  return { user: toPublicUser(user), ...details, history };
+  const [details, history, reg] = await Promise.all([
+    profile(db, driverId),
+    auditFor(db, 'driver', driverId),
+    one<{ name: string; phone: string }>(
+      db,
+      'SELECT s.full_name AS name, s.phone FROM naya.drivers d JOIN naya.users s ON s.id = d.registered_by WHERE d.user_id = $1',
+      [driverId],
+    ),
+  ]);
+  // NAYA Staff aliyemsajili (null = alijisajili mwenyewe kwenye app)
+  return { user: toPublicUser(user), ...details, history, registeredBy: reg ?? null };
 }
 
 /** Badiliko la hali kutoka `from` kwenda `to` — linashindwa kwa 409 kama mtu mwingine ameshabadilisha. */

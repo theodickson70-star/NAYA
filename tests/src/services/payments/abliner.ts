@@ -20,7 +20,7 @@
 //   - Hali nyingine yoyote isiyo "completed"/"failed" inachukuliwa kama "bado" (PENDING) — kamwe si mafanikio.
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { FastifyRequest } from 'fastify';
-import type { PaymentProvider, PaymentRequest, ProviderResult, ProviderStatus, WebhookResult } from './provider.js';
+import type { FeeMode, PaymentProvider, PaymentRequest, ProviderResult, ProviderStatus, WebhookResult } from './provider.js';
 
 const DEFAULT_BASE = 'https://abliner.net';
 const TIMEOUT_MS = 20_000;
@@ -109,7 +109,9 @@ function friendly(error: AblinerError, direction: 'IN' | 'OUT') {
     case 'invalid_phone':
       return 'Namba ya simu si sahihi au haina akaunti ya pesa ya simu.';
     case 'amount_out_of_range':
-      return `Kiasi hakiruhusiwi (TSh ${ABLINER_MIN_AMOUNT.toLocaleString('en-US')} hadi ${ABLINER_MAX_AMOUNT.toLocaleString('en-US')}).`;
+      return direction === 'IN'
+        ? `Kiasi hakiruhusiwi (TSh ${ABLINER_MIN_AMOUNT.toLocaleString('en-US')} hadi ${ABLINER_MAX_AMOUNT.toLocaleString('en-US')}).`
+        : 'Kiasi ni kidogo mno kutuma kwa Abliner — kitatumwa pamoja na malipo yajayo ya dereva huyu.';
     case 'insufficient_funds':
       return 'Salio la NAYA kwenye Abliner halitoshi kutuma pesa. Ofisi ijaze salio kisha ijaribu tena.';
     case 'unauthorized':
@@ -132,6 +134,9 @@ export function mapStatus(status: unknown): ProviderStatus {
   if (s === 'failed') return 'FAILED';
   return 'PENDING';
 }
+
+/** Abliner inafunga majibu ndani ya `data` ({ status: "success", data: {...} }) — tunakubali yote mawili. */
+export const unwrap = (json: Json): Json => (json.data && typeof json.data === 'object' && !Array.isArray(json.data) ? (json.data as Json) : json);
 
 const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, 100) : null);
 
@@ -176,7 +181,8 @@ export const abliner: PaymentProvider = {
         body,
         headers: { 'idempotency-key': req.reference, 'x-abliner-timestamp': ts, 'x-abliner-signature': sign(cfg.webhookSecret, ts, bodyText) },
       });
-      return { status: mapStatus(json.status), providerRef: str(json.id), message: mapStatus(json.status) === 'FAILED' ? str(json.message) : null };
+      const data = unwrap(json);
+      return { status: mapStatus(data.status), providerRef: str(data.id), message: mapStatus(data.status) === 'FAILED' ? str(data.message) : null };
     } catch (error) {
       if (error instanceof AblinerError && error.definite) return { status: 'FAILED', message: friendly(error, 'IN') };
       // Mtandao / 5xx / 409 request_in_progress: hatujui kama push imetumwa → PENDING; worker inauliza hali kwa reference yetu.
@@ -192,12 +198,44 @@ export const abliner: PaymentProvider = {
       const json = await call(cfg, 'POST', '/api/v1/withdrawals', {
         body: { amount: req.amount, method: 'mobile', currency: 'TZS', recipient: req.phone, reference: req.reference },
       });
-      const data = (json.data && typeof json.data === 'object' ? json.data : json) as Json;
+      const data = unwrap(json);
       return { status: mapStatus(data.status), providerRef: str(data.id), message: mapStatus(data.status) === 'FAILED' ? str(data.message) : null };
     } catch (error) {
       if (error instanceof AblinerError && error.definite) return { status: 'FAILED', message: friendly(error, 'OUT') };
       // HATUJUI kama pesa imetoka — hakuna kurudia kiotomatiki. Muamala unabaki PENDING; worker inauliza hali.
       throw error;
+    }
+  },
+
+  /**
+   * GET /api/v1/withdrawals/preview?method=mobile&amount=… → { amount_tzs, fee_tzs, total_debited_tzs } (nyaraka).
+   * 'on_top': ada inakatwa kwenye salio letu → tunatuma `net`. 'deducted': ada inakatwa kwa mpokeaji → tunaongeza mpaka
+   * mpokeaji apate `net` kamili (hatua 3 za preview; preview ikishindwa → makadirio ya 4%, kiwango cha juu cha Abliner).
+   */
+  async quoteDisbursement(net: number, feeMode: FeeMode) {
+    const cfg = requireConfig();
+    const preview = async (amount: number) => {
+      const d = unwrap(await call(cfg, 'GET', `/api/v1/withdrawals/preview?method=mobile&amount=${amount}`));
+      const fee = Number(d.fee_tzs);
+      if (!Number.isFinite(fee) || fee < 0) throw new Error('preview haina fee_tzs');
+      return fee;
+    };
+    try {
+      if (feeMode === 'on_top') return { send: net, fee: await preview(net), source: 'preview' as const };
+      let send = net;
+      let fee = 0;
+      for (let i = 0; i < 3; i += 1) {
+        fee = Math.ceil(await preview(send));
+        if (send - fee >= net) break;
+        send = net + fee;
+      }
+      if (send - fee < net) send = net + fee; // hatua ya mwisho: kila mara mpokeaji apate angalau net
+      return { send, fee: send - net, source: 'preview' as const };
+    } catch (error) {
+      console.error(`[abliner] preview: ${(error as Error).message}`);
+      if (feeMode === 'on_top') return { send: net, fee: 0, source: 'estimate' as const };
+      const send = Math.ceil(net / 0.96);
+      return { send, fee: send - net, source: 'estimate' as const };
     }
   },
 
@@ -254,8 +292,13 @@ export async function ablinerBalance() {
   if (!cfg) return { ok: false as const, message: 'ABLINER_API_KEY na ABLINER_WEBHOOK_SECRET hazijawekwa kwenye Railway → Variables.' };
   try {
     const json = await call(cfg, 'GET', '/api/v1/balance');
-    const balance = typeof json.balance === 'number' ? json.balance : Number(json.balance);
-    return { ok: true as const, balance: Number.isFinite(balance) ? balance : null, currency: str(json.currency) ?? 'TZS' };
+    // Nyaraka: { status: "success", data: { balance, currency: "TZS", balances: { TZS, USD, KES, UGX } } }
+    const data = unwrap(json);
+    const tzs = data.balances && typeof data.balances === 'object' ? (data.balances as Json).TZS : undefined;
+    const raw = data.balance ?? tzs;
+    const balance = raw === null || raw === undefined || raw === '' ? Number.NaN : Number(raw);
+    if (!Number.isFinite(balance)) return { ok: false as const, message: 'Abliner ilijibu bila salio linalosomeka.', httpStatus: null };
+    return { ok: true as const, balance, currency: str(data.currency) ?? 'TZS' };
   } catch (error) {
     const message = error instanceof AblinerError ? friendly(error, 'OUT') : 'Abliner haikupatikana (mtandao).';
     return { ok: false as const, message, httpStatus: error instanceof AblinerError ? error.httpStatus : null };

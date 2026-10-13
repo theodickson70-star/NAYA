@@ -119,8 +119,10 @@ export async function paymentRoutes(app: FastifyInstance): Promise<void> {
   app.put('/api/admin/payments/auto-payout', adminOnly, async (request) => {
     const input = z
       .object({
-        enabled: z.boolean(),
-        dailyLimit: z.coerce.number({ error: 'Weka kikomo' }).int().min(500, 'Kikomo angalau TSh 500').max(10_000_000),
+        enabled: z.boolean().optional(),
+        dailyLimit: z.coerce.number({ error: 'Weka kikomo' }).int().min(500, 'Kikomo angalau TSh 500').max(10_000_000).optional(),
+        minPayout: z.coerce.number({ error: 'Weka kima cha chini' }).int().min(1, 'Kima cha chini angalau TSh 1').max(1_000_000).optional(),
+        feeMode: z.enum(['deducted', 'on_top'], { error: 'Chagua jinsi ada inavyotozwa' }).optional(),
       })
       .parse(request.body);
     return ok(await saveAutoPayout(uid(request), input));

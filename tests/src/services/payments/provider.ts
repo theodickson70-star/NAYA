@@ -9,6 +9,7 @@ import type { FastifyRequest } from 'fastify';
 import { abliner, ablinerConfig } from './abliner.js';
 import { simulator } from './simulator.js';
 
+export type FeeMode = 'deducted' | 'on_top';
 export type MobileNetwork = 'MPESA' | 'MIXX' | 'AIRTEL' | 'HALOPESA';
 export const MOBILE_NETWORKS: MobileNetwork[] = ['MPESA', 'MIXX', 'AIRTEL', 'HALOPESA'];
 
@@ -48,6 +49,11 @@ export interface PaymentProvider {
   collect(req: PaymentRequest): Promise<ProviderResult>;
   /** Kutuma pesa kwenda kwenye simu (B2C / disbursement). */
   disburse(req: PaymentRequest): Promise<ProviderResult>;
+  /**
+   * Si lazima: kiasi cha KUTUMA ili dereva apokee `net` kamili (NAYA inabeba ada ya kutuma).
+   * feeMode 'deducted' = kampuni inakata ada kutoka kwa pesa ya mpokeaji → NAYA inaongeza; 'on_top' = ada inakatwa kwenye salio letu.
+   */
+  quoteDisbursement?(net: number, feeMode: FeeMode): Promise<{ send: number; fee: number; source: 'preview' | 'estimate' }>;
   /** Hali ya muamala kwa reference yetu (kwa kuhakiki tusipopata callback). */
   status(reference: string, direction: 'IN' | 'OUT', providerRef?: string | null): Promise<ProviderResult>;
   /** Callback kutoka kampuni ya malipo — lazima ithibitishe saini/siri; ikishindwa → throw. */

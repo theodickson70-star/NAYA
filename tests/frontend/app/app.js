@@ -24,6 +24,7 @@ import * as akaunti from './akaunti.js';
 import * as malipo from './malipo.js';
 import * as appUpdate from './update.js';
 import * as terms from './terms.js';
+import * as staff from './staff.js';
 import { initI18n, langSwitchHtml, onLangChange } from '/shared/i18n.js';
 import { finishSplash, previewSound, setSoundEnabled, soundEnabled, splashActive, splashReady } from './splash.js';
 
@@ -32,7 +33,7 @@ const api = createApi('naya_app_token');
 const $ = (id) => document.getElementById(id);
 const views = ['view-loading', 'view-intro', 'view-auth', 'view-verify', 'view-role', 'view-offline', 'view-app'];
 const MAX_BYTES = 3 * 1024 * 1024;
-const VERSION = '0.18.0';
+const VERSION = '0.19.1';
 
 let account = null; // { user, activeMode, driverStatus, canDrive }
 let driver = null; // wasifu wa udereva (mode ya Dereva)
@@ -348,6 +349,11 @@ $('verify-logout').addEventListener('click', () => {
 // ---------- Akaunti na mode ----------
 async function loadAccount() {
   account = await api.get('/api/account');
+  // NAYA Staff: app ile ile, kazi zao tu (sajili bodaboda, maeneo) — hakuna abiria/dereva, safari wala malipo.
+  if (account.staff) {
+    show('view-app');
+    return route();
+  }
   if (account.verificationRequired) return showVerify();
   startRealtime();
   // App ya Android: sajili simu hii kwa kengele ya maombi (kimya; ruhusa ikiwa imeshatolewa).
@@ -419,6 +425,24 @@ async function switchMode(mode, { goHome } = {}) {
   else route();
 }
 
+/**
+ * Kufungua NAYA Staff (dereva/abiria mwenye ruhusa). Dereva aliye online anaulizwa kwenda offline kwanza,
+ * ili maombi ya safari yasimfikie akiwa anasajili bodaboda bila kujua.
+ */
+async function openStaffMode() {
+  if (account.activeMode === 'DRIVER' && account.canDrive) {
+    const state = await api.get('/api/driver/state');
+    if (state.online) {
+      if (!confirm('Uko online kama dereva. Ukifungua NAYA Staff utawekwa offline ili usikose maombi ya safari bila kujua. Endelea?')) return;
+      await api.post('/api/driver/online', { online: false });
+      rides.stopGps();
+      rides.stopBackground();
+      toast('Uko offline — sasa uko NAYA Staff');
+    }
+  }
+  location.hash = '#/s';
+}
+
 // ---------- Taarifa za papo hapo ----------
 function startRealtime() {
   if (realtime) return;
@@ -486,9 +510,18 @@ function startRealtime() {
 // ---------- Njia (tabs) ----------
 function route() {
   if (!account) return;
+  if (account.staff) return staff.route();
+  document.body.classList.remove('mode-staff');
+  // Dereva aliyesajiliwa na NAYA Staff: password ya muda inabadilishwa kwanza.
+  if (account.user?.mustChangePassword) {
+    show('view-app');
+    return staff.renderPasswordScreen();
+  }
   rides.stopPolling();
   malipo.stop();
   stopNearby();
+  // Abiria/dereva aliyepewa ruhusa ya NAYA Staff na ofisi: kazi za staff ziko #/s (wengine hawazioni kabisa).
+  if (account.staffAccess && /^#\/s(\/|$)/.test(location.hash)) return staff.route();
   tab = location.hash.startsWith('#/akaunti') ? 'account' : location.hash.startsWith('#/maoni') ? 'feedback' : 'home';
   const picker = location.hash.match(/^#\/chagua\/(kwenda|kutoka)/)?.[1] ?? null;
   for (const a of document.querySelectorAll('[data-tab]')) {
@@ -945,6 +978,14 @@ function modeCardHtml() {
           ? 'Utafungua ombi la udereva kwa akaunti hii hii — hakuna akaunti mpya.'
           : 'Ni akaunti ile ile; unaweza kubadili wakati wowote.'
       }</p>
+      ${
+        account.staffAccess
+          ? `<div class="mode-staff-entry">
+        <button class="btn btn-gold btn-block" type="button" data-open-staff>Fungua NAYA Staff</button>
+        <p class="muted small">Sajili bodaboda na pendekeza maeneo. Ofisi ya NAYA imekupa ruhusa hii.</p>
+      </div>`
+          : ''
+      }
     </section>`;
 }
 
@@ -1403,6 +1444,18 @@ $('app-content').addEventListener('click', async (event) => {
     $('file-input').click();
     return;
   }
+  const openStaff = event.target.closest('[data-open-staff]');
+  if (openStaff) {
+    openStaff.disabled = true;
+    try {
+      await openStaffMode();
+    } catch (err) {
+      handleError(err, 'switch-error');
+    } finally {
+      openStaff.disabled = false;
+    }
+    return;
+  }
   const switchTo = event.target.closest('[data-switch]');
   if (switchTo) {
     switchTo.disabled = true;
@@ -1533,6 +1586,8 @@ function signOutLocally() {
   realtime = null;
   rides.reset();
   akaunti.reset();
+  staff.reset();
+  document.body.classList.remove('mode-staff', 'mode-forcepw');
   tripHistory = null;
   passengerOffers = null;
   account = null;
@@ -1585,6 +1640,7 @@ akaunti.init({
   loadSupportList: () => support.loadCardList(),
 });
 appUpdate.init({ api });
+staff.init({ api, toast, handleError, logout: () => logout(), account: () => account, reloadAccount: () => loadAccount() });
 rides.init({
   api,
   pushState: () => pushState(api),

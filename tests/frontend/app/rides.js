@@ -694,6 +694,7 @@ function payoutLine(ride) {
   if (st === 'PENDING') return `NAYA inakutumia ${amt} sasa hivi kwenye namba yako kuu ya malipo.`;
   if (st === 'PAID') return `NAYA imekutumia ${amt} kwenye namba yako kuu ya malipo.`;
   if (st === 'HELD') return `NAYA itakutumia ${amt} baada ya ukaguzi wa ofisi.`;
+  if (st === 'WAITING') return `NAYA itakutumia ${amt} pamoja na safari zako zijazo za ofa (kiasi kidogo hakitumwi peke yake).`;
   if (st === 'FAILED') return `Kutuma ${amt} kumeshindwa — ofisi itakutumia tena.`;
   return `NAYA itakutumia ${amt} kwenye namba yako ya malipo (Akaunti → Malipo ya ofa).`;
 }

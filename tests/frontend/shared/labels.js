@@ -27,6 +27,15 @@ export const VEHICLE_TYPES = { BODABODA: 'Bodaboda', BAJAJI: 'Bajaji' };
 
 export const AUDIT_ACTIONS = {
   'location.created': 'Eneo limeongezwa',
+  'location.approved': 'Eneo limeidhinishwa',
+  'location.rejected': 'Eneo limekataliwa',
+  'staff.driver_registered': 'Amesajiliwa na NAYA Staff',
+  'staff.driver_submitted': 'NAYA Staff ametuma kwa uthibitisho',
+  'staff.location_proposed': 'NAYA Staff amependekeza eneo',
+  'staff.created': 'Akaunti ya NAYA Staff imetengenezwa',
+  'staff.suspended': 'NAYA Staff amesimamishwa',
+  'staff.activated': 'NAYA Staff amerudishwa',
+  'staff.password_reset': 'Password ya NAYA Staff imebadilishwa',
   'location.updated': 'Eneo limebadilishwa',
   'location.deactivated': 'Eneo limezimwa',
   'location.activated': 'Eneo limewashwa',

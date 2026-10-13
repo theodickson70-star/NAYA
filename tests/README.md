@@ -115,6 +115,44 @@ Alama za kutiliwa shaka (`rides.flags`), zinaonekana kwa ofisi kwenye safari, Ri
 DRIVER, PASSENGER, AUTO au ADMIN. Migration `021_safari_rahisi.sql` inaongeza safu tu (haifuti data); safari zinazoendelea zisizo
 za ofa zinaondolewa PIN ili zisikwame.
 
+## Ruhusa ya NAYA Staff kwa akaunti iliyopo (0.19.1)
+
+Namba moja = akaunti moja. Ofisi ikiandika namba ambayo tayari ina akaunti (abiria au dereva), haipati kosa tena:
+inaonyeshwa jina na aina ya akaunti → **"Ndiyo, mpe ruhusa ya staff"**. Migration `028_staff_ruhusa.sql` inaongeza
+`users.staff_access` (NULL / ACTIVE / SUSPENDED), `staff_since`, `staff_added_by` (haifuti data).
+
+- Hakuna akaunti mpya wala password mpya — anaingia kwa password yake ile ile. "Password mpya" ya ofisi haipo kwa akaunti hizi.
+- Kwenye app: **Akaunti → Badili mode → "Fungua NAYA Staff"** (inaonekana kwa wenye ruhusa tu; `#/s`). Dereva aliye online
+  anaulizwa na kuwekwa offline kwanza. "Rudi kwenye Dereva/Abiria" inamrudisha kwenye app yake.
+- Kusimamisha kunaondoa **ruhusa ya staff tu**: udereva, safari, salio na malipo yake vinaendelea; token yake haifi.
+- Hawezi kujisajili mwenyewe kama dereva (namba iliyopo inakataliwa) wala kuthibitisha madereva. Akaunti za ofisi haziwezi kuwa staff.
+- API mpya: `POST /api/admin/staff/lookup` · `POST /api/admin/staff` inakubali `linkExisting: true`. `/api/account` ina `staffAccess`.
+
+## NAYA Staff (0.19.0)
+
+Wasaidizi wa NAYA wanaoingia kwenye **app ya NAYA** (si ofisi) na kupata kazi zao tu. Migration `027_naya_staff.sql` inaongeza
+cheo `STAFF`, `users.must_change_password`, `users.created_by`, `drivers.registered_by` na hali ya ukaguzi ya maeneo (haifuti data).
+
+- **Ofisi → Mipangilio → NAYA Staff** (`#/staff`): ongeza staff (jina + simu) → password ya muda inaonyeshwa mara moja;
+  simamisha / rudisha / password mpya; idadi ya kazi ya kila staff.
+- **Staff kwenye app**: anaweka password yake kwanza, kisha: *Sajili bodaboda* (akaunti + chombo + picha 4 kwa kamera → "Inasubiri ofisi"),
+  *Ongeza eneo* (GPS ya simu → linasubiri ofisi), *Kazi zangu*. Haoni pesa, mipangilio, wateja wala safari; hawezi kuingia `/admin`.
+- **Ofisi pekee inathibitisha madereva.** Dereva aliyesajiliwa na staff: "Amesajiliwa na NAYA Staff: …" kwenye ofisi; akiingia kwenye app
+  kwa password ya muda anaibadilisha na kukubali Masharti ya Dereva mwenyewe.
+- **Maeneo ya staff** hayaonekani kwa wateja mpaka ofisi iyaidhinishe (Maeneo → "Maeneo yanayosubiri uidhinishe"; pia kwenye Muhtasari).
+- API: `/api/staff/*` (STAFF tu, baada ya kubadilisha password), `/api/admin/staff*`, `/api/admin/locations/pending`, `/api/admin/locations/:id/review`.
+
+## Malipo ya ofa: ada na kiasi kidogo (0.18.2)
+
+- **NAYA inabeba ada ya kutuma** — dereva anapokea deni lake kamili. Kabla ya kila withdrawal NAYA inauliza Abliner
+  `GET /api/v1/withdrawals/preview` na (kwa chaguo-msingi "inakatwa kwa dereva") inaongeza ada kwenye kiasi cha kutuma.
+  Mipangilio ya mfumo → Malipo ya simu → "Ada ya Abliner ya kutuma" inaweza kubadilishwa kuwa "kwenye salio la NAYA".
+  Ada iliyolipwa inaonekana kwenye Miamala ya simu (`payments.meta.fee`, `meta.sendAmount`); `payments.amount` ni deni la dereva.
+- **Kima cha chini cha kutuma** (chaguo-msingi TSh 1,000): deni dogo zaidi halitumwi peke yake — safari inakuwa `WAITING`
+  ("Inakusanywa") na inatumwa pamoja na safari zijazo za ofa za dereva huyo kwa muamala mmoja. Migration `026_malipo_madogo.sql`
+  inapanua CHECK ya hali tu.
+- Kiasi cha webhook kinakaguliwa kwa pesa inayoingia tu (Abliner inaweza kuripoti kiasi baada ya ada kwa pesa inayotoka).
+
 ## Ofisi — mpangilio mpya (0.18.0)
 
 Menyu ya pembeni kwa makundi (inaweza kukunjwa kuwa alama tu; inakumbukwa kwenye browser):
