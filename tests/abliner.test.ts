@@ -28,7 +28,8 @@ const { mapStatus, sign } = await import('../src/services/payments/abliner.js');
 interface Seen { method: string; path: string; headers: IncomingMessage['headers']; body: string }
 const seen: Seen[] = [];
 const txs = new Map<string, Record<string, unknown>>(); // customer_reference → muamala
-let mode: { deposit?: 'ok' | 'invalid_phone' | 'server_error'; withdrawal?: 'ok' | 'drop' | 'insufficient' } = {};
+let mode: { deposit?: 'ok' | 'invalid_phone' | 'server_error'; withdrawal?: 'ok' | 'drop' | 'insufficient' | 'too_small' } = {};
+const feeOf = (amount: number) => Math.ceil(amount * 0.04); // ada ya bandia ya kutuma (4%)
 let counter = 0;
 let mock: Server;
 
@@ -66,7 +67,12 @@ function startMock() {
         txs.set(b.reference, tx);
         return send(res, 200, { status: 'success', data: tx });
       }
+      if (req.method === 'GET' && url.pathname === '/api/v1/withdrawals/preview') {
+        const amount = Number(url.searchParams.get('amount'));
+        return send(res, 200, { status: 'success', data: { amount_tzs: amount, fee_tzs: feeOf(amount), total_debited_tzs: amount + feeOf(amount) } });
+      }
       if (req.method === 'POST' && url.pathname === '/api/v1/withdrawals') {
+        if (mode.withdrawal === 'too_small') return send(res, 422, { status: 'error', code: 'amount_out_of_range', message: 'Amount out of range' });
         if (mode.withdrawal === 'drop') return req.socket.destroy(); // jibu limepotea — hatujui kama pesa imetoka
         if (mode.withdrawal === 'insufficient') return send(res, 402, { status: 'error', code: 'insufficient_funds', message: 'Insufficient balance' });
         const b = JSON.parse(body);
@@ -394,12 +400,70 @@ describe('Abliner — malipo ya ofa kwa bodaboda (withdrawal)', () => {
     const p = await payment(r.promo_payment_id);
     const req = posts('/api/v1/withdrawals').at(-1)!;
     assert.equal(req.headers.authorization, `Bearer ${KEY}`);
-    assert.deepEqual(JSON.parse(req.body), { amount: 1500, method: 'mobile', currency: 'TZS', recipient: `255764${s}`, reference: p.reference });
+    // NAYA inabeba ada (chaguo-msingi "inakatwa kwa dereva"): inatuma 1,563 ili dereva apokee 1,500 kamili (1,563 − 63)
+    assert.deepEqual(JSON.parse(req.body), { amount: 1563, method: 'mobile', currency: 'TZS', recipient: `255764${s}`, reference: p.reference });
+    const previews = seen.filter((x) => x.path === '/api/v1/withdrawals/preview');
+    assert.ok(previews.length >= 1 && previews[0].method === 'GET');
+    const meta = (await payment(p.id)).meta;
+    assert.equal(meta.sendAmount, 1563);
+    assert.equal(meta.fee, 63);
+    assert.equal((await payment(p.id)).amount, 1500); // deni la dereva
+    // Abliner inaripoti kiasi alichopokea dereva (si 1,563) — bado inathibitishwa (pesa inayotoka haikaguliwi kiasi)
     const hook = await webhook('withdrawal.completed', { id: p.provider_ref, type: 'withdrawal', status: 'completed', amount: 1500, customer_reference: p.reference, provider_reference: `WD${s}` });
     assert.equal(hook.status, 200);
     assert.equal((await ride(rideId)).promo_payout_state, 'PAID');
     assert.equal((await payment(p.id)).status, 'SUCCESS');
     assert.equal((await db.query('SELECT amount FROM naya.promo_payouts WHERE payment_id = $1', [p.id])).rows[0].amount, 1500);
+  });
+
+  it('deni chini ya kima cha chini → linakusanywa (WAITING); safari inayofuata inatumwa PAMOJA kwa muamala mmoja', async () => {
+    assert.equal((await call('PUT', '/api/admin/payments/auto-payout', { minPayout: 2000 }, 'admin')).status, 200);
+    const before = posts('/api/v1/withdrawals').length;
+    const first = await promoRide('d1');
+    const r1 = await rideState(first, (x) => x.promo_payout_state !== null);
+    assert.equal(r1.promo_payout_state, 'WAITING');
+    assert.match(r1.promo_payout_note, /Inakusanywa/);
+    assert.equal(posts('/api/v1/withdrawals').length, before, 'kiasi kidogo hakijatumwa');
+    const q = (await call('GET', '/api/admin/payments/queue', undefined, 'admin')).json.data;
+    assert.ok(q.waiting.some((w: any) => w.driverId === ids.d1 && w.amount === 1500));
+    const second = await promoRide('d1');
+    const r2 = await rideState(second, (x) => x.promo_payout_state === 'PENDING' && x.promo_payment_id);
+    assert.equal((await ride(first)).promo_payment_id, r2.promo_payment_id, 'safari zote mbili kwenye muamala mmoja');
+    const p = await payment(r2.promo_payment_id);
+    assert.equal(p.amount, 3000);
+    assert.equal(posts('/api/v1/withdrawals').length, before + 1);
+    assert.equal(JSON.parse(posts('/api/v1/withdrawals').at(-1)!.body).amount, 3000 + p.meta.fee);
+    await webhook('withdrawal.completed', { status: 'completed', amount: 3000, customer_reference: p.reference });
+    assert.equal((await ride(first)).promo_payout_state, 'PAID');
+    assert.equal((await ride(second)).promo_payout_state, 'PAID');
+    await call('PUT', '/api/admin/payments/auto-payout', { minPayout: 1000 }, 'admin');
+  });
+
+  it('ada "kwenye salio la NAYA" → deni kamili linatumwa bila kuongeza', async () => {
+    await call('PUT', '/api/admin/payments/auto-payout', { feeMode: 'on_top' }, 'admin');
+    const rideId = await promoRide('d1');
+    const r = await rideState(rideId, (x) => x.promo_payout_state === 'PENDING' && x.promo_payment_id);
+    assert.equal(JSON.parse(posts('/api/v1/withdrawals').at(-1)!.body).amount, 1500);
+    const p = await payment(r.promo_payment_id);
+    await webhook('withdrawal.completed', { status: 'completed', amount: 1500, customer_reference: p.reference });
+    await call('PUT', '/api/admin/payments/auto-payout', { feeMode: 'deducted' }, 'admin');
+  });
+
+  it('Abliner ikikataa kiasi (amount_out_of_range) → FAILED na ujumbe wa kutuma (si wa kupokea)', async () => {
+    mode = { withdrawal: 'too_small' };
+    const rideId = await promoRide('d1');
+    const r = await rideState(rideId, (x) => x.promo_payout_state === 'FAILED');
+    mode = {};
+    assert.match(r.promo_payout_note, /kidogo mno kutuma/);
+    assert.doesNotMatch(r.promo_payout_note, /3,000,000/);
+    // ofisi ikiweka kima cha chini juu ya deni hili → "Jaribu tena" inalikusanya badala ya kulituma
+    await call('PUT', '/api/admin/payments/auto-payout', { minPayout: 5000 }, 'admin');
+    const res = await call('POST', `/api/admin/payments/rides/${rideId}/approve`, {}, 'admin');
+    assert.equal(res.status, 200);
+    assert.match(res.json.data.message, /Inakusanywa/);
+    assert.equal((await ride(rideId)).promo_payout_state, 'WAITING');
+    await call('PUT', '/api/admin/payments/auto-payout', { minPayout: 1000 }, 'admin');
+    await db.query(`UPDATE naya.rides SET promo_payout_state = 'REJECTED' WHERE id = $1`, [rideId]); // isiingilie majaribio yanayofuata
   });
 
   it('jibu la withdrawal likipotea → inabaki PENDING; worker HAITUMI tena (inauliza hali tu)', async () => {

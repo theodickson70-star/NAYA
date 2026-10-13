@@ -407,7 +407,13 @@ async function loadFinanceHome() {
             <ul class="auto-unconfirmed">${q.unconfirmed.map((u) => `<li><strong>${esc(u.driverName)}</strong> · ${formatTsh(u.amount)} · ${esc(u.networkLabel ?? '')} ${esc(showNumber(u.network, u.phone))} · <code>${esc(u.reference)}</code></li>`).join('')}</ul>`
           : ''
       }
-      ${!q.held.length && !q.failed.length && !q.unconfirmed.length ? '<p class="empty">Hakuna malipo yanayosubiri.</p>' : ''}
+      ${
+        (q.waiting ?? []).length
+          ? `<h3>Yanakusanywa <span class="badge badge-muted">${n(q.waiting.length)}</span></h3><p class="small muted">Deni dogo kuliko kima cha chini cha kutuma (${formatTsh(s.minPayout ?? 1000)}). Litatumwa lenyewe pamoja na safari zijazo za ofa za dereva huyo — hakuna unachohitaji kufanya.</p>
+            <ul class="auto-unconfirmed">${q.waiting.map((w) => `<li><a href="#/malipo/madereva/${esc(w.driverId)}"><strong>${esc(w.driverName)}</strong></a> · ${formatTsh(w.amount)} · safari ${n(w.rides)}</li>`).join('')}</ul>`
+          : ''
+      }
+      ${!q.held.length && !q.failed.length && !q.unconfirmed.length && !(q.waiting ?? []).length ? '<p class="empty">Hakuna malipo yanayosubiri.</p>' : ''}
     </section>`;
   } catch (err) {
     fail(err);
@@ -441,7 +447,7 @@ async function loadTransactions() {
                 <td>${t.kind === 'SUBSCRIPTION' ? `Ada ya mwezi<span class="rp-sub">Imeingia${t.months ? ` · miezi ${n(t.months)}` : ''}</span>` : 'Malipo ya ofa<span class="rp-sub">Imetoka</span>'}</td>
                 <td><a href="#/malipo/madereva/${esc(t.driverId)}">${esc(t.driverName)}</a></td>
                 <td>${esc(t.networkLabel)}<span class="rp-sub">${esc(formatPhone(t.phone))}</span></td>
-                <td class="num"><strong>${formatTsh(t.amount)}</strong></td>
+                <td class="num"><strong>${formatTsh(t.amount)}</strong>${t.fee ? `<span class="rp-sub">+ ada ${formatTsh(t.fee)} (NAYA)</span>` : ''}</td>
                 <td><span class="badge badge-${tone}">${label}</span>${t.failureReason ? `<span class="rp-sub">${esc(t.failureReason)}</span>` : ''}</td>
                 <td><code>${esc(t.reference)}</code>${t.providerRef ? `<span class="rp-sub">${esc(t.providerRef)}</span>` : ''}</td></tr>`;
             })
@@ -714,8 +720,8 @@ async function onClick(event) {
     } else if (!confirm('Tuma malipo haya kwa dereva sasa?')) return;
     auto.disabled = true;
     try {
-      await ctx.api.post(`/api/admin/payments/rides/${id}/${auto.dataset.auto}`, body);
-      toast(auto.dataset.auto === 'reject' ? 'Malipo yamekataliwa' : 'Malipo yanatumwa');
+      const res = await ctx.api.post(`/api/admin/payments/rides/${id}/${auto.dataset.auto}`, body);
+      toast(auto.dataset.auto === 'reject' ? 'Malipo yamekataliwa' : res?.message ?? 'Malipo yanatumwa');
       return loadFinanceHome();
     } catch (err) {
       auto.disabled = false;

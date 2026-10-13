@@ -459,7 +459,14 @@
           <div class="settings-grid">
             <div><label for="ap-limit">Kikomo kwa dereva kwa siku (TSh)</label><input id="ap-limit" type="number" min="500" step="500" inputmode="numeric"></div>
             <div><label for="wl-low">Onyo la salio dogo la Abliner (TSh)</label><input id="wl-low" type="number" min="0" step="500" inputmode="numeric"></div>
+            <div><label for="ap-min">Kima cha chini cha kutuma (TSh)</label><input id="ap-min" type="number" min="1" step="100" inputmode="numeric"></div>
+            <div><label for="ap-fee">Ada ya Abliner ya kutuma</label>
+              <select id="ap-fee">
+                <option value="deducted">Inakatwa kwa dereva — NAYA iongeze ili apate kamili</option>
+                <option value="on_top">Inakatwa kwenye salio la NAYA — tuma deni kamili</option>
+              </select></div>
           </div>
+          <p class="muted small">NAYA inabeba ada ya kutuma: dereva anapokea deni lake kamili. Deni chini ya kima cha chini linakusanywa na kutumwa pamoja na safari zijazo.</p>
           <p class="muted small">Kikomo kinahesabiwa kwa siku ya Dar es Salaam. Salio likishuka chini ya kiwango cha onyo, Muhtasari na Malipo vinaonyesha onyo jekundu.</p>
           <p class="alert alert-danger" id="ap-error" role="alert" hidden></p>
           <div class="actions"><button class="btn btn-primary" type="submit">Hifadhi mipangilio ya malipo</button></div>

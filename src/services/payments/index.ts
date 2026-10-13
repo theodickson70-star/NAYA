@@ -17,7 +17,7 @@ import { notify, notifyAdmins } from '../notify.js';
 import { NETWORK_LABEL, type Network, promoBalance } from '../promotions.js';
 import { creditSubscription, getSettings, subscriptionPaidMessage, type PaymentMethod } from '../subscriptions.js';
 import { ablinerBalance, ablinerCallbackUrl } from './abliner.js';
-import { getProvider, guessNetwork, MOBILE_NETWORKS, type MobileNetwork, providerProblem, type ProviderResult } from './provider.js';
+import { type FeeMode, getProvider, guessNetwork, MOBILE_NETWORKS, type MobileNetwork, providerProblem, type ProviderResult } from './provider.js';
 
 const TZ = 'Africa/Dar_es_Salaam';
 const IN_TIMEOUT_MINUTES = 15; // ombi la kulipa lisilojibiwa → limeshindwa (likija baadaye SUCCESS bado linakubaliwa)
@@ -39,7 +39,7 @@ interface PaymentRow {
   provider_ref: string | null;
   status: Status;
   failure_reason: string | null;
-  meta: { months?: number; rideIds?: string[] };
+  meta: { months?: number; rideIds?: string[]; sendAmount?: number; fee?: number; feeSource?: string };
   attempt: number;
   created_at: Date;
   completed_at: Date | null;
@@ -64,6 +64,8 @@ function view(p: PaymentRow) {
     status: p.status,
     failureReason: p.failure_reason,
     months: p.meta?.months ?? null,
+    fee: p.meta?.fee ?? null, // ada ya kutuma ambayo NAYA imebeba (malipo ya kutoka)
+    sendAmount: p.meta?.sendAmount ?? null,
     createdAt: p.created_at,
     completedAt: p.completed_at,
   };
@@ -74,16 +76,21 @@ function view(p: PaymentRow) {
 export interface AutoPayoutSettings {
   enabled: boolean;
   dailyLimit: number;
+  /** Deni la dereva chini ya hiki halitumwi peke yake — linakusanywa (Abliner haikubali kiasi kidogo). */
+  minPayout: number;
+  /** Ada ya kutuma: 'deducted' = inakatwa kwa mpokeaji (NAYA inaongeza ili dereva apate kamili); 'on_top' = kwenye salio letu. */
+  feeMode: FeeMode;
 }
 
 export async function getAutoPayout(client: Db = db): Promise<AutoPayoutSettings> {
   const row = await one<{ value: Partial<AutoPayoutSettings> }>(client, `SELECT value FROM naya.settings WHERE key = 'auto_payout'`);
-  return { enabled: true, dailyLimit: 10000, ...(row?.value ?? {}) };
+  return { enabled: true, dailyLimit: 10000, minPayout: 1000, feeMode: 'deducted', ...(row?.value ?? {}) };
 }
 
-export async function saveAutoPayout(adminId: string, input: AutoPayoutSettings) {
+export async function saveAutoPayout(adminId: string, partial: Partial<AutoPayoutSettings>) {
   await transaction(async (client) => {
     const before = await getAutoPayout(client);
+    const input: AutoPayoutSettings = { ...before, ...Object.fromEntries(Object.entries(partial).filter(([, v]) => v !== undefined)) };
     await client.query(
       `INSERT INTO naya.settings (key, value, updated_by, updated_at) VALUES ('auto_payout', $1, $2, now())
        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_by = EXCLUDED.updated_by, updated_at = now()`,
@@ -301,14 +308,20 @@ export async function handleCallback(providerName: string, request: FastifyReque
     await recordWebhook(provider.name, result.eventId, { event: result.event, outcome: 'IGNORED' });
     return { received: true, ignored: true };
   }
-  const payment = await one<{ amount: number; status: string }>(db, 'SELECT amount, status FROM naya.payments WHERE reference = $1 AND provider = $2', [result.reference, provider.name]);
+  const payment = await one<{ amount: number; status: string; direction: 'IN' | 'OUT' }>(
+    db,
+    'SELECT amount, status, direction FROM naya.payments WHERE reference = $1 AND provider = $2',
+    [result.reference, provider.name],
+  );
   if (!payment) {
     console.error(`[payments] callback ${providerName}: reference isiyojulikana ${result.reference}`);
     await recordWebhook(provider.name, result.eventId, { event: result.event, reference: result.reference, status: result.status, outcome: 'UNKNOWN_REFERENCE' });
     if (provider.name === 'simulator') throw notFound('Muamala haukupatikana');
     return { received: true, ignored: true };
   }
-  if (result.status === 'SUCCESS' && result.amount != null && result.amount !== payment.amount) {
+  // Kiasi kinakaguliwa kwa pesa INAYOINGIA tu (mteja asilipe kidogo akaandikwa amelipa kamili). Pesa inayotoka tuliianzisha
+  // sisi, na kampuni inaweza kuripoti kiasi baada ya ada — hilo halizuii uthibitisho.
+  if (payment.direction === 'IN' && result.status === 'SUCCESS' && result.amount != null && result.amount !== payment.amount) {
     // Kiasi kimepingana — hakuna kinachoandikwa "kimelipwa"; ofisi inajulishwa na kukagua kwenye Abliner.
     console.error(`[payments] callback ${providerName} ${result.reference}: kiasi ${result.amount} ≠ ${payment.amount}`);
     await recordWebhook(provider.name, result.eventId, { event: result.event, reference: result.reference, status: result.status, outcome: 'AMOUNT_MISMATCH' });
@@ -391,14 +404,25 @@ export async function onPromoRideCompleted(rideId: string) {
       await client.query(`UPDATE naya.rides SET promo_payout_state = 'HELD', promo_payout_note = $2 WHERE id = $1`, [rideId, reason]);
       return { held: reason, ride };
     }
-    const prepared = await preparePayout(client, ride, account!, provider.name, null, 1, settings.dailyLimit);
+    const prepared = await preparePayout(client, ride, account!, provider.name, null, 1, settings);
     if (prepared && 'overLimit' in prepared) {
       await client.query(`UPDATE naya.rides SET promo_payout_state = 'HELD', promo_payout_note = $2 WHERE id = $1`, [rideId, prepared.overLimit]);
       return { held: prepared.overLimit, ride };
     }
+    if (prepared && 'waiting' in prepared) return { waiting: prepared.waiting, ride };
     return prepared;
   });
   if (!plan) return;
+  if ('waiting' in plan) {
+    await notify({
+      userId: plan.ride.driver_id,
+      event: 'driver',
+      kind: 'promo_payout_waiting',
+      title: 'Malipo ya ofa yanakusanywa',
+      body: `NAYA itakutumia ${tsh(plan.ride.promo_discount)} pamoja na safari zako zijazo za ofa (kiasi kidogo hakitumwi peke yake).`,
+    });
+    return;
+  }
   if ('held' in plan) {
     await notify({
       userId: plan.ride.driver_id,
@@ -413,7 +437,13 @@ export async function onPromoRideCompleted(rideId: string) {
   await sendPayout(plan.payment);
 }
 
-/** Ndani ya transaction: muamala wa kutuma (kiasi kisizidi deni la NAYA kwa dereva, ukiondoa yanayotumwa sasa). */
+const waitingNote = (owed: number, min: number) =>
+  `Inakusanywa: deni la ${tsh(owed)} ni chini ya kima cha chini cha kutuma (${tsh(min)}) — litatumwa pamoja na safari zijazo za ofa.`;
+
+/**
+ * Ndani ya transaction: muamala wa kutuma kwa safari hii PAMOJA na safari zilizokuwa zinakusanywa (WAITING) za dereva huyu.
+ * Kiasi = deni la safari hizo, kisichozidi deni lote la NAYA kwa dereva ukiondoa yanayotumwa sasa.
+ */
 async function preparePayout(
   client: Db,
   ride: PayoutRide,
@@ -421,8 +451,8 @@ async function preparePayout(
   providerName: string,
   createdBy: string | null,
   attempt: number,
-  dailyLimit: number,
-): Promise<{ payment: PaymentRow } | { overLimit: string } | null> {
+  settings: AutoPayoutSettings,
+): Promise<{ payment: PaymentRow } | { overLimit: string } | { waiting: string } | null> {
   // Safu ya dereva imefungwa: malipo mawili ya dereva mmoja hayawezi kupita kikomo kwa pamoja.
   await client.query('SELECT 1 FROM naya.drivers WHERE user_id = $1 FOR UPDATE', [ride.driver_id]);
   const { balance } = await promoBalance(client, ride.driver_id);
@@ -431,14 +461,26 @@ async function preparePayout(
     `SELECT coalesce(sum(amount), 0)::int AS sum FROM naya.payments WHERE user_id = $1 AND kind = 'PROMO_PAYOUT' AND status = 'PENDING'`,
     [ride.driver_id],
   );
-  const amount = Math.min(ride.promo_discount, balance - (pending?.sum ?? 0));
+  const waiting = await many<{ id: string; promo_discount: number }>(
+    client,
+    `SELECT id, promo_discount FROM naya.rides WHERE driver_id = $1 AND promo_payout_state = 'WAITING' AND id <> $2 ORDER BY completed_at FOR UPDATE`,
+    [ride.driver_id, ride.id],
+  );
+  const rideIds = [ride.id, ...waiting.map((w) => w.id)];
+  const owed = ride.promo_discount + waiting.reduce((t, w) => t + w.promo_discount, 0);
+  const amount = Math.min(owed, balance - (pending?.sum ?? 0));
   if (amount <= 0) {
     // Ofisi ilishamlipa (kwa mkono) — hakuna cha kutuma
-    await client.query(`UPDATE naya.rides SET promo_payout_state = 'PAID', promo_payout_note = 'Ilishalipwa kwa mkono' WHERE id = $1`, [ride.id]);
+    await client.query(`UPDATE naya.rides SET promo_payout_state = 'PAID', promo_payout_note = 'Ilishalipwa kwa mkono' WHERE id = ANY($1::uuid[])`, [rideIds]);
     return null;
   }
+  if (amount < settings.minPayout) {
+    const note = waitingNote(amount, settings.minPayout);
+    await client.query(`UPDATE naya.rides SET promo_payout_state = 'WAITING', promo_payout_note = $2 WHERE id = ANY($1::uuid[])`, [rideIds, note]);
+    return { waiting: note };
+  }
   // Kikomo cha siku (Africa/Dar_es_Salaam) — kwa KILA malipo ya simu, ya moja kwa moja na ya ofisi.
-  if ((await paidToday(client, ride.driver_id)) + amount > dailyLimit) return { overLimit: limitReason(dailyLimit) };
+  if ((await paidToday(client, ride.driver_id)) + amount > settings.dailyLimit) return { overLimit: limitReason(settings.dailyLimit) };
   const payment = await insertPayment(client, {
     kind: 'PROMO_PAYOUT',
     direction: 'OUT',
@@ -447,22 +489,36 @@ async function preparePayout(
     network: account.network as MobileNetwork,
     phone: account.phone,
     provider: providerName,
-    meta: { rideIds: [ride.id] },
+    meta: { rideIds },
     attempt,
     createdBy,
   });
-  await client.query(`UPDATE naya.rides SET promo_payout_state = 'PENDING', promo_payout_note = NULL, promo_payment_id = $2 WHERE id = $1`, [ride.id, payment.id]);
+  await client.query(
+    `UPDATE naya.rides SET promo_payout_state = 'PENDING', promo_payout_note = NULL, promo_payment_id = $2 WHERE id = ANY($1::uuid[])`,
+    [rideIds, payment.id],
+  );
   return { payment };
 }
 
 async function sendPayout(payment: PaymentRow) {
   const provider = getProvider();
   if (!provider) return;
+  // NAYA inabeba ada ya kutuma: dereva apokee `payment.amount` kamili (deni lake). Kiasi cha kutuma kinahifadhiwa kwanza.
+  let send = payment.amount;
+  if (provider.quoteDisbursement) {
+    const { feeMode } = await getAutoPayout();
+    const q = await provider.quoteDisbursement(payment.amount, feeMode);
+    send = q.send;
+    await db.query(
+      `UPDATE naya.payments SET meta = meta || $2::jsonb, updated_at = now() WHERE id = $1`,
+      [payment.id, JSON.stringify({ sendAmount: q.send, fee: q.fee, feeSource: q.source, feeMode })],
+    );
+  }
   let result: ProviderResult;
   try {
     result = await provider.disburse({
       reference: payment.reference,
-      amount: payment.amount,
+      amount: send,
       phone: payment.phone,
       network: payment.network,
       description: 'NAYA malipo ya safari ya ofa',
@@ -500,14 +556,21 @@ export async function approvePayout(adminId: string, rideId: string) {
     if (!account) throw conflict('Dereva hajaweka namba ya kupokea pesa.');
     if (!(MOBILE_NETWORKS as string[]).includes(account.network)) throw conflict('Namba kuu ya dereva si ya pesa ya simu — tuma kwa mkono.');
     const attempt = ride.promo_payment_id ? ((await one<{ attempt: number }>(client, 'SELECT attempt FROM naya.payments WHERE id = $1', [ride.promo_payment_id]))?.attempt ?? 0) + 1 : 1;
-    const { dailyLimit } = await getAutoPayout(client);
-    const prepared = await preparePayout(client, ride, account, provider.name, adminId, attempt, dailyLimit);
+    const settings = await getAutoPayout(client);
+    const prepared = await preparePayout(client, ride, account, provider.name, adminId, attempt, settings);
     if (prepared && 'overLimit' in prepared) throw conflict(prepared.overLimit);
-    await writeAudit(client, { actorId: adminId, action: 'promo_payout.approved', targetType: 'ride', targetId: rideId, details: { amount: prepared?.payment.amount ?? 0 } });
+    await writeAudit(client, {
+      actorId: adminId,
+      action: 'promo_payout.approved',
+      targetType: 'ride',
+      targetId: rideId,
+      details: { amount: prepared && 'payment' in prepared ? prepared.payment.amount : 0 },
+    });
     return prepared;
   });
   if (plan && 'payment' in plan) await sendPayout(plan.payment);
-  return payoutQueue();
+  const queue = await payoutQueue();
+  return { ...queue, message: plan && 'waiting' in plan ? plan.waiting : plan && 'payment' in plan ? 'Malipo yanatumwa' : 'Hakuna cha kutuma — ilishalipwa' };
 }
 
 /** Ofisi: "Kataa" — safari ya kutiliwa shaka; NAYA haimdai dereva kiasi hiki tena. */
@@ -554,7 +617,7 @@ export async function checkPendingPayments() {
 // ------------------------------------------------------------------ ofisi
 
 export async function payoutQueue() {
-  const [held, failed, unconfirmed] = await Promise.all([
+  const [held, failed, unconfirmed, waiting] = await Promise.all([
     many(
       db,
       `SELECT r.id, r.completed_at AS "completedAt", r.pickup_name AS "from", r.dest_name AS "to", r.promo_discount AS amount,
@@ -579,10 +642,16 @@ export async function payoutQueue() {
          FROM naya.payments p JOIN naya.users u ON u.id = p.user_id
         WHERE p.kind = 'PROMO_PAYOUT' AND p.status = 'PENDING' AND p.created_at < now() - interval '5 minutes' ORDER BY p.created_at`,
     ),
+    many(
+      db,
+      `SELECT u.id AS "driverId", u.full_name AS "driverName", count(*)::int AS rides, sum(r.promo_discount)::int AS amount, max(r.completed_at) AS "lastAt"
+         FROM naya.rides r JOIN naya.users u ON u.id = r.driver_id
+        WHERE r.promo_payout_state = 'WAITING' GROUP BY u.id, u.full_name ORDER BY max(r.completed_at) DESC LIMIT 200`,
+    ),
   ]);
   const label = (n: string | null) => (n ? NETWORK_LABEL[n as Network] ?? n : null);
   const withLabel = (rows: unknown[]) => (rows as Record<string, unknown>[]).map((r) => ({ ...r, networkLabel: label(r.network as string | null) }));
-  return { held: withLabel(held), failed: withLabel(failed), unconfirmed: withLabel(unconfirmed) };
+  return { held: withLabel(held), failed: withLabel(failed), unconfirmed: withLabel(unconfirmed), waiting };
 }
 
 export async function paymentsOverview() {

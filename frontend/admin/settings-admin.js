@@ -47,6 +47,8 @@ async function loadPayments() {
     $('ap-enabled').checked = !!o.settings.enabled;
     $('ap-enabled').disabled = !o.config.canDisburse;
     $('ap-limit').value = o.settings.dailyLimit;
+    $('ap-min').value = o.settings.minPayout ?? 1000;
+    $('ap-fee').value = o.settings.feeMode ?? 'deducted';
     $('wl-low').value = w.lowBalance;
   } catch (err) {
     fail(err, 'ap-error');
@@ -87,7 +89,14 @@ async function saveAutoPay(event) {
   try {
     const writes = [ctx.api.put('/api/admin/payments/wallet-settings', { lowBalance: Number($('wl-low').value) })];
     if (!$('ap-enabled').disabled || $('ap-limit').value) {
-      writes.push(ctx.api.put('/api/admin/payments/auto-payout', { enabled: $('ap-enabled').checked, dailyLimit: Number($('ap-limit').value) }));
+      writes.push(
+        ctx.api.put('/api/admin/payments/auto-payout', {
+          enabled: $('ap-enabled').checked,
+          dailyLimit: Number($('ap-limit').value),
+          minPayout: Number($('ap-min').value),
+          feeMode: $('ap-fee').value,
+        }),
+      );
     }
     await Promise.all(writes);
     ctx.toast('Mipangilio ya malipo imehifadhiwa');

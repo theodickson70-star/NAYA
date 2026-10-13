@@ -20,7 +20,7 @@
 //   - Hali nyingine yoyote isiyo "completed"/"failed" inachukuliwa kama "bado" (PENDING) — kamwe si mafanikio.
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { FastifyRequest } from 'fastify';
-import type { PaymentProvider, PaymentRequest, ProviderResult, ProviderStatus, WebhookResult } from './provider.js';
+import type { FeeMode, PaymentProvider, PaymentRequest, ProviderResult, ProviderStatus, WebhookResult } from './provider.js';
 
 const DEFAULT_BASE = 'https://abliner.net';
 const TIMEOUT_MS = 20_000;
@@ -109,7 +109,9 @@ function friendly(error: AblinerError, direction: 'IN' | 'OUT') {
     case 'invalid_phone':
       return 'Namba ya simu si sahihi au haina akaunti ya pesa ya simu.';
     case 'amount_out_of_range':
-      return `Kiasi hakiruhusiwi (TSh ${ABLINER_MIN_AMOUNT.toLocaleString('en-US')} hadi ${ABLINER_MAX_AMOUNT.toLocaleString('en-US')}).`;
+      return direction === 'IN'
+        ? `Kiasi hakiruhusiwi (TSh ${ABLINER_MIN_AMOUNT.toLocaleString('en-US')} hadi ${ABLINER_MAX_AMOUNT.toLocaleString('en-US')}).`
+        : 'Kiasi ni kidogo mno kutuma kwa Abliner — kitatumwa pamoja na malipo yajayo ya dereva huyu.';
     case 'insufficient_funds':
       return 'Salio la NAYA kwenye Abliner halitoshi kutuma pesa. Ofisi ijaze salio kisha ijaribu tena.';
     case 'unauthorized':
@@ -202,6 +204,38 @@ export const abliner: PaymentProvider = {
       if (error instanceof AblinerError && error.definite) return { status: 'FAILED', message: friendly(error, 'OUT') };
       // HATUJUI kama pesa imetoka — hakuna kurudia kiotomatiki. Muamala unabaki PENDING; worker inauliza hali.
       throw error;
+    }
+  },
+
+  /**
+   * GET /api/v1/withdrawals/preview?method=mobile&amount=… → { amount_tzs, fee_tzs, total_debited_tzs } (nyaraka).
+   * 'on_top': ada inakatwa kwenye salio letu → tunatuma `net`. 'deducted': ada inakatwa kwa mpokeaji → tunaongeza mpaka
+   * mpokeaji apate `net` kamili (hatua 3 za preview; preview ikishindwa → makadirio ya 4%, kiwango cha juu cha Abliner).
+   */
+  async quoteDisbursement(net: number, feeMode: FeeMode) {
+    const cfg = requireConfig();
+    const preview = async (amount: number) => {
+      const d = unwrap(await call(cfg, 'GET', `/api/v1/withdrawals/preview?method=mobile&amount=${amount}`));
+      const fee = Number(d.fee_tzs);
+      if (!Number.isFinite(fee) || fee < 0) throw new Error('preview haina fee_tzs');
+      return fee;
+    };
+    try {
+      if (feeMode === 'on_top') return { send: net, fee: await preview(net), source: 'preview' as const };
+      let send = net;
+      let fee = 0;
+      for (let i = 0; i < 3; i += 1) {
+        fee = Math.ceil(await preview(send));
+        if (send - fee >= net) break;
+        send = net + fee;
+      }
+      if (send - fee < net) send = net + fee; // hatua ya mwisho: kila mara mpokeaji apate angalau net
+      return { send, fee: send - net, source: 'preview' as const };
+    } catch (error) {
+      console.error(`[abliner] preview: ${(error as Error).message}`);
+      if (feeMode === 'on_top') return { send: net, fee: 0, source: 'estimate' as const };
+      const send = Math.ceil(net / 0.96);
+      return { send, fee: send - net, source: 'estimate' as const };
     }
   },
 

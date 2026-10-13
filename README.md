@@ -115,6 +115,17 @@ Alama za kutiliwa shaka (`rides.flags`), zinaonekana kwa ofisi kwenye safari, Ri
 DRIVER, PASSENGER, AUTO au ADMIN. Migration `021_safari_rahisi.sql` inaongeza safu tu (haifuti data); safari zinazoendelea zisizo
 za ofa zinaondolewa PIN ili zisikwame.
 
+## Malipo ya ofa: ada na kiasi kidogo (0.18.2)
+
+- **NAYA inabeba ada ya kutuma** — dereva anapokea deni lake kamili. Kabla ya kila withdrawal NAYA inauliza Abliner
+  `GET /api/v1/withdrawals/preview` na (kwa chaguo-msingi "inakatwa kwa dereva") inaongeza ada kwenye kiasi cha kutuma.
+  Mipangilio ya mfumo → Malipo ya simu → "Ada ya Abliner ya kutuma" inaweza kubadilishwa kuwa "kwenye salio la NAYA".
+  Ada iliyolipwa inaonekana kwenye Miamala ya simu (`payments.meta.fee`, `meta.sendAmount`); `payments.amount` ni deni la dereva.
+- **Kima cha chini cha kutuma** (chaguo-msingi TSh 1,000): deni dogo zaidi halitumwi peke yake — safari inakuwa `WAITING`
+  ("Inakusanywa") na inatumwa pamoja na safari zijazo za ofa za dereva huyo kwa muamala mmoja. Migration `026_malipo_madogo.sql`
+  inapanua CHECK ya hali tu.
+- Kiasi cha webhook kinakaguliwa kwa pesa inayoingia tu (Abliner inaweza kuripoti kiasi baada ya ada kwa pesa inayotoka).
+
 ## Ofisi — mpangilio mpya (0.18.0)
 
 Menyu ya pembeni kwa makundi (inaweza kukunjwa kuwa alama tu; inakumbukwa kwenye browser):
