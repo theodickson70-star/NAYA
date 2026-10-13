@@ -14,6 +14,7 @@ import * as usersAdmin from './users-admin.js';
 import * as ridesAdmin from './rides-admin.js';
 import * as safetyAdmin from './safety-admin.js';
 import * as settingsAdmin from './settings-admin.js';
+import * as staffAdmin from './staff-admin.js';
 import * as subsAdmin from './subscriptions-admin.js';
 import { countUp, reducedMotion, toast } from './ui.js';
 import { loadWallet } from './wallet-admin.js';
@@ -34,7 +35,7 @@ const views = ['view-loading', 'view-login', 'view-offline', 'view-app'];
 const pages = [
   'page-overview', 'page-drivers', 'page-driver', 'page-locations', 'page-fares', 'page-rides', 'page-ride', 'page-subscriptions', 'page-sos',
   'page-live', 'page-users', 'page-user', 'page-support', 'page-ticket', 'page-reports', 'page-broadcast', 'page-feedback', 'page-offers',
-  'page-settings',
+  'page-settings', 'page-staff',
 ];
 
 /** Kichwa cha juu (breadcrumb): kundi la menyu → ukurasa. */
@@ -42,7 +43,7 @@ const TITLES = {
   overview: ['', 'Muhtasari'], live: ['Operesheni', 'Ramani live'], rides: ['Operesheni', 'Safari'], sos: ['Operesheni', 'Dharura'],
   drivers: ['Watu', 'Madereva'], users: ['Watu', 'Wateja'], finance: ['Fedha', 'Malipo'], subscriptions: ['Fedha', 'Ada ya mwezi'],
   offers: ['Fedha', 'Ofa'], broadcast: ['Mawasiliano', 'Matangazo'], support: ['Mawasiliano', 'Msaada'], feedback: ['Mawasiliano', 'Maoni'],
-  reports: ['', 'Ripoti'], settings: ['Mipangilio', 'Mipangilio ya mfumo'], fares: ['Mipangilio', 'Bei na nauli'], locations: ['Mipangilio', 'Maeneo'],
+  reports: ['', 'Ripoti'], settings: ['Mipangilio', 'Mipangilio ya mfumo'], staff: ['Mipangilio', 'NAYA Staff'], fares: ['Mipangilio', 'Bei na nauli'], locations: ['Mipangilio', 'Maeneo'],
 };
 const DETAIL_TITLE = { 'page-driver': 'Dereva', 'page-ride': 'Safari moja', 'page-user': 'Mtumiaji', 'page-ticket': 'Ombi la msaada' };
 let me = null;
@@ -172,6 +173,7 @@ function route() {
   else if (parts[0] === 'ripoti') page = 'page-reports';
   else if (parts[0] === 'ofa' || parts[0] === 'malipo') page = 'page-offers';
   else if (parts[0] === 'mipangilio') page = 'page-settings';
+  else if (parts[0] === 'staff') page = 'page-staff';
   else if (parts[0] === 'matangazo') page = 'page-broadcast';
   else if (parts[0] === 'maoni') page = 'page-feedback';
   closeMenu();
@@ -190,7 +192,7 @@ function route() {
     'page-overview': 'overview', 'page-drivers': 'drivers', 'page-driver': 'drivers', 'page-locations': 'locations', 'page-fares': 'fares',
     'page-rides': 'rides', 'page-ride': 'rides', 'page-subscriptions': 'subscriptions', 'page-sos': 'sos', 'page-live': 'live',
     'page-users': 'users', 'page-user': 'users', 'page-support': 'support', 'page-ticket': 'support', 'page-reports': 'reports', 'page-broadcast': 'broadcast', 'page-feedback': 'feedback',
-    'page-offers': parts[0] === 'malipo' ? 'finance' : 'offers', 'page-settings': 'settings',
+    'page-offers': parts[0] === 'malipo' ? 'finance' : 'offers', 'page-settings': 'settings', 'page-staff': 'staff',
   };
   const navKey = navFor[page];
   for (const a of document.querySelectorAll('[data-nav]')) {
@@ -221,6 +223,8 @@ function route() {
   if (page === 'page-reports') reportsAdmin.open(parts[1] ?? '', params);
   if (page === 'page-offers') ofaAdmin.open(parts);
   if (page === 'page-settings') settingsAdmin.open(section);
+  if (page === 'page-staff') staffAdmin.loadPage();
+  if (page === 'page-locations') staffAdmin.loadPendingLocations();
   if (page === 'page-broadcast') broadcastAdmin.load();
   if (page === 'page-feedback') feedbackAdmin.load();
 }
@@ -363,6 +367,7 @@ async function loadOverview() {
   }
   const walletP = loadWallet($('ov-wallet'), { ctx: { api, onAuthError: handleAuthError } });
   const financeP = loadFinanceBadge();
+  const locationsP = loadLocationsBadge();
   $('greeting').textContent = `${greetingFor(new Date())}, ${me.fullName.split(' ')[0]}`;
   $('today').textContent = new Date().toLocaleDateString('sw-TZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   try {
@@ -397,7 +402,7 @@ async function loadOverview() {
     $('stat-apk-users').textContent = n(data.app?.users ?? 0);
     safetyAdmin.setOpenCount(data.sosOpen);
     setNavCounts(data);
-    renderQueue(data, walletP, financeP);
+    renderQueue(data, walletP, financeP, locationsP);
     loadTrend();
     setDot('sys-sms', data.sms.enabled ? 'ok' : 'wait');
     $('sys-sms-text').textContent = data.sms.enabled ? 'SMS (Beem) zimewashwa' : 'SMS (Beem) hazijawashwa — weka BEEM_API_KEY na BEEM_SECRET_KEY';
@@ -457,7 +462,7 @@ function setNavCounts(data) {
 }
 
 /** "Kazi zinazokusubiri": mambo yanayohitaji mtu wa ofisi sasa hivi, ya hatari kwanza. */
-async function renderQueue(data, walletP = Promise.resolve(null), financeP = Promise.resolve(0)) {
+async function renderQueue(data, walletP = Promise.resolve(null), financeP = Promise.resolve(0), locationsP = Promise.resolve(0)) {
   let searching = 0;
   try {
     const live = await api.get('/api/admin/live');
@@ -465,7 +470,7 @@ async function renderQueue(data, walletP = Promise.resolve(null), financeP = Pro
   } catch {
     // si muhimu
   }
-  const [wallet, payoutsWaiting] = await Promise.all([walletP.catch(() => null), financeP.catch(() => 0)]);
+  const [wallet, payoutsWaiting, locationsWaiting] = await Promise.all([walletP.catch(() => null), financeP.catch(() => 0), locationsP.catch(() => 0)]);
   const items = [
     [data.sosOpen, 'bad', 'Dharura zilizo wazi', 'Mpigie mtu aliyeomba msaada sasa hivi', '#/dharura', 'Shughulikia'],
     [wallet?.low ? 1 : 0, 'bad', 'Salio la Abliner liko chini', `Chini ya TSh ${Number(wallet?.lowBalance ?? 0).toLocaleString('en-US')} — jaza salio ili malipo ya ofa yasishindwe`, '#/malipo', 'Fungua Malipo', '!'],
@@ -473,6 +478,7 @@ async function renderQueue(data, walletP = Promise.resolve(null), financeP = Pro
     [searching, 'bad', 'Wateja wanasubiri dereva', 'Mpe dereva maalum kutoka ramani au ukurasa wa safari', '#/ramani', 'Fungua ramani'],
     [data.supportOpen, 'warn', 'Maombi ya msaada yanasubiri jibu', 'Malalamiko na maswali kutoka kwenye app', '#/msaada?hali=OPEN', 'Jibu'],
     [data.feedbackNew, 'warn', 'Maoni mapya ya wateja na madereva', 'Yasome na uyafanyie kazi — mtoaji anajulishwa', '#/maoni', 'Soma'],
+    [locationsWaiting, 'warn', 'Maeneo yanasubiri uidhinishe', 'Yamependekezwa na NAYA Staff — wateja hawayaoni mpaka uyaidhinishe', '#/maeneo', 'Kagua'],
     [data.drivers.PENDING, 'warn', 'Madereva wanasubiri uthibitisho', 'Kagua nyaraka, kisha thibitisha au kataa', '#/madereva?hali=PENDING', 'Kagua'],
     [data.subscriptions.feeWaived ? 0 : data.subscriptions.expiredDrivers, 'warn', 'Madereva wenye ada iliyoisha', 'Hawapokei safari mpaka walipe', '#/ada', 'Angalia'],
     [data.rides.noDriverToday, 'warn', 'Safari zilizokosa dereva leo', 'Waombe madereva zaidi waende online saa za shughuli', '#/ripoti', 'Ripoti'],
@@ -553,7 +559,9 @@ async function loadDrivers(status, q) {
         (d) => `<a class="driver-row" href="#/madereva/${esc(d.id)}">
           <span><span class="driver-name">${esc(d.fullName)}</span><br><span class="driver-sub">${esc(formatPhone(d.phone))}</span></span>
           <span class="col-vehicle">${d.plateNumber ? `<span class="plate">${esc(d.plateNumber)}</span><br><span class="driver-sub">${esc(VEHICLE_TYPES[d.vehicleType] ?? '')}</span>` : '<span class="driver-sub">Chombo bado</span>'}</span>
-          <span class="col-date driver-sub">${d.submittedAt ? `Alituma ${esc(formatDate(d.submittedAt))}` : `Alijisajili ${esc(formatDate(d.createdAt))}`}</span>
+          <span class="col-date driver-sub">${d.submittedAt ? `Alituma ${esc(formatDate(d.submittedAt))}` : `Alijisajili ${esc(formatDate(d.createdAt))}`}${
+            d.registeredBy ? `<br><span class="staff-tag">NAYA Staff: ${esc(d.registeredBy)}</span>` : ''
+          }</span>
           <span>${badge(DRIVER_STATUS, d.status)}</span>
         </a>`,
       )
@@ -628,9 +636,10 @@ function renderDriver(data) {
     <div class="detail-head">
       <div>
         <h1>${esc(user.fullName)}</h1>
-        <p class="muted"><a href="tel:+${esc(user.phone)}">${esc(formatPhone(user.phone))}</a> · Alijisajili ${esc(formatDate(driver.createdAt))}${
+        <p class="muted"><a href="tel:+${esc(user.phone)}">${esc(formatPhone(user.phone))}</a> · ${data.registeredBy ? 'Alisajiliwa' : 'Alijisajili'} ${esc(formatDate(driver.createdAt))}${
           driver.submittedAt ? ` · Alituma ${esc(formatDate(driver.submittedAt, true))}` : ''
         }</p>
+        ${data.registeredBy ? `<p class="staff-tag staff-tag-big">Amesajiliwa na NAYA Staff: <strong>${esc(data.registeredBy.name)}</strong> · ${esc(formatPhone(data.registeredBy.phone))}</p>` : ''}
       </div>
       ${badge(DRIVER_STATUS, driver.status)}
     </div>
@@ -825,6 +834,22 @@ async function loadPendingCount() {
     // si muhimu
   }
   loadFinanceBadge();
+  loadLocationsBadge();
+}
+
+function setLocationsBadge(n) {
+  $('nav-locations').textContent = n;
+  $('nav-locations').hidden = !n;
+}
+/** Menyu → Maeneo: maeneo yaliyopendekezwa na NAYA Staff yanayosubiri kuidhinishwa. */
+async function loadLocationsBadge() {
+  try {
+    const rows = await api.get('/api/admin/locations/pending');
+    setLocationsBadge(rows.length);
+    return rows.length;
+  } catch {
+    return 0;
+  }
 }
 
 /** Menyu → Malipo: idadi ya malipo ya ofa yanayosubiri uamuzi wa ofisi (ukaguzi / yaliyoshindwa). */
@@ -893,6 +918,7 @@ liveAdmin.setup({ api, onAuthError: handleAuthError });
 reportsAdmin.setup({ api, onAuthError: handleAuthError });
 ofaAdmin.setup({ api, onAuthError: handleAuthError });
 settingsAdmin.setup({ api, onAuthError: handleAuthError, toast });
+staffAdmin.setup({ api, onAuthError: handleAuthError, onPendingChange: setLocationsBadge, onApproved: () => places.loadLocations($('location-q').value) });
 broadcastAdmin.setup({ api, onAuthError: handleAuthError });
 feedbackAdmin.setup({ api, onAuthError: handleAuthError });
 start();

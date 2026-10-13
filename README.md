@@ -115,6 +115,20 @@ Alama za kutiliwa shaka (`rides.flags`), zinaonekana kwa ofisi kwenye safari, Ri
 DRIVER, PASSENGER, AUTO au ADMIN. Migration `021_safari_rahisi.sql` inaongeza safu tu (haifuti data); safari zinazoendelea zisizo
 za ofa zinaondolewa PIN ili zisikwame.
 
+## NAYA Staff (0.19.0)
+
+Wasaidizi wa NAYA wanaoingia kwenye **app ya NAYA** (si ofisi) na kupata kazi zao tu. Migration `027_naya_staff.sql` inaongeza
+cheo `STAFF`, `users.must_change_password`, `users.created_by`, `drivers.registered_by` na hali ya ukaguzi ya maeneo (haifuti data).
+
+- **Ofisi → Mipangilio → NAYA Staff** (`#/staff`): ongeza staff (jina + simu) → password ya muda inaonyeshwa mara moja;
+  simamisha / rudisha / password mpya; idadi ya kazi ya kila staff.
+- **Staff kwenye app**: anaweka password yake kwanza, kisha: *Sajili bodaboda* (akaunti + chombo + picha 4 kwa kamera → "Inasubiri ofisi"),
+  *Ongeza eneo* (GPS ya simu → linasubiri ofisi), *Kazi zangu*. Haoni pesa, mipangilio, wateja wala safari; hawezi kuingia `/admin`.
+- **Ofisi pekee inathibitisha madereva.** Dereva aliyesajiliwa na staff: "Amesajiliwa na NAYA Staff: …" kwenye ofisi; akiingia kwenye app
+  kwa password ya muda anaibadilisha na kukubali Masharti ya Dereva mwenyewe.
+- **Maeneo ya staff** hayaonekani kwa wateja mpaka ofisi iyaidhinishe (Maeneo → "Maeneo yanayosubiri uidhinishe"; pia kwenye Muhtasari).
+- API: `/api/staff/*` (STAFF tu, baada ya kubadilisha password), `/api/admin/staff*`, `/api/admin/locations/pending`, `/api/admin/locations/:id/review`.
+
 ## Malipo ya ofa: ada na kiasi kidogo (0.18.2)
 
 - **NAYA inabeba ada ya kutuma** — dereva anapokea deni lake kamili. Kabla ya kila withdrawal NAYA inauliza Abliner

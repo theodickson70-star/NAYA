@@ -24,6 +24,7 @@ import * as akaunti from './akaunti.js';
 import * as malipo from './malipo.js';
 import * as appUpdate from './update.js';
 import * as terms from './terms.js';
+import * as staff from './staff.js';
 import { initI18n, langSwitchHtml, onLangChange } from '/shared/i18n.js';
 import { finishSplash, previewSound, setSoundEnabled, soundEnabled, splashActive, splashReady } from './splash.js';
 
@@ -32,7 +33,7 @@ const api = createApi('naya_app_token');
 const $ = (id) => document.getElementById(id);
 const views = ['view-loading', 'view-intro', 'view-auth', 'view-verify', 'view-role', 'view-offline', 'view-app'];
 const MAX_BYTES = 3 * 1024 * 1024;
-const VERSION = '0.18.2';
+const VERSION = '0.19.0';
 
 let account = null; // { user, activeMode, driverStatus, canDrive }
 let driver = null; // wasifu wa udereva (mode ya Dereva)
@@ -348,6 +349,11 @@ $('verify-logout').addEventListener('click', () => {
 // ---------- Akaunti na mode ----------
 async function loadAccount() {
   account = await api.get('/api/account');
+  // NAYA Staff: app ile ile, kazi zao tu (sajili bodaboda, maeneo) — hakuna abiria/dereva, safari wala malipo.
+  if (account.staff) {
+    show('view-app');
+    return route();
+  }
   if (account.verificationRequired) return showVerify();
   startRealtime();
   // App ya Android: sajili simu hii kwa kengele ya maombi (kimya; ruhusa ikiwa imeshatolewa).
@@ -486,6 +492,13 @@ function startRealtime() {
 // ---------- Njia (tabs) ----------
 function route() {
   if (!account) return;
+  if (account.staff) return staff.route();
+  document.body.classList.remove('mode-staff');
+  // Dereva aliyesajiliwa na NAYA Staff: password ya muda inabadilishwa kwanza.
+  if (account.user?.mustChangePassword) {
+    show('view-app');
+    return staff.renderPasswordScreen();
+  }
   rides.stopPolling();
   malipo.stop();
   stopNearby();
@@ -1533,6 +1546,8 @@ function signOutLocally() {
   realtime = null;
   rides.reset();
   akaunti.reset();
+  staff.reset();
+  document.body.classList.remove('mode-staff', 'mode-forcepw');
   tripHistory = null;
   passengerOffers = null;
   account = null;
@@ -1585,6 +1600,7 @@ akaunti.init({
   loadSupportList: () => support.loadCardList(),
 });
 appUpdate.init({ api });
+staff.init({ api, toast, handleError, logout: () => logout(), account: () => account, reloadAccount: () => loadAccount() });
 rides.init({
   api,
   pushState: () => pushState(api),

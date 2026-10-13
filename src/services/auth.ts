@@ -116,7 +116,8 @@ export async function changePassword(userId: string, currentPassword: string, ne
   if (currentPassword === newPassword) throw new AppError(400, 'Chagua password tofauti na ya sasa.');
   const updated = await one<UserRow>(
     db,
-    `UPDATE naya.users SET password_hash = $2, token_version = token_version + 1, updated_at = now() WHERE id = $1 RETURNING *`,
+    `UPDATE naya.users SET password_hash = $2, must_change_password = false, token_version = token_version + 1, updated_at = now()
+      WHERE id = $1 RETURNING *`,
     [userId, await hashPassword(newPassword)],
   );
   await removeAllFcmTokens(userId);

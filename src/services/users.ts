@@ -1,8 +1,8 @@
 // SQL ya watumiaji (naya.users). Hakuna mantiki ya biashara hapa.
 import { type Db, many, one } from '../db/pool.js';
 
-/** USER = mtumiaji wa app (abiria na/au dereva). ADMIN/SUPER_ADMIN = ofisi. */
-export type UserRole = 'USER' | 'ADMIN' | 'SUPER_ADMIN';
+/** USER = mtumiaji wa app (abiria na/au dereva). STAFF = NAYA Staff (app, kazi maalum). ADMIN/SUPER_ADMIN = ofisi. */
+export type UserRole = 'USER' | 'STAFF' | 'ADMIN' | 'SUPER_ADMIN';
 export type AppMode = 'PASSENGER' | 'DRIVER';
 export type UserStatus = 'ACTIVE' | 'SUSPENDED';
 
@@ -28,6 +28,8 @@ export interface UserRow {
   photo_updated_at?: Date | null;
   emergency_name?: string | null;
   emergency_phone?: string | null;
+  /** Password ya muda — lazima aibadilishe (migration 027). */
+  must_change_password?: boolean;
 }
 
 /** Mtumiaji kama anavyoonekana nje ya server — kamwe bila password_hash wala token_version. */
@@ -43,6 +45,7 @@ export interface PublicUser {
   /** Ana picha? photoVersion inabadilika picha ikibadilishwa (kwa cache ya app). */
   hasPhoto: boolean;
   photoVersion: number | null;
+  mustChangePassword: boolean;
 }
 
 export function toPublicUser(u: UserRow): PublicUser {
@@ -56,6 +59,7 @@ export function toPublicUser(u: UserRow): PublicUser {
     createdAt: u.created_at,
     hasPhoto: !!u.photo_file_id,
     photoVersion: u.photo_updated_at ? new Date(u.photo_updated_at).getTime() : null,
+    mustChangePassword: !!u.must_change_password,
   };
 }
 

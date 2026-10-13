@@ -29,7 +29,7 @@ export function listLocations(options: { q?: string; includeInactive?: boolean }
   return many<LocationView>(
     db,
     `SELECT ${LOCATION_COLUMNS} FROM naya.locations
-      WHERE ($1::boolean OR is_active) AND ($2::text IS NULL OR name ILIKE $2 OR area ILIKE $2)
+      WHERE ($1::boolean OR is_active) AND review_status = 'APPROVED' AND ($2::text IS NULL OR name ILIKE $2 OR area ILIKE $2)
       ORDER BY is_active DESC, name`,
     [options.includeInactive ?? false, q],
   );

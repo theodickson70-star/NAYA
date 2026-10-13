@@ -964,3 +964,38 @@ a.kpi:hover, .queue-item:hover, .settings-tile:hover { transform: translateY(-2p
 .side-user { padding-top: 10px; margin-top: 6px; }
 .auto-pay a:not(.btn), .page-head + .rp-tabs ~ * a:not(.btn):not(.wc-btn):not(.rp-person) { color: var(--naya-green); font-weight: 700; }
 .page-head a.btn { text-decoration: none; }
+
+/* =====================================================================
+   0.19.0 — NAYA Staff (ofisi)
+   ===================================================================== */
+.staff-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; margin-top: 16px; }
+.staff-card { background: var(--white); border: 1px solid var(--line); border-radius: 18px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+.staff-card.is-off { opacity: 0.72; }
+.staff-card header { display: flex; align-items: center; gap: 12px; }
+.staff-card header > span:nth-child(2) { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.staff-card header small { color: var(--muted); }
+.staff-avatar { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; flex: none; background: var(--naya-green-dark); color: var(--warning); font-weight: 800; font-family: var(--font-display); }
+.staff-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; margin: 0; background: var(--line); border-radius: 12px; overflow: hidden; }
+.staff-stats div { background: var(--bg); padding: 8px 10px; }
+.staff-stats dt { font-size: 12px; color: var(--muted); }
+.staff-stats dd { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 20px; }
+.staff-stats dd small { font-family: var(--font-body); font-weight: 400; font-size: 13px; color: var(--muted); }
+.staff-card .muted.small { margin: 0; }
+.staff-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.staff-actions .btn { text-decoration: none; }
+.btn-danger-text { color: var(--danger); }
+.staff-secret { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-top: 14px; padding: 18px 20px; border-radius: 18px; background: #FFF6D6; border: 1.5px solid var(--warning); animation: rise 0.4s var(--ease-out) both; }
+.staff-secret h3 { margin: 0 0 4px; }
+.staff-secret p { margin: 4px 0 0; }
+.staff-password { display: inline-block; margin-top: 10px !important; padding: 10px 18px; border-radius: 12px; background: var(--white); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 26px; font-weight: 700; letter-spacing: 0.12em; user-select: all; }
+.staff-tag { display: inline-block; margin-top: 4px; font-size: 12px; font-weight: 700; color: var(--naya-green-dark); background: var(--naya-mint); padding: 1px 8px; border-radius: 999px; }
+.staff-tag-big { font-size: 14px; padding: 4px 12px; margin: 6px 0 0; }
+.loc-pending { margin: 12px 0 14px; border-color: #F0D98A !important; background: #FFFBEA !important; }
+.loc-pending h2 { margin: 0 0 4px; display: flex; gap: 8px; align-items: center; }
+.pending-locs { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
+.pending-locs li { display: grid; grid-template-columns: 1fr auto auto auto; gap: 8px; align-items: center; padding: 10px 12px; border-radius: 12px; background: var(--white); border: 1px solid var(--line); }
+.pending-locs li > span { display: flex; flex-direction: column; min-width: 0; }
+.pending-locs small { color: var(--muted); }
+.pending-locs .btn { text-decoration: none; }
+@media (max-width: 640px) { .pending-locs li { grid-template-columns: 1fr 1fr 1fr; } .pending-locs li > span { grid-column: 1 / -1; } }
+@media (prefers-reduced-motion: reduce) { .staff-secret { animation: none; } }
