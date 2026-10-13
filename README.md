@@ -115,6 +115,38 @@ Alama za kutiliwa shaka (`rides.flags`), zinaonekana kwa ofisi kwenye safari, Ri
 DRIVER, PASSENGER, AUTO au ADMIN. Migration `021_safari_rahisi.sql` inaongeza safu tu (haifuti data); safari zinazoendelea zisizo
 za ofa zinaondolewa PIN ili zisikwame.
 
+## Jina la mwenye namba na Control Number (0.20.0)
+
+Kutoka nyaraka za Abliner (hakuna endpoint iliyobuniwa): `GET /api/v1/lookup?phone=` → `{ phone, name, network }`
+(404 `name_not_found` = haijathibitishwa) na `POST /api/v1/control-numbers` `{ amount, description, payment_mode, reference, customer_name? }`
+→ `{ id, control_number, … }`; ikilipwa, webhook ileile ya deposits (`transaction.completed`) inakuja. **Hakuna cha kubadilisha
+Railway wala Abliner.** Migration `029_majina_na_control.sql` inaongeza `phone_names` (cache), `name_lookups` (kumbukumbu),
+safu za uthibitisho kwenye `driver_payout_accounts`, na njia `CONTROL` kwenye kumbukumbu za ada (haifuti data).
+
+- **Namba tu → jina linatokea**: namba za malipo za dereva (anathibitisha "jina hili ni sahihi"; jina la mtandao ndilo linahifadhiwa),
+  Ofisi → Ongeza staff, NAYA Staff → Sajili bodaboda. Huduma isipopatikana, jina linaandikwa kwa mkono kama zamani.
+- **Faragha**: `POST /api/name-lookup` ni kwa dereva, NAYA Staff na ofisi tu; kikomo cha namba tofauti kwa saa 24
+  (dereva 15, staff 80, ofisi 300); kila ombi linaandikwa. Namba haiandikwi kwenye logs.
+- **Kinga ya malipo**: kabla ya kumtumia dereva pesa, jina la namba linaangaliwa tena (cache ≤ saa 6). Likiwa la mtu mwingine
+  (laini imehamishwa) au mtandao haulijui → pesa haitumwi, safari inaonyesha sababu, dereva anapata arifa. Akithibitisha namba
+  upya kwenye app, malipo yaliyosimama yanatumwa yenyewe. Huduma ya majina ikiwa chini → malipo yanaendelea.
+- **Control number ya ada**: Akaunti → Ada ya mwezi → "Pata control number" (kiasi kamili, `EXACT`; siku 7). Dereva analipa
+  kutoka M-Pesa, Mixx, Airtel Money, HaloPesa au benki; siku zinaongezwa zenyewe. Namba ileile kwa miezi ileile; zisizozidi 3
+  zisizolipwa. Ikilipwa baada ya kuisha muda bado inakubaliwa.
+
+## Ruhusa ya NAYA Staff kwa akaunti iliyopo (0.19.1)
+
+Namba moja = akaunti moja. Ofisi ikiandika namba ambayo tayari ina akaunti (abiria au dereva), haipati kosa tena:
+inaonyeshwa jina na aina ya akaunti → **"Ndiyo, mpe ruhusa ya staff"**. Migration `028_staff_ruhusa.sql` inaongeza
+`users.staff_access` (NULL / ACTIVE / SUSPENDED), `staff_since`, `staff_added_by` (haifuti data).
+
+- Hakuna akaunti mpya wala password mpya — anaingia kwa password yake ile ile. "Password mpya" ya ofisi haipo kwa akaunti hizi.
+- Kwenye app: **Akaunti → Badili mode → "Fungua NAYA Staff"** (inaonekana kwa wenye ruhusa tu; `#/s`). Dereva aliye online
+  anaulizwa na kuwekwa offline kwanza. "Rudi kwenye Dereva/Abiria" inamrudisha kwenye app yake.
+- Kusimamisha kunaondoa **ruhusa ya staff tu**: udereva, safari, salio na malipo yake vinaendelea; token yake haifi.
+- Hawezi kujisajili mwenyewe kama dereva (namba iliyopo inakataliwa) wala kuthibitisha madereva. Akaunti za ofisi haziwezi kuwa staff.
+- API mpya: `POST /api/admin/staff/lookup` · `POST /api/admin/staff` inakubali `linkExisting: true`. `/api/account` ina `staffAccess`.
+
 ## NAYA Staff (0.19.0)
 
 Wasaidizi wa NAYA wanaoingia kwenye **app ya NAYA** (si ofisi) na kupata kazi zao tu. Migration `027_naya_staff.sql` inaongeza

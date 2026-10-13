@@ -30,7 +30,13 @@ export interface UserRow {
   emergency_phone?: string | null;
   /** Password ya muda — lazima aibadilishe (migration 027). */
   must_change_password?: boolean;
+  /** Ruhusa ya NAYA Staff kwenye akaunti ya USER (migration 028): NULL | 'ACTIVE' | 'SUSPENDED'. */
+  staff_access?: 'ACTIVE' | 'SUSPENDED' | null;
 }
+
+/** Anaweza kufanya kazi za NAYA Staff? Akaunti ya STAFF, au akaunti ya USER (mf. dereva) yenye ruhusa hai. */
+export const hasStaffAccess = (u: Pick<UserRow, 'role'> & { staff_access?: string | null }) =>
+  u.role === 'STAFF' || (u.role === 'USER' && u.staff_access === 'ACTIVE');
 
 /** Mtumiaji kama anavyoonekana nje ya server — kamwe bila password_hash wala token_version. */
 export interface PublicUser {

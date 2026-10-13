@@ -5,9 +5,12 @@
 //   #/s/eneo      Pendekeza eneo (GPS ya simu) → linasubiri ofisi iliidhinishe
 //   #/s/kazi      Kazi zangu: madereva na maeneo
 // Staff hawezi kuthibitisha dereva wala kuona pesa / mipangilio — hizo ni za ofisi tu.
+// 0.19.1: abiria/dereva aliyepewa ruhusa ya staff (account.staffAccess) anafungua kazi hizi kwa #/s — mwanzo wake ni #/s,
+// na "Rudi kwenye Dereva/Abiria" inamrudisha kwenye app yake ya kawaida (#/).
 import { escapeHtml as esc } from '/shared/api.js';
 import { DOCUMENT_ORDER, DOCUMENT_STATUS, formatDate, formatPhone, LOCATION_CATEGORIES } from '/shared/labels.js';
 import { preparePhoto } from './photo.js';
+import { watchPhone } from '/shared/namelookup.js';
 
 const $ = (id) => document.getElementById(id);
 let ctx = null; // { api, toast, handleError, logout, account() }
@@ -77,7 +80,10 @@ export function route() {
 }
 
 const content = () => $('app-content');
-const back = (href = '#/', label = 'Rudi') => `<a class="sf-back" href="${href}">← ${label}</a>`;
+/** Akaunti ya staff tu (role STAFF) → true. Abiria/dereva mwenye ruhusa ya staff → false. */
+const staffOnlyAccount = () => !!ctx.account()?.staff;
+const home = () => (staffOnlyAccount() ? '#/' : '#/s');
+const back = (href = home(), label = 'Rudi') => `<a class="sf-back" href="${href}">← ${label}</a>`;
 function fail(err, boxId) {
   if (ctx.handleError(err, boxId)) return true;
   return false;
@@ -99,10 +105,12 @@ async function renderHome() {
     </div>
     <section class="sf-stats" id="sf-stats" aria-label="Kazi zako"><p class="muted">Inapakia…</p></section>
     <section class="card sf-recent"><h2>Madereva wa karibuni</h2><div id="sf-recent"><p class="muted">Inapakia…</p></div></section>
-    <div class="sf-foot">
-      <a class="btn btn-ghost btn-block" href="#/s/password">Badilisha password</a>
-      <button class="btn btn-ghost btn-block" type="button" data-sf="logout">Toka</button>
-    </div>`;
+    <div class="sf-foot">${
+      staffOnlyAccount()
+        ? `<a class="btn btn-ghost btn-block" href="#/s/password">Badilisha password</a>
+      <button class="btn btn-ghost btn-block" type="button" data-sf="logout">Toka</button>`
+        : `<a class="btn btn-primary btn-block" href="#/" id="sf-leave">Rudi kwenye ${acc.activeMode === 'DRIVER' ? 'Dereva' : 'Abiria'}</a>`
+    }</div>`;
   try {
     const [home, drivers] = await Promise.all([ctx.api.get('/api/staff/home'), ctx.api.get('/api/staff/drivers')]);
     if (!$('sf-stats')) return;
@@ -136,10 +144,11 @@ function renderRegister() {
     <p class="lead">Jaza taarifa za dereva na chombo chake. Hatua inayofuata ni kupiga picha za nyaraka.</p>
     <form class="card sf-form" id="sf-register" novalidate>
       <h2>Dereva</h2>
-      <label for="sf-name">Jina kamili</label>
-      <input id="sf-name" name="fullName" autocomplete="off" required>
       <label for="sf-phone">Namba ya simu ya dereva</label>
       <input id="sf-phone" name="phone" inputmode="tel" placeholder="07XX XXX XXX" required>
+      <p class="sf-who" id="sf-who" aria-live="polite" hidden></p>
+      <label for="sf-name">Jina kamili <span class="optional">(linajazwa lenyewe kutoka mtandaoni)</span></label>
+      <input id="sf-name" name="fullName" autocomplete="off" required>
       <h2>Chombo</h2>
       <fieldset class="choice">
         <legend>Aina ya chombo</legend>
@@ -159,6 +168,41 @@ function renderRegister() {
       <p class="alert alert-danger" id="sf-register-error" role="alert" hidden></p>
       <button class="btn btn-primary btn-block" type="submit">Sajili na endelea kwa picha</button>
     </form>`;
+  const name = $('sf-name');
+  name.addEventListener('input', () => delete name.dataset.auto);
+  watchPhone($('sf-phone'), {
+    api: ctx.api,
+    purpose: 'DRIVER_REG',
+    onState: (st) => {
+      const box = $('sf-who');
+      if (!box) return;
+      if (st.state === 'idle') return (box.hidden = true);
+      box.hidden = false;
+      if (st.state === 'loading') {
+        box.className = 'sf-who is-loading';
+        box.textContent = 'Inatafuta jina la mwenye namba…';
+        return;
+      }
+      const r = st.result;
+      if (st.state === 'error' || !r?.available) {
+        box.className = 'sf-who is-muted';
+        box.textContent = 'Jina halikupatikana kwa sasa — liandike mwenyewe.';
+        return;
+      }
+      if (!r.found) {
+        box.className = 'sf-who is-bad';
+        box.textContent = 'Mtandao haujathibitisha namba hii. Hakikisha ni namba sahihi ya dereva.';
+        return;
+      }
+      box.className = 'sf-who is-found';
+      box.innerHTML = `Jina kwenye ${esc(r.networkLabel ?? 'mtandao')}: <strong>${esc(r.name)}</strong>`;
+      // Jaza jina kama halijaandikwa (au lilijazwa na sisi); staff anaweza kulirekebisha.
+      if (!name.value.trim() || name.dataset.auto) {
+        name.value = r.displayName;
+        name.dataset.auto = '1';
+      }
+    },
+  });
 }
 
 // ------------------------------------------------------------------ dereva mmoja
@@ -459,7 +503,8 @@ async function onSubmit(event) {
       ctx.api.setToken(r.token);
       document.body.classList.remove('mode-forcepw');
       ctx.toast('Password imebadilishwa');
-      if (location.hash && location.hash !== '#/') history.replaceState(null, '', location.pathname);
+      const toStaffHome = !staffOnlyAccount() && location.hash.startsWith('#/s');
+      if (location.hash && location.hash !== '#/') history.replaceState(null, '', location.pathname + (toStaffHome ? '#/s' : ''));
       await ctx.reloadAccount(); // app.js inachora tena (staff au dereva)
     }
   } catch (err) {

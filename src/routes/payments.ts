@@ -2,6 +2,9 @@
 //   App:    GET  /api/payments/config                      → yamewashwa? mitandao
 //           POST /api/driver/subscription/pay              → { months, network, phone } — ombi la PIN linaenda kwenye simu
 //           GET  /api/payments/:id                         → hali ya muamala wako (app inauliza mpaka ukamilike)
+//           POST /api/driver/subscription/control-number   → { months } — control number ya kulipa kutoka benki / app yoyote
+//           GET  /api/driver/subscription/control-numbers  → zisizolipwa bado
+//           POST /api/name-lookup                          → { phone, purpose } jina la mwenye namba (dereva / staff / ofisi)
 //   Kampuni: POST /api/payments/callback/:provider         → uthibitisho (adapter inakagua saini)
 //   Ofisi:  GET  /api/admin/payments/overview | /queue | /api/admin/payments(.csv)
 //           PUT  /api/admin/payments/auto-payout            → { enabled, dailyLimit }
@@ -26,10 +29,14 @@ import {
   rejectPayout,
   saveAutoPayout,
   startSubscriptionPayment,
+  startSubscriptionControlNumber,
+  openControlNumbers,
   applyResult,
 } from '../services/payments/index.js';
 import { type CallbackResult, getProvider, MOBILE_NETWORKS } from '../services/payments/provider.js';
 import { simulator } from '../services/payments/simulator.js';
+import { lookupForUser } from '../services/name-lookup.js';
+import { assertPasswordChanged } from '../services/staff.js';
 import { notFound, ok } from '../utils/http.js';
 import { normalizeTzPhone } from '../utils/phone.js';
 
@@ -66,6 +73,24 @@ export async function paymentRoutes(app: FastifyInstance): Promise<void> {
     const input = paySchema.parse(request.body);
     return ok(await startSubscriptionPayment(uid(request), { ...input, network: input.network as (typeof MOBILE_NETWORKS)[number] }));
   });
+  app.post('/api/driver/subscription/control-number', { ...user, config: { rateLimit: { max: 10, timeWindow: '10 minutes' } } }, async (request) => {
+    const { months } = paySchema.pick({ months: true }).parse(request.body);
+    return ok(await startSubscriptionControlNumber(uid(request), { months }));
+  });
+  app.get('/api/driver/subscription/control-numbers', user, async (request) => ok(await openControlNumbers(uid(request))));
+
+  // Jina la mwenye namba (Abliner Name Lookup) — walioingia tu, kwa kikomo cha kila siku (services/name-lookup.ts).
+  app.post(
+    '/api/name-lookup',
+    { preHandler: requireRole('USER', 'STAFF', ...ADMIN_ROLES), config: { rateLimit: { max: 30, timeWindow: '10 minutes' } } },
+    async (request) => {
+      assertPasswordChanged(request.currentUser);
+      const { phone, purpose } = z
+        .object({ phone: phoneField, purpose: z.enum(['PAYOUT', 'STAFF', 'DRIVER_REG']).default('PAYOUT') })
+        .parse(request.body);
+      return ok(await lookupForUser(request.currentUser, phone, purpose));
+    },
+  );
   app.get('/api/payments/:id', user, async (request) => ok(await myPayment(uid(request), idParam.parse(request.params).id)));
 
   // Kampuni ya malipo → NAYA. Haina token ya mtumiaji; usalama ni saini inayokaguliwa na adapter.

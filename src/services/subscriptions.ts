@@ -28,7 +28,8 @@ const DEFAULTS: SubscriptionSettings = {
 };
 
 export const PAYMENT_METHODS = ['CASH', 'MPESA', 'AIRTEL', 'TIGO', 'HALOPESA', 'BANK'] as const;
-export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+/** CONTROL = control number (BillPay) — inaandikwa na mfumo tu, ofisi haichagui. */
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number] | 'CONTROL';
 
 export async function getSettings(client: Db = db): Promise<SubscriptionSettings> {
   const row = await one<{ value: Partial<SubscriptionSettings> }>(client, `SELECT value FROM naya.settings WHERE key = 'subscription'`);

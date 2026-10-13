@@ -33,7 +33,7 @@ const api = createApi('naya_app_token');
 const $ = (id) => document.getElementById(id);
 const views = ['view-loading', 'view-intro', 'view-auth', 'view-verify', 'view-role', 'view-offline', 'view-app'];
 const MAX_BYTES = 3 * 1024 * 1024;
-const VERSION = '0.19.0';
+const VERSION = '0.20.0';
 
 let account = null; // { user, activeMode, driverStatus, canDrive }
 let driver = null; // wasifu wa udereva (mode ya Dereva)
@@ -425,6 +425,24 @@ async function switchMode(mode, { goHome } = {}) {
   else route();
 }
 
+/**
+ * Kufungua NAYA Staff (dereva/abiria mwenye ruhusa). Dereva aliye online anaulizwa kwenda offline kwanza,
+ * ili maombi ya safari yasimfikie akiwa anasajili bodaboda bila kujua.
+ */
+async function openStaffMode() {
+  if (account.activeMode === 'DRIVER' && account.canDrive) {
+    const state = await api.get('/api/driver/state');
+    if (state.online) {
+      if (!confirm('Uko online kama dereva. Ukifungua NAYA Staff utawekwa offline ili usikose maombi ya safari bila kujua. Endelea?')) return;
+      await api.post('/api/driver/online', { online: false });
+      rides.stopGps();
+      rides.stopBackground();
+      toast('Uko offline — sasa uko NAYA Staff');
+    }
+  }
+  location.hash = '#/s';
+}
+
 // ---------- Taarifa za papo hapo ----------
 function startRealtime() {
   if (realtime) return;
@@ -502,6 +520,8 @@ function route() {
   rides.stopPolling();
   malipo.stop();
   stopNearby();
+  // Abiria/dereva aliyepewa ruhusa ya NAYA Staff na ofisi: kazi za staff ziko #/s (wengine hawazioni kabisa).
+  if (account.staffAccess && /^#\/s(\/|$)/.test(location.hash)) return staff.route();
   tab = location.hash.startsWith('#/akaunti') ? 'account' : location.hash.startsWith('#/maoni') ? 'feedback' : 'home';
   const picker = location.hash.match(/^#\/chagua\/(kwenda|kutoka)/)?.[1] ?? null;
   for (const a of document.querySelectorAll('[data-tab]')) {
@@ -958,6 +978,14 @@ function modeCardHtml() {
           ? 'Utafungua ombi la udereva kwa akaunti hii hii — hakuna akaunti mpya.'
           : 'Ni akaunti ile ile; unaweza kubadili wakati wowote.'
       }</p>
+      ${
+        account.staffAccess
+          ? `<div class="mode-staff-entry">
+        <button class="btn btn-gold btn-block" type="button" data-open-staff>Fungua NAYA Staff</button>
+        <p class="muted small">Sajili bodaboda na pendekeza maeneo. Ofisi ya NAYA imekupa ruhusa hii.</p>
+      </div>`
+          : ''
+      }
     </section>`;
 }
 
@@ -1059,7 +1087,7 @@ const SUB_STATE = {
   EXPIRED: ['bad', 'Imeisha'],
   NONE: ['muted', 'Haijaanza'],
 };
-const PAY_METHODS = { CASH: 'Taslimu', MPESA: 'M-Pesa', AIRTEL: 'Airtel Money', TIGO: 'Mixx by Yas (Tigo Pesa)', HALOPESA: 'HaloPesa', BANK: 'Benki' };
+const PAY_METHODS = { CASH: 'Taslimu', MPESA: 'M-Pesa', AIRTEL: 'Airtel Money', TIGO: 'Mixx by Yas (Tigo Pesa)', HALOPESA: 'HaloPesa', BANK: 'Benki', CONTROL: 'Control number' };
 
 async function loadSubscriptionSection() {
   try {
@@ -1414,6 +1442,18 @@ $('app-content').addEventListener('click', async (event) => {
   if (upload) {
     pendingUploadType = upload.dataset.upload;
     $('file-input').click();
+    return;
+  }
+  const openStaff = event.target.closest('[data-open-staff]');
+  if (openStaff) {
+    openStaff.disabled = true;
+    try {
+      await openStaffMode();
+    } catch (err) {
+      handleError(err, 'switch-error');
+    } finally {
+      openStaff.disabled = false;
+    }
     return;
   }
   const switchTo = event.target.closest('[data-switch]');

@@ -2,11 +2,16 @@
 // safari za ofa alizobeba na malipo ambayo NAYA imeshamtumia.
 import { escapeHtml as esc } from '/shared/api.js';
 import { formatDate, formatPhone, formatTsh } from '/shared/labels.js';
+import { watchPhone } from '/shared/namelookup.js';
 
 const $ = (id) => document.getElementById(id);
 let ctx = null; // { api, handleError, toast }
 let editing = null; // id ya namba inayobadilishwa, 'new' = mpya, null = fomu imefungwa
 let wallet = null;
+let lookup = null; // watchPhone ya fomu iliyo wazi
+let who = null; // { phone, result } — jina la namba kutoka mtandao (0.20.0)
+const MOBILE = ['MPESA', 'MIXX', 'AIRTEL', 'HALOPESA'];
+const lookupOn = () => !!wallet?.nameLookup && MOBILE.includes($('wl-network')?.value);
 
 export const NETWORKS = {
   MPESA: 'M-Pesa (Vodacom)',
@@ -52,13 +57,18 @@ function accountForm(a) {
   const options = Object.entries(NETWORKS)
     .map(([k, l]) => `<option value="${k}"${a?.network === k ? ' selected' : ''}>${esc(l)}</option>`)
     .join('');
+  const auto = !!wallet.nameLookup;
   return `<form class="wallet-form" id="wallet-form" data-id="${esc(a?.id ?? '')}" novalidate>
     <label for="wl-network">Mtandao</label>
     <select id="wl-network">${options}</select>
     <label for="wl-phone">Namba ya kupokea pesa</label>
     <input id="wl-phone" inputmode="tel" autocomplete="tel" placeholder="0712 345 678" value="${esc(a ? shownNumber(a) : '')}">
-    <label for="wl-name">Jina la mwenye namba <span class="muted">(kama lilivyosajiliwa)</span></label>
-    <input id="wl-name" autocomplete="name" value="${esc(a?.accountName ?? '')}">
+    ${auto ? '<p class="muted small wl-hint" id="wl-hint">Andika namba tu — jina la mwenye namba litatokea lenyewe kutoka mtandaoni.</p>' : ''}
+    <div class="wl-who" id="wl-who" aria-live="polite" hidden></div>
+    <div id="wl-name-wrap"${auto && (!a || MOBILE.includes(a.network)) ? ' hidden' : ''}>
+      <label for="wl-name">Jina la mwenye namba <span class="muted">(kama lilivyosajiliwa)</span></label>
+      <input id="wl-name" autocomplete="name" value="${esc(a?.accountName ?? '')}">
+    </div>
     ${wallet.accounts.length > (a ? 1 : 0) ? `<label class="check"><input type="checkbox" id="wl-primary"${a?.primary ? ' checked' : ''}> Namba kuu (NAYA itatuma hapa)</label>` : ''}
     <p class="alert alert-danger" id="wl-error" role="alert" hidden></p>
     <div class="wallet-form-actions">
@@ -68,9 +78,74 @@ function accountForm(a) {
   </form>`;
 }
 
+/** Hali ya jina la namba kwenye fomu (inaitwa na watchPhone). */
+function showWho(s) {
+  const box = $('wl-who');
+  if (!box) return;
+  const nameWrap = $('wl-name-wrap');
+  if (!lookupOn()) {
+    box.hidden = true;
+    nameWrap.hidden = false;
+    who = null;
+    return;
+  }
+  if (s.state === 'idle') {
+    who = null;
+    box.hidden = true;
+    nameWrap.hidden = true;
+    return;
+  }
+  box.hidden = false;
+  if (s.state === 'loading') {
+    who = null;
+    box.className = 'wl-who is-loading';
+    box.innerHTML = '<span class="wl-spin" aria-hidden="true"></span> Inatafuta jina la mwenye namba…';
+    return;
+  }
+  const r = s.state === 'done' ? s.result : null;
+  if (!r || !r.available) {
+    // Huduma haipatikani (au kikomo cha leo) → aandike jina mwenyewe
+    who = null;
+    box.className = 'wl-who is-muted';
+    box.textContent = s.state === 'error' ? s.message : 'Jina halikupatikana kwa sasa — liandike mwenyewe kama lilivyosajiliwa.';
+    nameWrap.hidden = false;
+    return;
+  }
+  if (!r.found) {
+    who = { phone: s.phone, result: r };
+    box.className = 'wl-who is-bad';
+    box.innerHTML = '<strong>Mtandao haujathibitisha namba hii.</strong> Hakikisha umeandika namba sahihi yenye akaunti ya pesa ya simu.';
+    nameWrap.hidden = true;
+    return;
+  }
+  who = { phone: s.phone, result: r };
+  if (r.network && $('wl-network').value !== r.network && MOBILE.includes(r.network)) $('wl-network').value = r.network;
+  box.className = 'wl-who is-found';
+  box.innerHTML = `<span class="wl-who-name"><small>Jina kwenye ${esc(r.networkLabel ?? 'mtandao')}</small><strong>${esc(r.name)}</strong></span>
+    <label class="check wl-mine"><input type="checkbox" id="wl-mine"> Ndiyo, jina hili ni sahihi</label>`;
+  nameWrap.hidden = true;
+}
+
+function attachLookup() {
+  lookup?.stop();
+  lookup = null;
+  who = null;
+  const input = $('wl-phone');
+  if (!input || !wallet?.nameLookup) return;
+  lookup = watchPhone(input, { api: ctx.api, purpose: 'PAYOUT', onState: showWho });
+  $('wl-network').addEventListener('change', () => {
+    if (lookupOn()) lookup.retry();
+    else showWho({ state: 'idle' });
+  });
+}
+
 function render() {
   const box = $('wallet-body');
   if (!box || !wallet) return;
+  if (!editing) {
+    lookup?.stop();
+    lookup = null;
+  }
   const w = wallet;
   const noNumber = w.accounts.length === 0;
   const accounts = w.accounts
@@ -78,8 +153,15 @@ function render() {
       editing === a.id
         ? accountForm(a)
         : `<li class="wallet-acc">
-            <span><strong>${esc(a.networkLabel)}</strong>${a.primary ? ' <span class="badge badge-ok">Kuu</span>' : ''}<br>
-              <span class="muted">${esc(shownNumber(a))} · ${esc(a.accountName)}</span></span>
+            <span><strong>${esc(a.networkLabel)}</strong>${a.primary ? ' <span class="badge badge-ok">Kuu</span>' : ''}${
+              a.verified && !a.nameChanged ? ' <span class="badge badge-ok wl-verified" title="Jina limethibitishwa na mtandao">✓ Imethibitishwa</span>' : ''
+            }<br>
+              <span class="muted">${esc(shownNumber(a))} · ${esc(a.accountName)}</span>${
+                a.nameChanged
+                  ? `<span class="wl-changed" role="alert"><strong>Jina la namba hii limebadilika kwenye mtandao${a.nameChanged.to ? `: ${esc(a.nameChanged.to)}` : ''}.</strong> NAYA imesimamisha malipo kwenda namba hii mpaka uithibitishe upya.
+                      <button class="btn btn-small btn-primary" type="button" data-wallet="edit" data-id="${esc(a.id)}">Thibitisha upya</button></span>`
+                  : ''
+              }</span>
             <span class="wallet-acc-actions">
               <button class="link-btn" type="button" data-wallet="edit" data-id="${esc(a.id)}">Badilisha</button>
               <button class="link-btn link-danger" type="button" data-wallet="delete" data-id="${esc(a.id)}">Futa</button>
@@ -130,7 +212,10 @@ function render() {
     ${editing === 'new' ? accountForm(null) : w.accounts.length < 3 && editing === null ? `<button class="btn btn-${noNumber ? 'primary' : 'ghost'} btn-block" type="button" data-wallet="add">${noNumber ? 'Weka namba ya kupokea pesa' : 'Ongeza namba nyingine'}</button>` : ''}
     ${trips ? `<details class="wallet-more"><summary>Safari za ofa ulizobeba</summary><ul class="wallet-list">${trips}</ul></details>` : ''}
     ${payouts ? `<details class="wallet-more"><summary>Malipo uliyotumiwa na NAYA</summary><ul class="wallet-list">${payouts}</ul></details>` : ''}`;
-  if (editing) $('wl-phone')?.focus();
+  if (editing) {
+    attachLookup();
+    $('wl-phone')?.focus();
+  }
 }
 
 async function onClick(event) {
@@ -158,17 +243,37 @@ async function onSubmit(event) {
   const form = event.target;
   const button = form.querySelector('button[type="submit"]');
   $('wl-error').hidden = true;
+  if (lookupOn() && !who && $('wl-who') && ($('wl-who').hidden || $('wl-who').classList.contains('is-loading'))) {
+    // Jina la mwenye namba bado halijatokea — lisubiri (mtumiaji athibitishe jina kabla ya kuhifadhi)
+    lookup?.retry();
+    $('wl-error').textContent = 'Subiri kidogo — jina la mwenye namba linatafutwa.';
+    $('wl-error').hidden = false;
+    return;
+  }
+  const verifiedHere = lookupOn() && who?.result?.found;
+  if (lookupOn() && who?.result && !who.result.found) {
+    $('wl-error').textContent = 'Mtandao haujathibitisha namba hii. Andika namba sahihi.';
+    $('wl-error').hidden = false;
+    return;
+  }
+  if (verifiedHere && !$('wl-mine')?.checked) {
+    $('wl-error').textContent = 'Thibitisha kwamba jina la mwenye namba ni sahihi (weka alama).';
+    $('wl-error').hidden = false;
+    return;
+  }
   button.disabled = true;
   try {
     const body = {
       network: $('wl-network').value,
       phone: $('wl-phone').value,
-      accountName: $('wl-name').value,
+      accountName: $('wl-name-wrap').hidden ? '' : $('wl-name').value,
       ...(form.dataset.id ? { id: form.dataset.id } : {}),
       ...($('wl-primary') ? { primary: $('wl-primary').checked } : {}),
     };
     wallet.accounts = await ctx.api.post('/api/driver/payout-accounts', body);
     editing = null;
+    lookup?.stop();
+    lookup = null;
     ctx.toast('Namba imehifadhiwa');
     render();
   } catch (err) {

@@ -3,6 +3,7 @@
 import { escapeHtml as esc } from '/shared/api.js';
 import { formatDate, formatPhone, LOCATION_CATEGORIES } from '/shared/labels.js';
 import { toast } from './ui.js';
+import { watchPhone } from '/shared/namelookup.js';
 
 const $ = (id) => document.getElementById(id);
 let ctx = null; // { api, onAuthError, onPendingChange(n) }
@@ -18,7 +19,50 @@ function fail(err, boxId) {
 export function setup(context) {
   ctx = context;
   $('staff-form').addEventListener('submit', createStaff);
+  // Namba kwanza → jina linajazwa (akaunti ya NAYA iliyopo, au jina la mtandao kupitia Abliner)
+  const name = $('staff-name');
+  name.addEventListener('input', () => delete name.dataset.auto);
+  watchPhone($('staff-phone'), {
+    api: ctx.api,
+    path: '/api/admin/staff/lookup',
+    body: (phone) => ({ phone }),
+    onState: (st) => {
+      const box = $('staff-who');
+      if (st.state === 'idle') return (box.hidden = true);
+      box.hidden = false;
+      if (st.state === 'loading') {
+        box.className = 'staff-who';
+        box.textContent = 'Inatafuta jina…';
+        return;
+      }
+      if (st.state === 'error') {
+        if (ctx.onAuthError(st.err)) return;
+        box.className = 'staff-who is-bad';
+        box.textContent = st.message;
+        return;
+      }
+      const r = st.result;
+      let fill = null;
+      if (r.exists) {
+        box.className = r.blocked ? 'staff-who is-bad' : 'staff-who is-found';
+        box.innerHTML = r.blocked ? esc(r.blocked) : `Ana akaunti ya NAYA: <strong>${esc(r.fullName)}</strong> · ${esc(accountKind(r.driverStatus))}`;
+        fill = r.fullName;
+      } else if (r.networkName) {
+        box.className = 'staff-who is-found';
+        box.innerHTML = `Jina kwenye ${esc(r.networkLabel ?? 'mtandao')}: <strong>${esc(r.networkName)}</strong> — namba mpya kwa NAYA`;
+        fill = r.networkName;
+      } else {
+        box.className = 'staff-who';
+        box.textContent = r.lookupAvailable ? 'Mtandao haujathibitisha jina la namba hii — liandike mwenyewe.' : 'Namba mpya kwa NAYA — andika jina lake.';
+      }
+      if (fill && (!name.value.trim() || name.dataset.auto)) {
+        name.value = fill;
+        name.dataset.auto = '1';
+      }
+    },
+  });
   $('staff-list').addEventListener('click', onListClick);
+  $('staff-link').addEventListener('click', onLinkClick);
   $('staff-secret').addEventListener('click', (e) => {
     if (e.target.closest('[data-secret-close]')) $('staff-secret').hidden = true;
   });
@@ -30,12 +74,30 @@ export function setup(context) {
 export async function loadPage() {
   $('staff-error').hidden = true;
   $('staff-secret').hidden = true;
+  $('staff-link').hidden = true;
   try {
     render(await ctx.api.get('/api/admin/staff'));
   } catch (err) {
     fail(err, 'staff-error');
   }
 }
+
+const initials = (name) =>
+  name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0].toUpperCase())
+    .join('');
+
+const DRIVER_KIND = {
+  APPROVED: 'Dereva (amethibitishwa)',
+  PENDING: 'Dereva (anasubiri uthibitisho)',
+  INCOMPLETE: 'Dereva (usajili haujakamilika)',
+  REJECTED: 'Dereva (ombi limekataliwa)',
+  SUSPENDED: 'Dereva (amesimamishwa)',
+};
+const accountKind = (driverStatus) => (driverStatus ? DRIVER_KIND[driverStatus] ?? 'Dereva' : 'Abiria');
 
 function render(rows) {
   $('staff-count').textContent = rows.length ? `${rows.length}` : '';
@@ -44,19 +106,14 @@ function render(rows) {
         .map(
           (s) => `<article class="staff-card${s.status === 'SUSPENDED' ? ' is-off' : ''}">
             <header>
-              <span class="staff-avatar" aria-hidden="true">${esc(
-                s.fullName
-                  .split(' ')
-                  .filter(Boolean)
-                  .slice(0, 2)
-                  .map((w) => w[0].toUpperCase())
-                  .join(''),
-              )}</span>
-              <span><strong>${esc(s.fullName)}</strong><small>${esc(formatPhone(s.phone))}</small></span>
+              <span class="staff-avatar" aria-hidden="true">${esc(initials(s.fullName))}</span>
+              <span><strong>${esc(s.fullName)}</strong><small>${esc(formatPhone(s.phone))}</small>${
+                s.kind === 'LINKED' ? `<span class="staff-also">Pia ni ${esc(accountKind(s.driverStatus).toLowerCase())}</span>` : ''
+              }</span>
               ${
                 s.status === 'SUSPENDED'
-                  ? '<span class="badge badge-bad">Amesimamishwa</span>'
-                  : s.mustChangePassword
+                  ? `<span class="badge badge-bad">${s.kind === 'LINKED' && !s.accountSuspended ? 'Ruhusa imesimamishwa' : 'Amesimamishwa'}</span>`
+                  : s.mustChangePassword && s.kind === 'STAFF'
                     ? '<span class="badge badge-warn">Bado hajaingia</span>'
                     : '<span class="badge badge-ok">Hai</span>'
               }
@@ -67,14 +124,25 @@ function render(rows) {
               <div><dt>Wanasubiri wewe</dt><dd>${s.driversPending}</dd></div>
               <div><dt>Maeneo (yanasubiri)</dt><dd>${s.locationsAdded} <small>(${s.locationsPending})</small></dd></div>
             </dl>
-            <p class="muted small">Ameongezwa ${esc(formatDate(s.createdAt))}${s.lastLoginAt ? ` · aliingia mara ya mwisho ${esc(formatDate(s.lastLoginAt, true))}` : ''}</p>
+            ${
+              s.kind === 'LINKED'
+                ? `<p class="muted small">Anatumia akaunti yake ya NAYA na password yake mwenyewe. ${
+                    s.accountSuspended ? '<strong>Akaunti yake yote imesimamishwa (Watumiaji/Madereva).</strong>' : 'Kusimamisha kunaondoa ruhusa ya staff tu.'
+                  }</p>`
+                : ''
+            }
+            <p class="muted small">Staff tangu ${esc(formatDate(s.staffSince ?? s.createdAt))}${s.lastLoginAt ? ` · aliingia mara ya mwisho ${esc(formatDate(s.lastLoginAt, true))}` : ''}</p>
             <div class="staff-actions">
               ${s.driversPending ? `<a class="btn btn-primary btn-small" href="#/madereva?hali=PENDING">Kagua madereva</a>` : ''}
-              <button class="btn btn-ghost btn-small" type="button" data-staff="reset" data-id="${esc(s.id)}">Password mpya</button>
+              ${s.kind === 'STAFF' ? `<button class="btn btn-ghost btn-small" type="button" data-staff="reset" data-id="${esc(s.id)}">Password mpya</button>` : ''}
               ${
                 s.status === 'SUSPENDED'
-                  ? `<button class="btn btn-ghost btn-small" type="button" data-staff="activate" data-id="${esc(s.id)}">Mrudishe</button>`
-                  : `<button class="btn btn-ghost btn-small btn-danger-text" type="button" data-staff="suspend" data-id="${esc(s.id)}">Simamisha</button>`
+                  ? s.accountSuspended && s.kind === 'LINKED'
+                    ? ''
+                    : `<button class="btn btn-ghost btn-small" type="button" data-staff="activate" data-id="${esc(s.id)}">${s.kind === 'LINKED' ? 'Rudisha ruhusa' : 'Mrudishe'}</button>`
+                  : `<button class="btn btn-ghost btn-small btn-danger-text" type="button" data-staff="suspend" data-kind="${esc(s.kind)}" data-id="${esc(s.id)}">${
+                      s.kind === 'LINKED' ? 'Simamisha ruhusa' : 'Simamisha'
+                    }</button>`
               }
             </div>
           </article>`,
@@ -96,15 +164,71 @@ function showSecret(r, title) {
   box.scrollIntoView({ block: 'center', behavior: 'smooth' });
 }
 
+let linkCandidate = null; // { fullName, phone, found }
+
+function hideLink() {
+  linkCandidate = null;
+  $('staff-link').hidden = true;
+  $('staff-link').innerHTML = '';
+}
+
+/** Namba tayari ina akaunti (abiria/dereva): uliza kabla ya kumpa ruhusa ya staff kwenye akaunti hiyo hiyo. */
+function showLinkQuestion(input, found) {
+  linkCandidate = { ...input, found };
+  const box = $('staff-link');
+  box.innerHTML = `<h3>Namba hii tayari ina akaunti ya NAYA</h3>
+    <div class="staff-link-who">
+      <span class="staff-avatar" aria-hidden="true">${esc(initials(found.fullName))}</span>
+      <span><strong>${esc(found.fullName)}</strong><small>${esc(formatPhone(input.phone))} · ${esc(accountKind(found.driverStatus))}</small></span>
+    </div>
+    <p><strong>Mpe ruhusa ya NAYA Staff kwenye akaunti hii?</strong></p>
+    <ul class="small">
+      <li>Hakuna akaunti mpya wala password mpya — ataingia kwa password yake ile ile.</li>
+      <li>Kwenye app ataona chaguo la <strong>NAYA Staff</strong> pembeni ya Abiria / Dereva.</li>
+      ${found.driverStatus ? '<li>Udereva wake, safari, salio na malipo yake vinaendelea kama kawaida.</li>' : ''}
+      <li>Ukimsimamisha baadaye, ruhusa ya staff tu ndiyo inaondoka.</li>
+    </ul>
+    ${found.fullName.trim().toLowerCase() !== input.fullName.trim().toLowerCase() ? `<p class="small muted">Jina uliloandika (“${esc(input.fullName)}”) ni tofauti. Jina la akaunti (“${esc(found.fullName)}”) ndilo litatumika.</p>` : ''}
+    <p class="alert alert-danger" id="staff-link-error" role="alert" hidden></p>
+    <div class="actions">
+      <button class="btn btn-primary" type="button" data-link="confirm">Ndiyo, mpe ruhusa ya staff</button>
+      <button class="btn btn-ghost" type="button" data-link="cancel">Ghairi</button>
+    </div>`;
+  box.hidden = false;
+  box.scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+
+function showLinked(r) {
+  const box = $('staff-secret');
+  box.innerHTML = `<div>
+      <h3>${esc(r.fullName)} sasa ni NAYA Staff</h3>
+      <p>Mwambie afungue <strong>app yake ya NAYA</strong> kama kawaida → <strong>Akaunti → Badili mode → NAYA Staff</strong>. Ataingia kwa password yake ile ile.</p>
+    </div>
+    <button class="btn btn-ghost btn-small" type="button" data-secret-close>Sawa</button>`;
+  box.hidden = false;
+  box.scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+
 async function createStaff(event) {
   event.preventDefault();
   const form = event.currentTarget;
   const button = form.querySelector('button[type="submit"]');
   $('staff-form-error').hidden = true;
+  $('staff-secret').hidden = true;
+  hideLink();
   button.disabled = true;
+  const input = { fullName: $('staff-name').value, phone: $('staff-phone').value };
   try {
-    const r = await ctx.api.post('/api/admin/staff', { fullName: $('staff-name').value, phone: $('staff-phone').value });
+    const found = await ctx.api.post('/api/admin/staff/lookup', { phone: input.phone });
+    if (found.exists) {
+      if (found.blocked) throw new Error(found.blocked);
+      if (!input.fullName.trim()) throw new Error('Weka jina kamili');
+      showLinkQuestion(input, found);
+      return;
+    }
+    const r = await ctx.api.post('/api/admin/staff', input);
     form.reset();
+    $('staff-who').hidden = true;
     await loadPage();
     showSecret(r, 'NAYA Staff ameongezwa');
   } catch (err) {
@@ -114,12 +238,38 @@ async function createStaff(event) {
   }
 }
 
+async function onLinkClick(event) {
+  const b = event.target.closest('[data-link]');
+  if (!b || !linkCandidate) return;
+  if (b.dataset.link === 'cancel') return hideLink();
+  b.disabled = true;
+  try {
+    const r = await ctx.api.post('/api/admin/staff', { fullName: linkCandidate.fullName, phone: linkCandidate.phone, linkExisting: true });
+    $('staff-form').reset();
+    $('staff-who').hidden = true;
+    await loadPage();
+    toast('Ruhusa ya NAYA Staff imeongezwa');
+    showLinked(r);
+  } catch (err) {
+    b.disabled = false;
+    fail(err, 'staff-link-error');
+  }
+}
+
 async function onListClick(event) {
   const b = event.target.closest('[data-staff]');
   if (!b) return;
   const { id } = b.dataset;
   const action = b.dataset.staff;
-  if (action === 'suspend' && !confirm('Simamisha staff huyu? Atatolewa kwenye app papo hapo.')) return;
+  if (
+    action === 'suspend' &&
+    !confirm(
+      b.dataset.kind === 'LINKED'
+        ? 'Ondoa ruhusa ya NAYA Staff kwa mtu huyu? Akaunti yake (abiria/dereva) inaendelea kama kawaida.'
+        : 'Simamisha staff huyu? Atatolewa kwenye app papo hapo.',
+    )
+  )
+    return;
   if (action === 'reset' && !confirm('Mpe password mpya ya muda? Ya zamani itaacha kufanya kazi.')) return;
   b.disabled = true;
   try {
@@ -130,7 +280,7 @@ async function onListClick(event) {
       return;
     }
     render(await ctx.api.post(`/api/admin/staff/${id}/${action}`, {}));
-    toast(action === 'suspend' ? 'Staff amesimamishwa' : 'Staff amerudishwa');
+    toast(action === 'suspend' ? (b.dataset.kind === 'LINKED' ? 'Ruhusa ya staff imesimamishwa' : 'Staff amesimamishwa') : 'Staff amerudishwa');
   } catch (err) {
     b.disabled = false;
     fail(err, 'staff-error');

@@ -31,7 +31,8 @@ import {
   updatePromotion,
   voidPayout,
 } from '../services/promotions.js';
-import { ok } from '../utils/http.js';
+import { lookupForUser } from '../services/name-lookup.js';
+import { badRequest, conflict, ok } from '../utils/http.js';
 import { normalizeTzPhone } from '../utils/phone.js';
 import { getAutoPayout, paymentsConfig, releaseHeldForAccount } from '../services/payments/index.js';
 
@@ -86,7 +87,11 @@ const accountSchema = z
     id: z.uuid().optional(),
     network: z.enum(NETWORKS, { error: 'Chagua mtandao' }),
     phone: z.string({ error: 'Weka namba' }).trim().min(4, 'Weka namba').max(30),
-    accountName: z.string({ error: 'Weka jina la mwenye namba' }).trim().min(3, 'Weka jina la mwenye namba (kama lilivyosajiliwa)').max(80),
+    // Si lazima kwa pesa ya simu jina likithibitishwa na mtandao (0.20.0) — vinginevyo dereva analiandika.
+    accountName: z.preprocess(
+      (v) => (typeof v === 'string' && v.trim() === '' ? undefined : v),
+      z.string().trim().min(3, 'Weka jina la mwenye namba (kama lilivyosajiliwa)').max(80).optional(),
+    ),
     primary: z.boolean().optional(),
   })
   .transform((v, ctx) => {
@@ -126,10 +131,24 @@ export async function ofaRoutes(app: FastifyInstance): Promise<void> {
     const config = paymentsConfig();
     const settings = await getAutoPayout();
     // auto = malipo ya papo hapo yamewashwa (kampuni ya malipo inaruhusu kutuma + ofisi imewasha)
-    return ok({ ...(await driverPromoWallet(uid(request))), auto: { enabled: config.canDisburse && settings.enabled, dailyLimit: settings.dailyLimit } });
+    return ok({ ...(await driverPromoWallet(uid(request))), auto: { enabled: config.canDisburse && settings.enabled, dailyLimit: settings.dailyLimit }, nameLookup: config.nameLookup });
   });
   app.post('/api/driver/payout-accounts', { ...user, config: { rateLimit: { max: 20, timeWindow: '10 minutes' } } }, async (request) => {
-    const saved = await savePayoutAccount(uid(request), accountSchema.parse(request.body));
+    const input = accountSchema.parse(request.body);
+    // Pesa ya simu: jina linathibitishwa na mtandao (Abliner Name Lookup). Huduma isipopatikana → jina la dereva mwenyewe.
+    let verified: { name: string; network: string | null } | null = null;
+    if (['MPESA', 'MIXX', 'AIRTEL', 'HALOPESA'].includes(input.network)) {
+      const r = await lookupForUser(request.currentUser, input.phone, 'PAYOUT');
+      if (r.available && !r.found) throw conflict('Mtandao haujathibitisha namba hii. Hakikisha namba ni sahihi na ina akaunti ya pesa ya simu.');
+      if (r.available && r.found && r.name) verified = { name: r.name, network: r.network };
+    }
+    if (!verified && !input.accountName) throw badRequest('Weka jina la mwenye namba (kama lilivyosajiliwa)');
+    const saved = await savePayoutAccount(uid(request), {
+      ...input,
+      network: (verified?.network ?? input.network) as typeof input.network,
+      accountName: verified?.name ?? input.accountName!,
+      verifiedName: verified?.name ?? null,
+    });
     // Safari zilizosubiri malipo kwa kukosa namba: zitumwe sasa (malipo ya simu yakiwa yamewashwa)
     await releaseHeldForAccount(uid(request)).catch(() => {});
     return ok(saved);

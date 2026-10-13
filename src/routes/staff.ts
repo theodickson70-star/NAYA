@@ -4,7 +4,7 @@
 //                 PUT  /api/staff/drivers/:id/vehicle · PUT /api/staff/drivers/:id/documents/:type (picha/PDF)
 //                 GET  /api/staff/drivers/:id/documents/:type/file · POST /api/staff/drivers/:id/submit
 //                 GET  /api/staff/locations · POST /api/staff/locations
-//   Ofisi:        GET/POST /api/admin/staff · POST /api/admin/staff/:id/suspend|activate|reset-password
+//   Ofisi:        GET/POST /api/admin/staff · POST /api/admin/staff/lookup · POST /api/admin/staff/:id/suspend|activate|reset-password
 //                 GET /api/admin/locations/pending · POST /api/admin/locations/:id/review
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
@@ -14,8 +14,10 @@ import { ALLOWED_MIME_TYPES, MAX_DOCUMENT_BYTES } from '../services/files.js';
 import {
   assertMyDriver,
   assertPasswordChanged,
+  assertStaffAccess,
   createStaff,
   listStaff,
+  lookupStaffPhone,
   myDriver,
   myDrivers,
   myLocations,
@@ -28,6 +30,7 @@ import {
   staffHome,
   submitDriver,
 } from '../services/staff.js';
+import { lookupForUser } from '../services/name-lookup.js';
 import { badRequest, ok } from '../utils/http.js';
 import { phoneSchema } from '../validators/auth.js';
 import { documentTypeParam, vehicleSchema } from '../validators/drivers.js';
@@ -42,8 +45,12 @@ export async function staffRoutes(app: FastifyInstance): Promise<void> {
 
   const staffOnly = {
     preHandler: [
-      requireRole('STAFF'),
-      async (request: FastifyRequest) => assertPasswordChanged(request.currentUser as { must_change_password?: boolean }),
+      // Akaunti ya STAFF, au akaunti ya abiria/dereva iliyopewa ruhusa ya staff na ofisi (0.19.1)
+      requireRole('STAFF', 'USER'),
+      async (request: FastifyRequest) => {
+        assertStaffAccess(request.currentUser);
+        assertPasswordChanged(request.currentUser as { must_change_password?: boolean });
+      },
     ],
   };
   const sid = (request: { currentUser: { id: string } }) => request.currentUser.id;
@@ -96,8 +103,17 @@ export async function staffRoutes(app: FastifyInstance): Promise<void> {
   const aid = sid;
   app.get('/api/admin/staff', adminOnly, async () => ok(await listStaff()));
   app.post('/api/admin/staff', adminOnly, async (request, reply) => {
-    const input = z.object({ fullName, phone: phoneSchema }).parse(request.body);
+    const input = z.object({ fullName, phone: phoneSchema, linkExisting: z.boolean().optional() }).parse(request.body);
     return reply.status(201).send(ok(await createStaff(aid(request), input)));
+  });
+  // Namba tayari ina akaunti? (abiria/dereva → "Mpe ruhusa ya NAYA Staff?")
+  app.post('/api/admin/staff/lookup', adminOnly, async (request) => {
+    const { phone } = z.object({ phone: phoneSchema }).parse(request.body);
+    const found = await lookupStaffPhone(phone);
+    if (found.exists) return ok(found);
+    // Namba mpya kwa NAYA: jina kutoka mtandao (Abliner Name Lookup), ofisi inaweza kulirekebisha.
+    const net = await lookupForUser(request.currentUser, phone, 'STAFF');
+    return ok({ ...found, lookupAvailable: net.available, networkName: net.found ? net.displayName : null, networkLabel: net.networkLabel });
   });
   app.post('/api/admin/staff/:id/suspend', adminOnly, async (request) => ok(await setStaffActive(aid(request), idParam.parse(request.params).id, false)));
   app.post('/api/admin/staff/:id/activate', adminOnly, async (request) => ok(await setStaffActive(aid(request), idParam.parse(request.params).id, true)));

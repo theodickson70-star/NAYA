@@ -7,7 +7,7 @@ import { randomInt } from 'node:crypto';
 import { type Db, db, many, one, transaction } from '../db/pool.js';
 import { AppError, conflict, isUniqueViolation, notFound } from '../utils/http.js';
 import { writeAudit } from './audit.js';
-import { bumpTokenVersion } from './users.js';
+import { bumpTokenVersion, hasStaffAccess, type UserRole } from './users.js';
 import { hashPassword } from './auth.js';
 import { getDriverProfile, REQUIRED_DOCUMENTS } from './drivers.js';
 import { removeAllFcmTokens } from './fcm.js';
@@ -21,22 +21,88 @@ export const tempPassword = () => Array.from({ length: 10 }, () => ALPHABET[rand
 
 // ------------------------------------------------------------------ ofisi: akaunti za staff
 
+// Aina mbili za staff:
+//   STAFF  — akaunti mpya ya staff tu (role = 'STAFF', password ya muda kutoka ofisi);
+//   LINKED — akaunti iliyopo ya USER (mf. dereva) iliyopewa ruhusa ya staff (staff_access). Anatumia password yake ile ile,
+//            na kazi yake ya udereva / abiria haiguswi. Kusimamisha kunaondoa ruhusa ya staff TU.
+const IS_STAFF_SQL = `(u.role = 'STAFF' OR (u.role = 'USER' AND u.staff_access IS NOT NULL))`;
+
 export async function listStaff() {
   return many(
     db,
-    `SELECT u.id, u.full_name AS "fullName", u.phone, u.status, u.created_at AS "createdAt", u.last_login_at AS "lastLoginAt",
+    `SELECT u.id, u.full_name AS "fullName", u.phone, u.created_at AS "createdAt", u.last_login_at AS "lastLoginAt",
+            CASE WHEN u.role = 'STAFF' THEN 'STAFF' ELSE 'LINKED' END AS kind,
+            CASE WHEN u.role = 'STAFF' THEN u.status::text
+                 WHEN u.staff_access = 'SUSPENDED' THEN 'SUSPENDED'
+                 ELSE u.status::text END AS status,
+            (u.status <> 'ACTIVE') AS "accountSuspended",
+            CASE WHEN u.role = 'STAFF' THEN u.created_at ELSE coalesce(u.staff_since, u.created_at) END AS "staffSince",
             u.must_change_password AS "mustChangePassword",
-            (SELECT count(*)::int FROM naya.drivers d WHERE d.registered_by = u.id) AS "driversRegistered",
-            (SELECT count(*)::int FROM naya.drivers d WHERE d.registered_by = u.id AND d.status = 'APPROVED') AS "driversApproved",
-            (SELECT count(*)::int FROM naya.drivers d WHERE d.registered_by = u.id AND d.status = 'PENDING') AS "driversPending",
+            d.status AS "driverStatus",
+            (SELECT count(*)::int FROM naya.drivers x WHERE x.registered_by = u.id) AS "driversRegistered",
+            (SELECT count(*)::int FROM naya.drivers x WHERE x.registered_by = u.id AND x.status = 'APPROVED') AS "driversApproved",
+            (SELECT count(*)::int FROM naya.drivers x WHERE x.registered_by = u.id AND x.status = 'PENDING') AS "driversPending",
             (SELECT count(*)::int FROM naya.locations l WHERE l.created_by = u.id) AS "locationsAdded",
             (SELECT count(*)::int FROM naya.locations l WHERE l.created_by = u.id AND l.review_status = 'PENDING') AS "locationsPending"
-       FROM naya.users u WHERE u.role = 'STAFF'
-      ORDER BY u.status, u.full_name`,
+       FROM naya.users u LEFT JOIN naya.drivers d ON d.user_id = u.id
+      WHERE ${IS_STAFF_SQL}
+      ORDER BY 7, u.full_name`,
   );
 }
 
-export async function createStaff(adminId: string, input: { fullName: string; phone: string }) {
+/** Ofisi inaandika namba: je, tayari ina akaunti? (ili kuonyesha "Mpe ruhusa ya staff?" badala ya kosa) */
+export async function lookupStaffPhone(phone: string) {
+  const u = await one<{ id: string; full_name: string; role: string; status: string; staff_access: string | null; active_mode: string | null; driver_status: string | null }>(
+    db,
+    `SELECT u.id, u.full_name, u.role, u.status, u.staff_access, u.active_mode, d.status AS driver_status
+       FROM naya.users u LEFT JOIN naya.drivers d ON d.user_id = u.id WHERE u.phone = $1`,
+    [phone],
+  );
+  if (!u) return { exists: false as const };
+  const alreadyStaff = u.role === 'STAFF' || u.staff_access !== null;
+  const blocked =
+    u.role === 'ADMIN' || u.role === 'SUPER_ADMIN'
+      ? 'Namba hii ni ya akaunti ya ofisi. Haiwezi kuwa NAYA Staff.'
+      : alreadyStaff
+        ? 'Mtu huyu tayari ni NAYA Staff — yupo kwenye orodha hapa chini.'
+        : u.status !== 'ACTIVE'
+          ? 'Akaunti hii imesimamishwa. Irudishe kwanza kabla ya kumpa ruhusa ya staff.'
+          : null;
+  return {
+    exists: true as const,
+    id: u.id,
+    fullName: u.full_name,
+    /** DRIVER = ana ombi/akaunti ya udereva; PASSENGER = abiria tu */
+    kind: u.driver_status ? 'DRIVER' : 'PASSENGER',
+    driverStatus: u.driver_status,
+    canLink: !blocked,
+    blocked,
+  };
+}
+
+/**
+ * Ongeza NAYA Staff.
+ *  - Namba mpya → akaunti mpya ya staff + password ya muda (inaonyeshwa mara moja).
+ *  - Namba iliyopo (abiria/dereva) + linkExisting → akaunti yake inapewa ruhusa ya staff; hakuna password mpya.
+ */
+export async function createStaff(adminId: string, input: { fullName: string; phone: string; linkExisting?: boolean }) {
+  const found = await lookupStaffPhone(input.phone);
+  if (found.exists) {
+    if (found.blocked) throw conflict(found.blocked);
+    if (!input.linkExisting) {
+      throw conflict(`Namba hii tayari ina akaunti ya NAYA (${found.fullName}). Thibitisha kumpa ruhusa ya NAYA Staff kwenye akaunti hiyo.`);
+    }
+    await transaction(async (client) => {
+      const updated = await client.query(
+        `UPDATE naya.users SET staff_access = 'ACTIVE', staff_since = now(), staff_added_by = $2, updated_at = now()
+          WHERE id = $1 AND role = 'USER' AND status = 'ACTIVE' AND staff_access IS NULL`,
+        [found.id, adminId],
+      );
+      if (!updated.rowCount) throw conflict('Akaunti hii imebadilika sasa hivi. Jaribu tena.');
+      await writeAudit(client, { actorId: adminId, action: 'staff.linked', targetType: 'user', targetId: found.id, details: { kind: found.kind } });
+    });
+    return { id: found.id, fullName: found.fullName, phone: input.phone, linked: true as const, kind: found.kind };
+  }
   const password = tempPassword();
   try {
     const user = await transaction(async (client) => {
@@ -49,40 +115,59 @@ export async function createStaff(adminId: string, input: { fullName: string; ph
       await writeAudit(client, { actorId: adminId, action: 'staff.created', targetType: 'user', targetId: row!.id, details: { fullName: input.fullName } });
       return row!;
     });
-    return { id: user.id, fullName: input.fullName, phone: input.phone, tempPassword: password };
+    return { id: user.id, fullName: input.fullName, phone: input.phone, linked: false as const, tempPassword: password };
   } catch (error) {
-    if (isUniqueViolation(error)) throw conflict('Namba hii ya simu tayari ina akaunti ya NAYA. Tumia namba nyingine kwa staff.');
+    if (isUniqueViolation(error)) throw conflict('Namba hii imesajiliwa sasa hivi na mtu mwingine. Jaribu tena.');
     throw error;
   }
 }
 
 async function staffRow(client: Db, id: string, lock = false) {
-  const row = await one<{ id: string; full_name: string; phone: string; status: string }>(
+  const row = await one<{ id: string; full_name: string; phone: string; status: string; role: string }>(
     client,
-    `SELECT id, full_name, phone, status FROM naya.users WHERE id = $1 AND role = 'STAFF'${lock ? ' FOR UPDATE' : ''}`,
+    `SELECT u.id, u.full_name, u.phone, u.status, u.role FROM naya.users u WHERE u.id = $1 AND ${IS_STAFF_SQL}${lock ? ' FOR UPDATE' : ''}`,
     [id],
   );
   if (!row) throw notFound('Staff hakupatikana');
-  return row;
+  return { ...row, linked: row.role === 'USER' };
 }
 
-/** Simamisha / rudisha staff. Akisimamishwa anatolewa kwenye app papo hapo (vikao vyote vinakufa). */
+/**
+ * Simamisha / rudisha staff.
+ *  - Akaunti ya staff tu: inasimamishwa yote, anatolewa kwenye app papo hapo.
+ *  - Akaunti iliyopewa ruhusa (mf. dereva): ruhusa ya staff TU inaondoka; udereva, safari na malipo yake vinaendelea.
+ */
 export async function setStaffActive(adminId: string, id: string, active: boolean) {
+  let linked = false;
   await transaction(async (client) => {
-    await staffRow(client, id, true);
-    await client.query(`UPDATE naya.users SET status = $2, updated_at = now() WHERE id = $1`, [id, active ? 'ACTIVE' : 'SUSPENDED']);
-    if (!active) await bumpTokenVersion(client, id);
-    await writeAudit(client, { actorId: adminId, action: active ? 'staff.activated' : 'staff.suspended', targetType: 'user', targetId: id });
+    const s = await staffRow(client, id, true);
+    linked = s.linked;
+    if (linked) {
+      await client.query(`UPDATE naya.users SET staff_access = $2, updated_at = now() WHERE id = $1`, [id, active ? 'ACTIVE' : 'SUSPENDED']);
+    } else {
+      await client.query(`UPDATE naya.users SET status = $2, updated_at = now() WHERE id = $1`, [id, active ? 'ACTIVE' : 'SUSPENDED']);
+      if (!active) await bumpTokenVersion(client, id);
+    }
+    await writeAudit(client, {
+      actorId: adminId,
+      action: active ? 'staff.activated' : 'staff.suspended',
+      targetType: 'user',
+      targetId: id,
+      details: linked ? { scope: 'staff_access' } : undefined,
+    });
   });
-  if (!active) await removeAllFcmTokens(id).catch(() => {});
+  if (!active && !linked) await removeAllFcmTokens(id).catch(() => {});
   return listStaff();
 }
 
-/** Password mpya ya muda (staff ameisahau) — vikao vya zamani vinakufa. */
+/** Password mpya ya muda (staff ameisahau) — vikao vya zamani vinakufa. Kwa akaunti za staff tu. */
 export async function resetStaffPassword(adminId: string, id: string) {
   const password = tempPassword();
   const row = await transaction(async (client) => {
     const s = await staffRow(client, id, true);
+    if (s.linked) {
+      throw conflict('Huyu anatumia password ya akaunti yake mwenyewe (abiria/dereva). Aibadilishe mwenyewe kwenye app (Akaunti → Mipangilio → Badilisha password), au atumie "Umesahau password?" kwenye ukurasa wa kuingia.');
+    }
     await client.query(
       `UPDATE naya.users SET password_hash = $2, must_change_password = true, token_version = token_version + 1, updated_at = now() WHERE id = $1`,
       [id, await hashPassword(password)],
@@ -273,5 +358,12 @@ export async function reviewLocation(adminId: string, id: string, approve: boole
 /** Ulinzi wa ziada: staff mwenye password ya muda hawezi kufanya kazi mpaka aibadilishe. */
 export function assertPasswordChanged(user: { must_change_password?: boolean }) {
   if (user.must_change_password) throw new AppError(403, 'Badilisha password yako ya muda kwanza.');
+}
+
+/** Kazi za staff: akaunti ya STAFF, au akaunti ya USER yenye ruhusa hai ya staff. */
+export function assertStaffAccess(user: { role: UserRole; staff_access?: string | null }) {
+  if (hasStaffAccess(user)) return;
+  if (user.role === 'USER' && user.staff_access === 'SUSPENDED') throw new AppError(403, 'Ruhusa yako ya NAYA Staff imesimamishwa na ofisi.');
+  throw new AppError(403, 'Huna ruhusa ya kufanya hili.');
 }
 
