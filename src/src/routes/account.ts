@@ -5,6 +5,7 @@ import { issueToken, requireRole } from '../middleware/auth.js';
 import { changePassword } from '../services/auth.js';
 import { passwordSchema } from '../validators/auth.js';
 import { getAccount, setMode } from '../services/account.js';
+import { toPublicUser } from '../services/users.js';
 import { acceptCurrentTerms } from '../services/terms.js';
 import { ok } from '../utils/http.js';
 
@@ -15,7 +16,14 @@ const modeSchema = z.object({
 export async function accountRoutes(app: FastifyInstance): Promise<void> {
   const userOnly = { preHandler: requireRole('USER') };
 
-  app.get('/api/account', userOnly, async (request) => ok(await getAccount(request.currentUser)));
+  // NAYA Staff wanatumia app ile ile: wanapata akaunti fupi (cheo + password ya muda) na kazi zao (/api/staff/*).
+  app.get('/api/account', { preHandler: requireRole('USER', 'STAFF') }, async (request) =>
+    ok(
+      request.currentUser.role === 'STAFF'
+        ? { staff: true, user: toPublicUser(request.currentUser), mustChangePassword: !!request.currentUser.must_change_password }
+        : await getAccount(request.currentUser),
+    ),
+  );
 
   app.put('/api/account/mode', userOnly, async (request) => {
     const { mode } = modeSchema.parse(request.body);
@@ -37,7 +45,7 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
   });
 
   /** Kubadilisha password: vifaa vingine vyote vinatolewa; kifaa hiki kinapata token mpya. */
-  app.post('/api/account/password', { ...userOnly, config: { rateLimit: { max: 10, timeWindow: '15 minutes' } } }, async (request) => {
+  app.post('/api/account/password', { preHandler: requireRole('USER', 'STAFF'), config: { rateLimit: { max: 10, timeWindow: '15 minutes' } } }, async (request) => {
     const input = z
       .object({ currentPassword: z.string({ error: 'Weka password ya sasa' }).min(1, 'Weka password ya sasa').max(128), newPassword: passwordSchema })
       .parse(request.body);

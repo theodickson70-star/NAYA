@@ -9,7 +9,7 @@ import { env } from '../config/env.js';
 import { smsEnabled } from './sms.js';
 import { unreadSupportCount } from './support.js';
 import { termsState } from './terms.js';
-import { findUserById, toPublicUser, type AppMode, type UserRow } from './users.js';
+import { findUserById, hasStaffAccess, toPublicUser, type AppMode, type UserRow } from './users.js';
 
 export async function getAccount(user: UserRow) {
   const driverStatus = await driverStatusOf(db, user.id);
@@ -34,6 +34,8 @@ export async function getAccount(user: UserRow) {
     terms: await termsState(db, user.id),
     /** Mtu wa dharura (Akaunti → Usalama) — kitufe cha kumpigia kinaonekana kwenye "Dharura" safarini. */
     emergency: user.emergency_phone ? { name: user.emergency_name ?? '', phone: user.emergency_phone } : null,
+    /** Ofisi imempa ruhusa ya NAYA Staff (0.19.1) → chaguo la "NAYA Staff" linaonekana kwake tu. */
+    staffAccess: hasStaffAccess(user),
   };
 }
 

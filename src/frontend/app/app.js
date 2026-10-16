@@ -21,8 +21,12 @@ import * as support from './support.js';
 import * as feedback from './feedback.js';
 import * as wallet from './wallet.js';
 import * as akaunti from './akaunti.js';
+import * as malipo from './malipo.js';
 import * as appUpdate from './update.js';
 import * as terms from './terms.js';
+import * as staff from './staff.js';
+import * as mywallet from './mywallet.js';
+import * as farepay from './farepay.js';
 import { initI18n, langSwitchHtml, onLangChange } from '/shared/i18n.js';
 import { finishSplash, previewSound, setSoundEnabled, soundEnabled, splashActive, splashReady } from './splash.js';
 
@@ -31,7 +35,7 @@ const api = createApi('naya_app_token');
 const $ = (id) => document.getElementById(id);
 const views = ['view-loading', 'view-intro', 'view-auth', 'view-verify', 'view-role', 'view-offline', 'view-app'];
 const MAX_BYTES = 3 * 1024 * 1024;
-const VERSION = '0.15.0';
+const VERSION = '0.22.0';
 
 let account = null; // { user, activeMode, driverStatus, canDrive }
 let driver = null; // wasifu wa udereva (mode ya Dereva)
@@ -347,6 +351,11 @@ $('verify-logout').addEventListener('click', () => {
 // ---------- Akaunti na mode ----------
 async function loadAccount() {
   account = await api.get('/api/account');
+  // NAYA Staff: app ile ile, kazi zao tu (sajili bodaboda, maeneo) — hakuna abiria/dereva, safari wala malipo.
+  if (account.staff) {
+    show('view-app');
+    return route();
+  }
   if (account.verificationRequired) return showVerify();
   startRealtime();
   // App ya Android: sajili simu hii kwa kengele ya maombi (kimya; ruhusa ikiwa imeshatolewa).
@@ -418,6 +427,24 @@ async function switchMode(mode, { goHome } = {}) {
   else route();
 }
 
+/**
+ * Kufungua NAYA Staff (dereva/abiria mwenye ruhusa). Dereva aliye online anaulizwa kwenda offline kwanza,
+ * ili maombi ya safari yasimfikie akiwa anasajili bodaboda bila kujua.
+ */
+async function openStaffMode() {
+  if (account.activeMode === 'DRIVER' && account.canDrive) {
+    const state = await api.get('/api/driver/state');
+    if (state.online) {
+      if (!confirm('Uko online kama dereva. Ukifungua NAYA Staff utawekwa offline ili usikose maombi ya safari bila kujua. Endelea?')) return;
+      await api.post('/api/driver/online', { online: false });
+      rides.stopGps();
+      rides.stopBackground();
+      toast('Uko offline — sasa uko NAYA Staff');
+    }
+  }
+  location.hash = '#/s';
+}
+
 // ---------- Taarifa za papo hapo ----------
 function startRealtime() {
   if (realtime) return;
@@ -478,6 +505,8 @@ function startRealtime() {
         return;
       }
       rides.onRealtime(type, data);
+      // Wallet yangu ikiwa wazi: pesa imeingia / imetumwa → onyesha salio jipya
+      if (type === 'driver' && location.hash === '#/akaunti/wallet') mywallet.render('');
     },
   });
 }
@@ -485,8 +514,18 @@ function startRealtime() {
 // ---------- Njia (tabs) ----------
 function route() {
   if (!account) return;
+  if (account.staff) return staff.route();
+  document.body.classList.remove('mode-staff');
+  // Dereva aliyesajiliwa na NAYA Staff: password ya muda inabadilishwa kwanza.
+  if (account.user?.mustChangePassword) {
+    show('view-app');
+    return staff.renderPasswordScreen();
+  }
   rides.stopPolling();
+  malipo.stop();
   stopNearby();
+  // Abiria/dereva aliyepewa ruhusa ya NAYA Staff na ofisi: kazi za staff ziko #/s (wengine hawazioni kabisa).
+  if (account.staffAccess && /^#\/s(\/|$)/.test(location.hash)) return staff.route();
   tab = location.hash.startsWith('#/akaunti') ? 'account' : location.hash.startsWith('#/maoni') ? 'feedback' : 'home';
   const picker = location.hash.match(/^#\/chagua\/(kwenda|kutoka)/)?.[1] ?? null;
   for (const a of document.querySelectorAll('[data-tab]')) {
@@ -777,8 +816,10 @@ function estimateBlock() {
     <button class="btn btn-primary btn-block" type="button" data-action="book">Agiza safari</button>
     <p class="muted small" style="margin-top:8px">${
       options.some((o) => o.promo)
-        ? 'Malipo: unalipa dereva kiasi kilichopunguzwa taslimu; NAYA inamlipa dereva kilichobaki.'
-        : 'Malipo: taslimu kwa dereva. Nauli ni makadirio kwa umbali wa barabara.'
+        ? `Malipo: unalipa kiasi kilichopunguzwa ${trip.estimate.ridePay ? 'kwa simu ukifika au taslimu' : 'taslimu'}; NAYA inamlipa dereva kilichobaki.`
+        : trip.estimate.ridePay
+          ? 'Malipo: ukifika, lipa kwa simu kwenye app (ada ndogo ya simu juu ya nauli) au taslimu kwa dereva.'
+          : 'Malipo: taslimu kwa dereva. Nauli ni makadirio kwa umbali wa barabara.'
     }</p>`;
 }
 
@@ -919,6 +960,8 @@ function renderAccount() {
   if (section === 'mipangilio') return renderSettings();
   if (section === 'ada') return renderSubscriptionPage();
   if (section === 'malipo-ya-ofa') return renderWalletPage();
+  if (section === 'deni') return farepay.renderDebtPage();
+  if (section === 'wallet') return mywallet.render((location.hash.split('?')[0].split('/')[3] ?? '').trim());
   renderHub();
 }
 
@@ -943,6 +986,14 @@ function modeCardHtml() {
           ? 'Utafungua ombi la udereva kwa akaunti hii hii — hakuna akaunti mpya.'
           : 'Ni akaunti ile ile; unaweza kubadili wakati wowote.'
       }</p>
+      ${
+        account.staffAccess
+          ? `<div class="mode-staff-entry">
+        <button class="btn btn-gold btn-block" type="button" data-open-staff>Fungua NAYA Staff</button>
+        <p class="muted small">Sajili bodaboda na pendekeza maeneo. Ofisi ya NAYA imekupa ruhusa hii.</p>
+      </div>`
+          : ''
+      }
     </section>`;
 }
 
@@ -1044,7 +1095,7 @@ const SUB_STATE = {
   EXPIRED: ['bad', 'Imeisha'],
   NONE: ['muted', 'Haijaanza'],
 };
-const PAY_METHODS = { CASH: 'Taslimu', MPESA: 'M-Pesa', AIRTEL: 'Airtel Money', TIGO: 'Mixx by Yas (Tigo Pesa)', HALOPESA: 'HaloPesa', BANK: 'Benki' };
+const PAY_METHODS = { CASH: 'Taslimu', MPESA: 'M-Pesa', AIRTEL: 'Airtel Money', TIGO: 'Mixx by Yas (Tigo Pesa)', HALOPESA: 'HaloPesa', BANK: 'Benki', CONTROL: 'Control number' };
 
 async function loadSubscriptionSection() {
   try {
@@ -1060,18 +1111,21 @@ async function loadSubscriptionSection() {
     $('sub-body').innerHTML = `
       <div class="mode-row"><span><span class="muted">Ada</span><br><strong>${formatTsh(sub.monthlyFee)} kwa siku 30</strong></span><span class="badge badge-${tone}">${label}</span></div>
       <p>${line}</p>
-      <p class="sub-how"><strong>Jinsi ya kulipa:</strong> ${esc(sub.paymentInstructions)}</p>
+      ${sub.waived ? '<p class="alert alert-ok sub-waived" role="note"><strong>Kwa sasa ada haitozwi.</strong> Unapokea safari kama kawaida hata ada ikiwa imeisha. NAYA itakujulisha kabla ada haijaanza kutozwa tena.</p>' : ''}
+      ${malipo.sectionHtml(sub)}
+      <p class="sub-how"><strong>${sub.online?.enabled ? 'Au lipa ofisini:' : 'Jinsi ya kulipa:'}</strong> ${esc(sub.paymentInstructions)}</p>
       ${
         sub.payments.length
           ? `<h3 class="small-title">Malipo yako</h3><ul class="notes">${sub.payments
               .map(
-                (p) => `<li><strong>${formatTsh(p.amount)}</strong> · miezi ${p.months} · ${esc(PAY_METHODS[p.method] ?? p.method)}${
+                (p) => `<li><strong>${formatTsh(p.amount)}</strong> · ${p.months === 1 ? 'mwezi 1' : `miezi ${p.months}`} · ${esc(PAY_METHODS[p.method] ?? p.method)}${
                   p.reference ? ` · ${esc(p.reference)}` : ''
                 }<br><span class="muted">${esc(formatDate(p.createdAt))} → mpaka ${esc(formatDate(p.periodEnd))}</span></li>`,
               )
               .join('')}</ul>`
           : '<p class="muted">Bado hujalipa ada. Malipo yako yataonekana hapa.</p>'
       }`;
+    malipo.afterRender(sub);
   } catch (err) {
     if (handleError(err)) return;
     if ($('sub-body')) $('sub-body').innerHTML = `<p class="alert alert-danger" role="alert">${esc(err.message)}</p>`;
@@ -1398,6 +1452,18 @@ $('app-content').addEventListener('click', async (event) => {
     $('file-input').click();
     return;
   }
+  const openStaff = event.target.closest('[data-open-staff]');
+  if (openStaff) {
+    openStaff.disabled = true;
+    try {
+      await openStaffMode();
+    } catch (err) {
+      handleError(err, 'switch-error');
+    } finally {
+      openStaff.disabled = false;
+    }
+    return;
+  }
   const switchTo = event.target.closest('[data-switch]');
   if (switchTo) {
     switchTo.disabled = true;
@@ -1441,6 +1507,12 @@ $('app-content').addEventListener('click', async (event) => {
       tripHistory = null;
       passengerOffers = null;
     } catch (err) {
+      // 0.22.0: deni la nauli → "Deni langu" (lipa kwanza ndipo uagize)
+      if (err.status === 402) {
+        toast(err.message);
+        location.hash = '#/akaunti/deni';
+        return;
+      }
       if (handleError(err, 'book-error')) return;
       button.disabled = false;
       button.textContent = 'Agiza safari';
@@ -1528,6 +1600,8 @@ function signOutLocally() {
   realtime = null;
   rides.reset();
   akaunti.reset();
+  staff.reset();
+  document.body.classList.remove('mode-staff', 'mode-forcepw');
   tripHistory = null;
   passengerOffers = null;
   account = null;
@@ -1555,6 +1629,15 @@ feedback.init({
   },
 });
 wallet.init({ api, handleError, toast });
+mywallet.init({ api, handleError, toast });
+malipo.init({
+  api,
+  handleError,
+  toast,
+  phone: () => account?.user.phone ?? '',
+  onPaid: () => setTimeout(() => location.hash === '#/akaunti/ada' && loadSubscriptionSection(), 2500),
+  reload: () => renderSubscriptionPage(),
+});
 akaunti.init({
   api,
   handleError,
@@ -1572,6 +1655,8 @@ akaunti.init({
   loadSupportList: () => support.loadCardList(),
 });
 appUpdate.init({ api });
+staff.init({ api, toast, handleError, logout: () => logout(), account: () => account, reloadAccount: () => loadAccount() });
+farepay.init({ api, toast, handleError, myPhone: () => account?.user?.phone ?? null });
 rides.init({
   api,
   pushState: () => pushState(api),
@@ -1579,6 +1664,7 @@ rides.init({
   toast,
   handleError,
   firstName: () => firstName(),
+  myPhone: () => account?.user?.phone ?? null,
   emergency: () => account?.emergency ?? null,
   isPassengerHome: onPassengerHome,
   isDriverHome: () => account?.activeMode === 'DRIVER' && tab === 'home' && driver?.driver.status === 'APPROVED',

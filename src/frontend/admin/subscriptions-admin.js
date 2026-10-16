@@ -14,6 +14,8 @@ export const METHODS = {
   HALOPESA: 'HaloPesa',
   BANK: 'Benki',
 };
+/** Njia zinazoandikwa na mfumo tu (hazichaguliwi na ofisi). */
+const AUTO_METHODS = { CONTROL: 'Control number', WALLET: 'Wallet ya dereva' };
 const STATE = {
   ACTIVE: ['ok', 'Iko hai'],
   GRACE: ['warn', 'Siku za kulipa'],
@@ -40,13 +42,64 @@ export function setup(context) {
     loadList();
   });
   $('sub-settings-form').addEventListener('submit', saveSettings);
+  $('om-toggle').addEventListener('click', toggleOpenMode);
 }
 
 // ------------------------------------------------------------------ Ukurasa wa "Ada"
 
 export async function loadPage() {
   $('sub-error').hidden = true;
-  await Promise.all([loadList(), loadSettings()]);
+  await loadList();
+}
+
+/** Mipangilio ya mfumo → "Maombi ya safari" (mfumo huru) na "Ada ya mwezi" (fomu). */
+export async function loadSettingsSection() {
+  $('sub-settings-error').hidden = true;
+  await Promise.all([loadSettings(), loadOpenMode()]);
+}
+
+// ------------------------------------------------------------------ Mfumo huru (madereva wachache)
+
+let openMode = null;
+
+function renderOpenMode() {
+  const box = $('open-mode');
+  box.hidden = false;
+  box.classList.toggle('is-on', openMode);
+  $('om-badge').className = `badge badge-${openMode ? 'ok' : 'muted'}`;
+  $('om-badge').textContent = openMode ? 'Umewashwa' : 'Umezimwa';
+  $('om-text').textContent = openMode
+    ? 'Kila dereva aliyeidhinishwa na yuko online anapokea maombi bila vikwazo: ada ya mwezi haitozwi, mfumo haumweki offline, na ombi linaenda kwa madereva wote walio karibu kwa pamoja. Zima ukiwa na madereva wa kutosha.'
+    : 'Sheria za kawaida: ada ya mwezi lazima iwe hai, dereva asiyejibu au ambaye simu yake haionekani anawekwa offline, na maombi yanaenda kwa mawimbi (2, kisha 4).';
+  const button = $('om-toggle');
+  button.textContent = openMode ? 'Zima mfumo huru' : 'Washa mfumo huru';
+  button.className = `btn btn-small ${openMode ? 'btn-ghost' : 'btn-primary'}`;
+}
+
+async function loadOpenMode() {
+  try {
+    openMode = (await ctx.api.get('/api/admin/settings/dispatch')).openMode;
+    renderOpenMode();
+  } catch (err) {
+    fail(err, 'om-error');
+  }
+}
+
+async function toggleOpenMode() {
+  const next = !openMode;
+  if (!next && !confirm('Kuzima mfumo huru: madereva wenye ada iliyoisha wataacha kupokea maombi na kuwekwa offline. Endelea?')) return;
+  const button = $('om-toggle');
+  button.disabled = true;
+  $('om-error').hidden = true;
+  try {
+    openMode = (await ctx.api.put('/api/admin/settings/dispatch', { openMode: next })).openMode;
+    renderOpenMode();
+    loadList();
+  } catch (err) {
+    fail(err, 'om-error');
+  } finally {
+    button.disabled = false;
+  }
 }
 
 export async function loadList() {
@@ -163,7 +216,7 @@ function renderDriverPanel(driverId, sub) {
         : `<ul class="history">${sub.payments
             .map(
               (p) => `<li class="${p.voidedAt ? 'voided' : ''}">
-                <span><strong>${formatTsh(p.amount)}</strong> · miezi ${p.months} · ${esc(METHODS[p.method] ?? p.method)}${p.reference ? ` · ${esc(p.reference)}` : ''}</span>
+                <span><strong>${formatTsh(p.amount)}</strong> · miezi ${p.months} · ${esc(METHODS[p.method] ?? AUTO_METHODS[p.method] ?? p.method)}${p.reference ? ` · ${esc(p.reference)}` : ''}</span>
                 <span class="muted">${esc(formatDate(p.createdAt, true))} · na ${esc(p.recordedBy)} · mpaka ${esc(formatDate(p.periodEnd))}</span>
                 ${p.note ? `<span class="note">${esc(p.note)}</span>` : ''}
                 ${p.voidedAt ? `<span class="note">Yamebatilishwa na ${esc(p.voidedBy ?? '')}: ${esc(p.voidReason ?? '')}</span>` : ''}

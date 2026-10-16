@@ -115,6 +115,187 @@ Alama za kutiliwa shaka (`rides.flags`), zinaonekana kwa ofisi kwenye safari, Ri
 DRIVER, PASSENGER, AUTO au ADMIN. Migration `021_safari_rahisi.sql` inaongeza safu tu (haifuti data); safari zinazoendelea zisizo
 za ofa zinaondolewa PIN ili zisikwame.
 
+## Abiria kulipa nauli kwa simu (0.22.0)
+
+Abiria akifika (safari imekamilika) anaweza kulipa nauli kwa simu ndani ya app, au taslimu kwa dereva kama kawaida.
+
+- **Kuwasha:** Ofisi → Fedha → Malipo → **Nauli kwa simu**. Imezimwa kwa chaguo-msingi. Weka ada juu ya nauli (% na kiwango cha chini) iwe sawa na ada ya Abliner ya kupokea pesa.
+- **Abiria:** skrini ya "Umefika" inaonyesha nauli + ada ya simu = jumla. Anaweza kutumia namba yoyote (M-Pesa, Mixx, Airtel, HaloPesa), hadi namba 3 kwa safari moja. Anaweka PIN kwenye simu; "Umelipa" inaonekana tu baada ya mtandao kuthibitisha.
+- **Dereva:** anapata **nauli kamili kwenye wallet yake** (ada inabebwa na abiria). Akipewa taslimu anabonyeza "Nimepokea … taslimu". Abiria asipolipa kabisa → "Abiria hajalipa" → deni.
+- **Deni:** abiria mwenye deni hawezi kuagiza safari mpya mpaka alipe (Akaunti → Deni langu, kwa simu); pesa inaenda kwenye wallet ya dereva aliyemdai. Ofisi inaweza kuondoa deni ("amemlipa dereva taslimu" au "samehe") kwa sababu.
+- **Usalama:** malipo yanakubaliwa mara moja tu kwa kila safari. Malipo yakithibitishwa baada ya dereva kuandika taslimu, wallet haiguswi tena na ofisi inajulishwa. Dereva haoni namba alizotumia mlipaji.
+- Malipo yote yanaonekana kwenye Miamala ya simu (kichujio "Nauli kwa simu"). Migration 031 inaongeza safu tu kwenye `naya.rides` na kupanua CHECK moja — haifuti data.
+
+## Wallet ya dereva (0.21.0)
+
+Kila dereva aliyethibitishwa ana wallet yake ndani ya NAYA (inafunguliwa yenyewe). Pesa halisi iko kwenye akaunti ya NAYA kwa Abliner; wallet ni deni la NAYA kwa dereva, linalorekodiwa mstari kwa mstari (ledger).
+
+- **Mapato yanaingia wallet:** malipo ya ofa yanaingia kwenye wallet badala ya kutumwa kila safari (Ofisi → Malipo → Wallet za madereva → Mipangilio; ukiondoa alama, malipo yanatumwa moja kwa moja kama zamani).
+- **Kutoa pesa:** dereva anachagua kiasi → anaona ada ya mtandao na atakachopokea (kutoka Abliner) → anaweka PIN → pesa inatumwa **kwenye namba yake kuu iliyothibitishwa tu** (jina la mtandao). Kiwango cha chini TSh 1,000, kikomo TSh 100,000 kwa siku (vinabadilika kwenye mipangilio). Ada ya mtandao inabebwa na dereva.
+- **PIN ya wallet (tarakimu 4):** dereva anaitengeneza mwenyewe kwa password ya akaunti; ofisi haiioni (inahifadhiwa kama hash). PIN rahisi (1234, 0000, tarakimu za mwisho za simu) zinakataliwa. Makosa 5 → imefungwa dakika 30; makosa 10 → imefungwa mpaka ofisi ifungue.
+- **Nimesahau PIN:** dereva anaomba → ofisi inampigia kuthibitisha → "Ruhusu PIN mpya" → dereva anaweka PIN mpya kwa password yake → kutoa kunasubiri saa 24.
+- **Namba ya malipo:** kubadilisha au kufuta namba kuu kunahitaji PIN na kunaanzisha saa 24 za usalama (dereva anapata SMS).
+- **Ada ya mwezi kwa salio:** "Lipa ada" kwenye wallet (PIN). Ofisi ikibatilisha malipo hayo, pesa inarudi kwenye wallet.
+- **Kutoa kukishindwa:** pesa yote inarudi kwenye wallet mara moja; tatizo la mtandao → inabaki "inasubiri" na mfumo unakagua hali (hautumi mara mbili).
+- **Ofisi:** Fedha → Malipo → **Wallet za madereva** — deni la wallet zote dhidi ya salio la Abliner (onyo likiwa halitoshi), maombi ya PIN, orodha, na kwa kila dereva: historia kamili, kusimamisha/kufungua, kufungua PIN, kuruhusu PIN mpya, marekebisho (kiasi + sababu, yanaonekana kwa dereva).
+- Muhtasari wa ofisi unaonyesha "Salio la Abliner halitoshi wallet za madereva" na "Madereva wameomba PIN mpya ya wallet".
+- Hakuna commission. Migration 030 inaongeza `naya.wallets` na `naya.wallet_entries` tu — haifuti wala kubadilisha data iliyopo.
+
+## Jina la mwenye namba na Control Number (0.20.0)
+
+Kutoka nyaraka za Abliner (hakuna endpoint iliyobuniwa): `GET /api/v1/lookup?phone=` → `{ phone, name, network }`
+(404 `name_not_found` = haijathibitishwa) na `POST /api/v1/control-numbers` `{ amount, description, payment_mode, reference, customer_name? }`
+→ `{ id, control_number, … }`; ikilipwa, webhook ileile ya deposits (`transaction.completed`) inakuja. **Hakuna cha kubadilisha
+Railway wala Abliner.** Migration `029_majina_na_control.sql` inaongeza `phone_names` (cache), `name_lookups` (kumbukumbu),
+safu za uthibitisho kwenye `driver_payout_accounts`, na njia `CONTROL` kwenye kumbukumbu za ada (haifuti data).
+
+- **Namba tu → jina linatokea**: namba za malipo za dereva (anathibitisha "jina hili ni sahihi"; jina la mtandao ndilo linahifadhiwa),
+  Ofisi → Ongeza staff, NAYA Staff → Sajili bodaboda. Huduma isipopatikana, jina linaandikwa kwa mkono kama zamani.
+- **Faragha**: `POST /api/name-lookup` ni kwa dereva, NAYA Staff na ofisi tu; kikomo cha namba tofauti kwa saa 24
+  (dereva 15, staff 80, ofisi 300); kila ombi linaandikwa. Namba haiandikwi kwenye logs.
+- **Kinga ya malipo**: kabla ya kumtumia dereva pesa, jina la namba linaangaliwa tena (cache ≤ saa 6). Likiwa la mtu mwingine
+  (laini imehamishwa) au mtandao haulijui → pesa haitumwi, safari inaonyesha sababu, dereva anapata arifa. Akithibitisha namba
+  upya kwenye app, malipo yaliyosimama yanatumwa yenyewe. Huduma ya majina ikiwa chini → malipo yanaendelea.
+- **Control number ya ada**: Akaunti → Ada ya mwezi → "Pata control number" (kiasi kamili, `EXACT`; siku 7). Dereva analipa
+  kutoka M-Pesa, Mixx, Airtel Money, HaloPesa au benki; siku zinaongezwa zenyewe. Namba ileile kwa miezi ileile; zisizozidi 3
+  zisizolipwa. Ikilipwa baada ya kuisha muda bado inakubaliwa.
+
+## Ruhusa ya NAYA Staff kwa akaunti iliyopo (0.19.1)
+
+Namba moja = akaunti moja. Ofisi ikiandika namba ambayo tayari ina akaunti (abiria au dereva), haipati kosa tena:
+inaonyeshwa jina na aina ya akaunti → **"Ndiyo, mpe ruhusa ya staff"**. Migration `028_staff_ruhusa.sql` inaongeza
+`users.staff_access` (NULL / ACTIVE / SUSPENDED), `staff_since`, `staff_added_by` (haifuti data).
+
+- Hakuna akaunti mpya wala password mpya — anaingia kwa password yake ile ile. "Password mpya" ya ofisi haipo kwa akaunti hizi.
+- Kwenye app: **Akaunti → Badili mode → "Fungua NAYA Staff"** (inaonekana kwa wenye ruhusa tu; `#/s`). Dereva aliye online
+  anaulizwa na kuwekwa offline kwanza. "Rudi kwenye Dereva/Abiria" inamrudisha kwenye app yake.
+- Kusimamisha kunaondoa **ruhusa ya staff tu**: udereva, safari, salio na malipo yake vinaendelea; token yake haifi.
+- Hawezi kujisajili mwenyewe kama dereva (namba iliyopo inakataliwa) wala kuthibitisha madereva. Akaunti za ofisi haziwezi kuwa staff.
+- API mpya: `POST /api/admin/staff/lookup` · `POST /api/admin/staff` inakubali `linkExisting: true`. `/api/account` ina `staffAccess`.
+
+## NAYA Staff (0.19.0)
+
+Wasaidizi wa NAYA wanaoingia kwenye **app ya NAYA** (si ofisi) na kupata kazi zao tu. Migration `027_naya_staff.sql` inaongeza
+cheo `STAFF`, `users.must_change_password`, `users.created_by`, `drivers.registered_by` na hali ya ukaguzi ya maeneo (haifuti data).
+
+- **Ofisi → Mipangilio → NAYA Staff** (`#/staff`): ongeza staff (jina + simu) → password ya muda inaonyeshwa mara moja;
+  simamisha / rudisha / password mpya; idadi ya kazi ya kila staff.
+- **Staff kwenye app**: anaweka password yake kwanza, kisha: *Sajili bodaboda* (akaunti + chombo + picha 4 kwa kamera → "Inasubiri ofisi"),
+  *Ongeza eneo* (GPS ya simu → linasubiri ofisi), *Kazi zangu*. Haoni pesa, mipangilio, wateja wala safari; hawezi kuingia `/admin`.
+- **Ofisi pekee inathibitisha madereva.** Dereva aliyesajiliwa na staff: "Amesajiliwa na NAYA Staff: …" kwenye ofisi; akiingia kwenye app
+  kwa password ya muda anaibadilisha na kukubali Masharti ya Dereva mwenyewe.
+- **Maeneo ya staff** hayaonekani kwa wateja mpaka ofisi iyaidhinishe (Maeneo → "Maeneo yanayosubiri uidhinishe"; pia kwenye Muhtasari).
+- API: `/api/staff/*` (STAFF tu, baada ya kubadilisha password), `/api/admin/staff*`, `/api/admin/locations/pending`, `/api/admin/locations/:id/review`.
+
+## Malipo ya ofa: ada na kiasi kidogo (0.18.2)
+
+- **NAYA inabeba ada ya kutuma** — dereva anapokea deni lake kamili. Kabla ya kila withdrawal NAYA inauliza Abliner
+  `GET /api/v1/withdrawals/preview` na (kwa chaguo-msingi "inakatwa kwa dereva") inaongeza ada kwenye kiasi cha kutuma.
+  Mipangilio ya mfumo → Malipo ya simu → "Ada ya Abliner ya kutuma" inaweza kubadilishwa kuwa "kwenye salio la NAYA".
+  Ada iliyolipwa inaonekana kwenye Miamala ya simu (`payments.meta.fee`, `meta.sendAmount`); `payments.amount` ni deni la dereva.
+- **Kima cha chini cha kutuma** (chaguo-msingi TSh 1,000): deni dogo zaidi halitumwi peke yake — safari inakuwa `WAITING`
+  ("Inakusanywa") na inatumwa pamoja na safari zijazo za ofa za dereva huyo kwa muamala mmoja. Migration `026_malipo_madogo.sql`
+  inapanua CHECK ya hali tu.
+- Kiasi cha webhook kinakaguliwa kwa pesa inayoingia tu (Abliner inaweza kuripoti kiasi baada ya ada kwa pesa inayotoka).
+
+## Ofisi — mpangilio mpya (0.18.0)
+
+Menyu ya pembeni kwa makundi (inaweza kukunjwa kuwa alama tu; inakumbukwa kwenye browser):
+
+| Kundi | Kurasa |
+|---|---|
+| — | Muhtasari, Ripoti |
+| Operesheni | Ramani live, Safari, Dharura |
+| Watu | Madereva, Wateja |
+| Fedha | **Malipo** (`#/malipo`: salio la Abliner, malipo yanayosubiri uamuzi, madeni ya ofa, miamala), Ada ya mwezi, Ofa |
+| Mawasiliano | Msaada, Maoni, Matangazo |
+| Mipangilio | **Mipangilio ya mfumo** (`#/mipangilio`: mfumo huru, malipo ya simu, ada), Bei na nauli, Maeneo |
+
+- Muhtasari una kadi ya **salio la akaunti kuu ya Abliner** (`GET /api/admin/payments/wallet` — server inaliuliza Abliner mara moja kila
+  sekunde 30): pesa zilizoingia/kutoka leo, zinazosubiri uthibitisho. Salio likishuka chini ya kiwango (`PUT /api/admin/payments/wallet-settings`,
+  chaguo-msingi TSh 1,000) → kadi nyekundu + "Kazi zinazokusubiri".
+- Anwani za zamani `#/ofa/malipo…` na `#/ofa/miamala` zinapelekwa `#/malipo/madereva…` na `#/malipo/miamala`.
+- Mwendo (animations) unaheshimu "reduce motion" ya kifaa.
+
+## Abliner — malipo halisi ya simu (0.17.0)
+
+Imejengwa kwa nyaraka za https://abliner.net/docs tu (hakuna endpoint iliyobuniwa):
+
+| Kazi | Abliner |
+|---|---|
+| Ada ya mwezi (dereva → NAYA, USSD push) | `POST /api/v1/deposits` `{amount, method:"mobile", currency:"TZS", phone, reference, callback_url}` + `Idempotency-Key` + `x-abliner-timestamp` / `x-abliner-signature` (hex HMAC-SHA256 ya `ts.body`, `ABLINER_WEBHOOK_SECRET`) |
+| Malipo ya ofa (NAYA → bodaboda) | `POST /api/v1/withdrawals` `{amount, method:"mobile", currency:"TZS", recipient, reference}` |
+| Hali ya muamala (callback ikichelewa) | `GET /api/v1/transactions?customer_reference=<reference yetu>` |
+| "Kagua muunganiko" (ofisi) | `GET /api/v1/balance` — haigusi pesa |
+| Webhook | `POST /api/payments/callback/abliner` — `x-webhook-signature` (hex HMAC-SHA256 ya `x-webhook-timestamp.rawBody`), timestamp ≤ sekunde 300, `x-webhook-id` inazuia marudio |
+
+Usalama wa pesa:
+
+- Hakuna kinachoandikwa "kimelipwa" bila webhook iliyothibitishwa au `/transactions` kusema `completed`; hali nyingine yoyote = inasubiri.
+- Kiasi cha webhook kikipingana na chetu → hakitumiki (ofisi inajulishwa).
+- Withdrawals hazina idempotency iliyoandikwa na Abliner → NAYA **hairudii kutuma yenyewe**. Jibu likipotea, muamala unabaki
+  "haujathibitishwa" mpaka Abliner iseme `completed`/`failed`; ofisi inaweza "Jaribu tena" baada ya `failed` tu.
+- Kikomo cha malipo ya simu kwa dereva: TSh 10,000 kwa siku (Africa/Dar_es_Salaam) — kwa malipo ya moja kwa moja NA "Tuma" ya ofisi,
+  ndani ya transaction yenye lock ya dereva.
+- Migration `025_abliner.sql` inaongeza jedwali `payment_webhook_events` tu.
+
+Kuwasha (Railway → Variables): `ABLINER_API_KEY`, `ABLINER_WEBHOOK_SECRET`, kisha `PAYMENT_PROVIDER=abliner`.
+Webhook URL ya kuweka Abliner → Dashboard → API Keys: `https://naya-production-e5cf.up.railway.app/api/payments/callback/abliner`
+(NAYA pia inaituma kama `callback_url` kwenye kila deposit, kupitia `RAILWAY_PUBLIC_DOMAIN`).
+
+## Mfumo huru — madereva wachache (0.16.2)
+
+Migration `024_mfumo_huru.sql` inaongeza mpangilio `settings.dispatch = {"openMode": true}` (haifuti data). Ukiwa umewashwa:
+
+- ada ya mwezi haitozwi: dereva anaenda online na kupewa safari hata ada/siku za bure zimeisha (app haimzuii; ukumbusho na
+  arifa za "ada imeisha" hazitumwi);
+- mfumo haumweki dereva offline (kukosa kujibu, simu kutoonekana, ada) — anaenda offline mwenyewe tu;
+- simu "iliyolala" (app imefungwa) bado inapewa maombi;
+- ombi linaenda kwa madereva WOTE wa chombo hicho walio ndani ya km 10 kwa pamoja (hadi 10), sekunde 20; wa kwanza kukubali anapata safari.
+
+Vinavyobaki: kuidhinishwa na ofisi, akaunti hai, namba ya simu iliyothibitishwa, chombo sahihi, GPS, km 10, kutokuwa kwenye safari.
+Ofisi → **Ada ya mwezi** → "Mfumo huru" → Zima, sheria za kawaida (hapa chini) zinarudi. API: `GET/PUT /api/admin/settings/dispatch`.
+
+## Kumpata dereva haraka (0.16.1) — sheria za kawaida (mfumo huru ukizimwa)
+
+| Kipengele | Thamani |
+|---|---|
+| Wimbi la 1 | madereva 2 walio karibu zaidi kwa pamoja, sekunde 15 |
+| Wimbi la 2+ | madereva 4 wanaofuata kwa pamoja, sekunde 20 |
+| Mpangilio | simu zilizoonekana hivi karibuni kwanza, kisha aliye karibu |
+| Dereva wa app (APK) | anapewa maombi hadi dakika 10 tangu simu ilipoonekana mara ya mwisho |
+| Online bila kuonekana | simu isipoonekana dakika 20 (na hana safari) → offline + arifa |
+| Ombi la ofisi | sekunde 30 |
+
+Dereva ambaye ombi lake liliondolewa kwa sababu mwingine aliwahi (TAKEN) anapewa tena safari ile ikirudi kutafuta dereva.
+Ofisi → safari inayotafuta dereva → **Mpe dereva maalum**: madereva WOTE walio online, kila mmoja na sababu kama hapewi maombi
+(chombo tofauti, ada imeisha, hajaidhinishwa, hana GPS, yuko kwenye safari, anajibu ombi jingine, simu haijaonekana, yuko mbali).
+Hakuna migration.
+
+## Malipo ya simu (0.16.0)
+
+Pesa ya simu (M-Pesa, Mixx by Yas, Airtel Money, HaloPesa) kupitia kampuni ya malipo (`PAYMENT_PROVIDER`).
+Bila `PAYMENT_PROVIDER` kila kitu kinabaki cha mkono kama zamani.
+
+**1. Ada ya mwezi** — Akaunti → Ada ya mwezi → "Lipa kwa simu sasa" (miezi 1–3, mtandao unachaguliwa kutoka namba).
+`POST /api/driver/subscription/pay` → ombi la PIN (USSD push) → app inasubiri (`GET /api/payments/:id`) → kampuni ikithibitisha
+(callback `POST /api/payments/callback/:provider` au swali la hali kila dakika) → siku zinaongezwa zenyewe, risiti + SMS.
+Ombi lisilojibiwa dakika 15 → "limeshindwa"; uthibitisho ukifika baadaye bado unaongeza siku.
+
+**2. Malipo ya ofa ya papo hapo** — safari ya ofa ikikamilika, NAYA inatuma sehemu ya dereva kwenye namba yake kuu
+(M-Pesa / Mixx / Airtel / HaloPesa) yenyewe, kama: hakuna alama ya kutiliwa shaka, haikumalizwa na ofisi, na jumla ya leo ≤ kikomo
+(chaguo-msingi TSh 10,000 kwa dereva kwa siku; ofisi inabadilisha). Vinginevyo → **inasubiri ukaguzi** (Ofisi → Ofa → Malipo kwa madereva):
+"Tuma" au "Kataa" (iliyokataliwa haidaiwi tena). Kutuma kukishindwa → "Jaribu tena". Hali ya safari: `rides.promo_payout_state`.
+
+**Kinga:** muamala unaandikwa "Imefaulu" tu kampuni ya malipo ikithibitisha; callback mara mbili haiongezi mara mbili (row lock +
+unique `payment_id`); malipo ya kutoka hayaandikwi "yameshindwa" kwa kukosa jibu (yanaonekana "Hayajathibitishwa" ofisini);
+kiasi hakizidi deni la NAYA kwa dereva. Ofisi inaweza kuzima malipo ya papo hapo wakati wowote. Miamala yote: Ofisi → Ofa → Miamala ya simu (+ CSV).
+
+**Kuunganisha kampuni ya malipo:** adapter moja inayotimiza `PaymentProvider` (`src/services/payments/provider.ts`) —
+`collect`, `disburse`, `status`, `parseCallback` (lazima ithibitishe saini) — na kuisajili kwenye `getProvider()`.
+Kampuni bandia ya majaribio: `src/services/payments/simulator.ts` (haiwezi kuwashwa production).
+Migration `023_malipo.sql` inaongeza jedwali na safu tu.
+
 ## Akaunti mpya (0.15.0)
 
 App → **Akaunti** sasa ni menyu (kama Bolt/Uber), si orodha ndefu ya kadi:

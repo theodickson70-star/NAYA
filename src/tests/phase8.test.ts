@@ -64,6 +64,8 @@ const offerFor = async (who: string) => (await call('GET', '/api/driver/state', 
 
 before(async () => {
   await runMigrations(() => {});
+  // Majaribio haya ni ya sheria za KAWAIDA (mfumo huru umezimwa); mfumo huru una majaribio yake (mfumo-huru.test.ts).
+  await db.query(`INSERT INTO naya.settings (key, value) VALUES ('dispatch', '{"openMode": false}') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`);
   app = await buildApp({ logger: false });
   savedSettings = (await db.query(`SELECT value FROM naya.settings WHERE key = 'subscription'`)).rows[0]?.value ?? null;
   await db.query(
@@ -101,6 +103,7 @@ after(async () => {
   await db.query('DELETE FROM naya.fare_rules');
   if (savedSettings) await db.query(`UPDATE naya.settings SET value = $1 WHERE key = 'subscription'`, [JSON.stringify(savedSettings)]);
   await app.close();
+  await db.query(`UPDATE naya.settings SET value = '{"openMode": true}' WHERE key = 'dispatch'`);
   await db.end();
 });
 
@@ -223,7 +226,9 @@ describe('NAYA Phase 8 — ada ya mwezi', () => {
   it('ofisi: orodha ya ada na takwimu halisi za mwezi', async () => {
     const res = (await call('GET', '/api/admin/subscriptions?filter=all', undefined, 'admin')).json.data;
     assert.ok(res.stats.monthTotal >= 15000);
-    assert.ok(res.drivers.some((d: any) => d.id === ids.paid && d.state === 'ACTIVE'));
+    assert.ok(res.drivers.length > 0);
+    // (orodha ina kikomo cha 200 — database ya majaribio inaweza kuwa na madereva wengi; dereva huyu anakaguliwa moja kwa moja)
+    assert.equal((await call('GET', `/api/admin/drivers/${ids.paid}/subscription`, undefined, 'admin')).json.data.state, 'ACTIVE');
     const dash = (await call('GET', '/api/admin/dashboard', undefined, 'admin')).json.data;
     assert.ok(dash.subscriptions.monthTotal >= 15000);
     assert.equal(typeof dash.sosOpen, 'number');
@@ -281,7 +286,8 @@ describe('NAYA Phase 8 — usalama na ramani ya live', () => {
     assert.equal(view.json.data.driver.plateNumber, `MC ${s.slice(-3)} PAI`);
     assert.ok(view.json.data.driver.location);
     const text = JSON.stringify(view.json.data);
-    assert.equal(text.includes('255'), false, 'namba ya simu haipaswi kuonekana');
+    // namba ya simu (255 + tarakimu 9) — si '255' popote (inaweza kutokea kwenye muda/mahali kwa bahati)
+    assert.equal(/255[67]\d{8}/.test(text), false, 'namba ya simu haipaswi kuonekana');
     assert.equal((await call('POST', '/api/share', { token: 'x'.repeat(32) })).status, 404);
     // link mpya inaua ya zamani
     await call('POST', `/api/rides/${rideId}/share`, {}, 'p1');

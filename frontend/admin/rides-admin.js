@@ -7,6 +7,17 @@ let ctx = null; // { api, onAuthError }
 let scope = 'active';
 let refreshTimer = null;
 
+// Nauli kwa simu (0.22.0): ilivyolipwa
+const FARE = { MOBILE: 'imelipwa kwa simu', CASH: 'taslimu', DEBT: 'DENI (abiria hakulipa)' };
+function fareLine(r) {
+  const f = r.farePay;
+  if (!f) return r.status === 'COMPLETED' ? ' · taslimu' : '';
+  if (f.settlement === 'DEBT') return ` · ${f.debtCleared ? 'deni (limeondolewa)' : FARE.DEBT}`;
+  if (f.settlement) return ` · ${FARE[f.settlement]}`;
+  if (f.pending) return ' · abiria analipa kwa simu sasa';
+  return ' · malipo bado hayajaandikwa';
+}
+
 export const RIDE_STATUS = {
   SEARCHING: ['warn', 'Inatafuta dereva'],
   ACCEPTED: ['ok', 'Dereva anakuja'],
@@ -92,7 +103,7 @@ function render(r) {
     <div class="detail-head">
       <div>
         <h1>${esc(r.pickup.name)} → ${esc(r.destination.name)}</h1>
-        <p class="muted">${esc(VEHICLE_TYPES[r.vehicleType])} · km ${r.distanceKm} · ${r.promo ? `${formatTsh(r.fare)} — abiria ${formatTsh(r.passengerPays)} taslimu + ofa ya NAYA ${formatTsh(r.promo.discount)} (${esc(r.promo.title ?? '')})` : `${formatTsh(r.fare)} taslimu`} · Imeagizwa ${esc(formatDate(r.requestedAt, true))}</p>
+        <p class="muted">${esc(VEHICLE_TYPES[r.vehicleType])} · km ${r.distanceKm} · ${r.promo ? `${formatTsh(r.fare)} — abiria ${formatTsh(r.passengerPays)} taslimu + ofa ya NAYA ${formatTsh(r.promo.discount)} (${esc(r.promo.title ?? '')})` : `${formatTsh(r.fare)}`}${fareLine(r)} · Imeagizwa ${esc(formatDate(r.requestedAt, true))}</p>
       </div>
       ${badge(r.status)}
     </div>

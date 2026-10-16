@@ -6,6 +6,7 @@ import { t } from '/shared/i18n.js';
 import { escapeHtml as esc } from '/shared/api.js';
 import { formatDate, formatPhone, formatTsh, VEHICLE_TYPES } from '/shared/labels.js';
 import { rideMap } from '/shared/map.js';
+import * as farepay from './farepay.js';
 
 let ctx = null; // { api, toast, handleError, isPassengerHome, isDriverHome, onPassengerRideClosed, firstName }
 const $ = (id) => document.getElementById(id);
@@ -33,6 +34,9 @@ let shareUrl = ''; // link ya kushiriki (kama simu haina "Share")
 let mapView = null; // { rideId, map }
 const photos = new Map();
 const LIVE = ['ACCEPTED', 'ARRIVED', 'IN_PROGRESS'];
+let fareUi = {}; // nauli kwa simu: { busy, error, debtConfirm }
+let farePollAt = 0;
+let fareRideId = null; // dereva: safari ambayo fareUi ni yake
 
 export function init(context) {
   ctx = context;
@@ -119,7 +123,7 @@ function etaText(ride, eta, km) {
 function updateLive(data) {
   if (data.lat != null && data.lng != null) mapView?.map?.setDriver({ lat: data.lat, lng: data.lng });
   const el = $('ride-eta');
-  if (el && passengerRide) el.textContent = etaText(passengerRide, data.etaMinutes, data.distanceKm);
+  if (el && passengerRide && LIVE.includes(passengerRide.status)) el.textContent = etaText(passengerRide, data.etaMinutes, data.distanceKm);
 }
 
 const tel = (phone) => `tel:+${esc(phone)}`;
@@ -184,7 +188,7 @@ export async function book(body) {
 
 function passengerKey(r) {
   // Umbali/dakika hazimo hapa: zinasasishwa papo hapo bila kuchora skrini upya (ramani isianze upya).
-  return [r.status, r.redispatched, r.driver?.name, r.pin, r.sosOpen, r.shared, cancelOpen, sosSheet, shareUrl].join('|');
+  return [r.status, r.redispatched, r.driver?.name, r.pin, r.sosOpen, r.shared, cancelOpen, sosSheet, shareUrl, farepay.fareKey(r.farePay), fareUi.busy, fareUi.error].join('|');
 }
 
 export function renderPassengerRide(ride) {
@@ -192,6 +196,7 @@ export function renderPassengerRide(ride) {
     shareUrl = '';
     sosSheet = false;
   }
+  if (passengerRide?.id !== ride.id) fareUi = {};
   passengerRide = ride;
   const key = passengerKey(ride);
   // Usichore upya kama hakuna kilichobadilika (mf. abiria anaandika maoni au anachagua nyota).
@@ -215,9 +220,7 @@ export function renderPassengerRide(ride) {
     COMPLETED: [
       'done',
       `Umefika ${ride.destination.name}!`,
-      ride.promo
-        ? `Lipa dereva ${formatTsh(ride.passengerPays)} taslimu. Ofa ya NAYA imelipa ${formatTsh(ride.promo.discount)}.`
-        : `Lipa dereva ${formatTsh(ride.fare)} taslimu.`,
+      farepay.passengerHeadline(ride),
     ],
     NO_DRIVER: ['none', 'Hakuna dereva aliyepatikana karibu kwa sasa', 'Jaribu tena baada ya dakika chache.'],
     CANCELLED: ['none', 'Safari imeghairiwa', ride.cancelledBy === 'ADMIN' ? `Ofisi ya NAYA: ${ride.cancelReason ?? ''}` : ride.cancelReason ?? ''],
@@ -240,7 +243,7 @@ export function renderPassengerRide(ride) {
     <section class="card">${routeSummary(ride)}</section>
     ${
       ride.status === 'COMPLETED'
-        ? `<form class="card" id="rate-driver-form">
+        ? `${farepay.passengerCardHtml(ride, fareUi)}<form class="card" id="rate-driver-form">
             ${stars('rating', `Mpe ${esc(d?.name.split(' ')[0] ?? 'dereva')} nyota`)}
             <label for="rate-comment">Maoni <span class="optional">(si lazima)</span></label>
             <textarea id="rate-comment" maxlength="300" placeholder="Mf. Aliendesha kwa uangalifu"></textarea>
@@ -406,7 +409,14 @@ function loadDriverPhoto(rideId) {
 function ensurePassengerPolling() {
   if (pollTimer) return;
   pollTimer = setInterval(() => {
-    if (!ctx.isPassengerHome() || document.visibilityState !== 'visible' || !pollDue()) return;
+    if (!ctx.isPassengerHome() || document.visibilityState !== 'visible') return;
+    // Nauli kwa simu inasubiri PIN: uliza hali ya muamala (server inauliza kampuni ya malipo) kila sekunde 4
+    const pending = passengerRide?.farePay?.pending;
+    if (pending && Date.now() - farePollAt >= 4000) {
+      farePollAt = Date.now();
+      ctx.api.get(`/api/payments/${pending.id}`).then((p) => p.status !== 'PENDING' && refreshPassenger()).catch(() => {});
+    }
+    if (!pollDue()) return;
     refreshPassenger();
   }, 4000);
 }
@@ -470,9 +480,15 @@ function driverKey(s) {
     s.ride?.id,
     s.ride?.status,
     s.ride?.sosOpen,
+    s.ride?.promoPayout?.state,
+    farepay.fareKey(s.ride?.farePay),
+    fareUi.debtConfirm,
+    fareUi.busy,
+    fareUi.error,
     s.earnings.today.total,
     s.subscription?.state,
     s.subscription?.daysLeft,
+    s.subscription?.waived,
     standPicker,
     cancelOpen,
     sosSheet,
@@ -524,6 +540,10 @@ function renderDriverDashboard() {
   syncDriverService();
   if (!ctx.isDriverHome()) return;
   const s = driverData;
+  if ((s.ride?.id ?? null) !== fareRideId) {
+    fareRideId = s.ride?.id ?? null;
+    fareUi = {};
+  }
   const key = driverKey(s);
   if (key === lastKey && $('driver-screen')) return;
   lastKey = key;
@@ -559,7 +579,7 @@ function onlineHtml(s) {
     </section>`;
   }
   const sub = s.subscription;
-  if (!s.online && sub?.state === 'EXPIRED') return subscriptionBlockHtml(sub);
+  if (!s.online && sub?.state === 'EXPIRED' && !sub.waived) return subscriptionBlockHtml(sub);
   if (!s.online) {
     return `<section class="go-online">
       <h1>Habari, ${ctx.firstName()}</h1>
@@ -590,6 +610,7 @@ function onlineHtml(s) {
 // ---- Ada ya mwezi
 function subscriptionNoteHtml(sub) {
   if (!sub || sub.state === 'NONE') return '';
+  if (sub.waived) return '';
   if (sub.state === 'GRACE' || sub.state === 'EXPIRED') {
     return `<p class="alert alert-warn sub-note" role="note"><strong>Ada yako ya mwezi imeisha.</strong> Lipa ${formatTsh(sub.monthlyFee)} kabla ya ${esc(
       formatDate(sub.graceEndsAt, true),
@@ -608,8 +629,9 @@ function subscriptionBlockHtml(sub) {
     <h1>Ada ya mwezi imeisha</h1>
     <p>Lipa <strong>${formatTsh(sub.monthlyFee)}</strong> kwa mwezi ili uendelee kupokea safari za NAYA.</p>
     <p class="sub-how">${esc(sub.paymentInstructions)}</p>
-    <p class="muted">Ofisi ikishapokea malipo yako, utaweza kwenda online mara moja.</p>
-    <button class="btn btn-primary btn-block" type="button" data-ride="reload">Nimeshalipa — angalia tena</button>
+    <p class="muted">Malipo yakishapokelewa, utaweza kwenda online mara moja.</p>
+    <a class="btn btn-primary btn-block" href="#/akaunti/ada">Lipa ada</a>
+    <button class="btn btn-ghost btn-block" type="button" data-ride="reload">Nimeshalipa — angalia tena</button>
   </section>`;
 }
 
@@ -683,6 +705,18 @@ function startOfferCountdown(seconds, total) {
   }, 1000);
 }
 
+/** Dereva, safari ya ofa imekamilika: sehemu ya NAYA inatumwa vipi? */
+function payoutLine(ride) {
+  const amt = formatTsh(ride.promo.discount);
+  const st = ride.promoPayout?.state;
+  if (st === 'PENDING') return `NAYA inakutumia ${amt} sasa hivi kwenye namba yako kuu ya malipo.`;
+  if (st === 'PAID') return `NAYA imekutumia ${amt} kwenye namba yako kuu ya malipo.`;
+  if (st === 'HELD') return `NAYA itakutumia ${amt} baada ya ukaguzi wa ofisi.`;
+  if (st === 'WAITING') return `NAYA itakutumia ${amt} pamoja na safari zako zijazo za ofa (kiasi kidogo hakitumwi peke yake).`;
+  if (st === 'FAILED') return `Kutuma ${amt} kumeshindwa — ofisi itakutumia tena.`;
+  return `NAYA itakutumia ${amt} kwenye namba yako ya malipo (Akaunti → Malipo ya ofa).`;
+}
+
 function driverRideHtml(ride) {
   const p = ride.passenger;
   const steps = {
@@ -714,9 +748,10 @@ function driverRideHtml(ride) {
   };
   if (ride.status === 'COMPLETED') {
     return `<section class="ride-head ride-done" role="status"><span class="ride-pulse" aria-hidden="true"></span>
-        <h1>Pokea ${formatTsh(ride.passengerPays ?? ride.fare)}</h1><p>Taslimu kutoka kwa ${esc(p?.name ?? 'abiria')}.${
-          ride.promo ? ` NAYA itakutumia ${formatTsh(ride.promo.discount)} kwenye namba yako ya malipo (Akaunti → Malipo ya ofa).` : ''
-        }</p></section>
+        <h1>${ride.farePay?.settlement === 'MOBILE' ? 'Umelipwa' : 'Pokea'} ${formatTsh(ride.passengerPays ?? ride.fare)}</h1><p>${
+          ride.farePay?.settlement === 'MOBILE' ? `Kwa simu kutoka kwa ${esc(p?.name ?? 'abiria')} — iko kwenye wallet yako.` : ride.farePay?.enabled ? `Kutoka kwa ${esc(p?.name ?? 'abiria')}: kwa simu (app yake) au taslimu.` : `Taslimu kutoka kwa ${esc(p?.name ?? 'abiria')}.`
+        }${ride.promo ? ` ${payoutLine(ride)}` : ''}</p></section>
+      ${farepay.driverSectionHtml(ride, fareUi)}
       <form class="card" id="rate-passenger-form">
         ${stars('rating', `Mpe ${esc(p?.name.split(' ')[0] ?? 'abiria')} nyota`)}
         <p class="alert alert-danger" id="rate-error" role="alert" hidden></p>
@@ -747,7 +782,7 @@ function driverRideHtml(ride) {
     <section class="card">
       <div class="driver-top">
         <span class="driver-photo pax-photo" id="pax-photo">${paxInitials(p?.name)}</span>
-        <span class="driver-who"><strong>${esc(p?.name ?? 'Abiria')}</strong><span class="muted">${esc(paxMeta(p))}</span><span class="muted">Abiria · ${formatTsh(ride.passengerPays ?? ride.fare)} taslimu</span></span>
+        <span class="driver-who"><strong>${esc(p?.name ?? 'Abiria')}</strong><span class="muted">${esc(paxMeta(p))}</span><span class="muted">Abiria · nauli ${formatTsh(ride.passengerPays ?? ride.fare)}</span></span>
       </div>
       <div class="actions two">
         ${p ? `<a class="btn btn-ghost call" href="${tel(p.phone)}">${ICON.phone} Piga simu</a>` : ''}
@@ -881,6 +916,47 @@ async function onClick(event) {
   if (!el) return;
   const action = el.dataset.ride;
   const id = el.dataset.id;
+
+  // Nauli kwa simu (abiria / dereva)
+  if (action === 'fare-pay' && passengerRide) {
+    const phone = farepay.phoneValue('fp-phone');
+    if (phone.replace(/\D/g, '').length < 9) {
+      fareUi = { error: 'Weka namba ya simu ya kulipia.' };
+      lastKey = '';
+      return renderPassengerRide(passengerRide);
+    }
+    fareUi = { busy: true };
+    lastKey = '';
+    renderPassengerRide(passengerRide);
+    try {
+      await ctx.api.post(`/api/rides/${passengerRide.id}/pay`, { phone });
+      fareUi = {};
+    } catch (err) {
+      if (ctx.handleError(err)) return;
+      fareUi = { error: err.message };
+    }
+    lastKey = '';
+    return refreshPassenger();
+  }
+  if (action === 'settle-debt' || action === 'settle-debt-keep') {
+    fareUi = { debtConfirm: action === 'settle-debt' };
+    lastKey = '';
+    return renderDriverDashboard();
+  }
+  if ((action === 'settle-cash' || action === 'settle-debt-confirm') && id) {
+    fareUi = { ...fareUi, busy: true, error: null };
+    el.disabled = true;
+    try {
+      await ctx.api.post(`/api/driver/rides/${id}/settle`, { how: action === 'settle-cash' ? 'CASH' : 'DEBT' });
+      fareUi = {};
+      ctx.toast(action === 'settle-cash' ? 'Imeandikwa: umepokea taslimu' : 'Deni limeandikwa');
+    } catch (err) {
+      if (ctx.handleError(err)) return;
+      fareUi = { ...fareUi, busy: false, error: err.message };
+    }
+    lastKey = '';
+    return refreshDriver();
+  }
 
   // Abiria
   if (action === 'cancel' || action === 'cancel-keep') {

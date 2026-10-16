@@ -11,8 +11,8 @@ import { codeSchema, loginSchema, passwordSchema, phoneSchema, registerSchema } 
  *  ("driver"/"customer" ni majina ya zamani ya app — yanaelekezwa kwenye app moja.) */
 const PORTAL_ROLES: Record<string, UserRole[]> = {
   admin: ADMIN_ROLES,
-  app: ['USER'],
-  driver: ['USER'],
+  app: ['USER', 'STAFF'], // NAYA Staff wanaingia kwenye app ile ile (wanapata kazi zao tu)
+  driver: ['USER', 'STAFF'],
   customer: ['USER'],
 };
 const portalSchema = z.object({ portal: z.enum(['admin', 'app', 'driver', 'customer']).optional() });

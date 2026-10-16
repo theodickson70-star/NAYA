@@ -1371,3 +1371,36 @@ input, select, textarea { font-size: 17px; padding: 13px 14px; border-radius: va
 .mw-paylink .muted { color: #CFE9DA; font-size: 13.5px; }
 .mw-paylink > span:last-child { font-size: 24px; color: var(--gold-2); }
 .mw-result .btn { text-decoration: none; }
+
+/* Nauli kwa simu (0.22.0) */
+.fp-card h2 { margin: 0 0 8px; font-size: 18px; }
+.fp-card.is-ok, .fp-card.is-muted, .fp-card.is-bad { display: flex; gap: 14px; align-items: flex-start; }
+.fp-card.is-ok { background: linear-gradient(180deg, #E9F6EF, #fff); }
+.fp-card.is-bad { background: #FBECE9; }
+.fp-card.is-bad h2 { color: var(--danger, #C2412D); }
+.fp-card.is-bad > div { flex: 1; }
+.fp-card.is-bad .btn { margin-top: 10px; }
+.fp-ico { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: var(--g700); color: #fff; }
+.fp-card.is-muted .fp-ico { background: #E6ECE9; color: #3E4F47; }
+.fp-ico svg, .fp-card .btn svg, .fp-note svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.fp-card .btn svg { margin-right: 8px; vertical-align: -5px; }
+.fp-sum { margin: 4px 0 14px; padding: 4px 14px; border-radius: 14px; background: #F3F6F4; }
+.fp-sum div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 7px 0; }
+.fp-sum dt { color: #5C6A62; font-size: 15px; }
+.fp-sum dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fp-sum .is-total { border-top: 1.5px dashed #CBD8D0; margin-top: 2px; padding-top: 9px; }
+.fp-sum .is-total dt { color: var(--ink); font-weight: 700; }
+.fp-sum .is-total dd { font-size: 20px; font-weight: 800; }
+.fp-phone { font-size: 20px; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+.fp-or { margin: 12px 0 0; text-align: center; color: #5C6A62; font-size: 14.5px; }
+.fp-note { display: flex; align-items: center; gap: 8px; margin: 10px 0; color: var(--g700); font-weight: 700; }
+.fp-wait { display: flex; gap: 14px; align-items: center; }
+.fp-wait p { margin: 0; line-height: 1.45; }
+.fp-spin { flex: none; width: 34px; height: 34px; border-radius: 50%; border: 3.5px solid #DCE7E1; border-top-color: var(--g700); animation: fp-spin 0.9s linear infinite; }
+@keyframes fp-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .fp-spin { animation-duration: 2.5s; } }
+.fp-debts { list-style: none; padding: 6px 16px; }
+.fp-debts li { display: flex; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid #E6ECE9; }
+.fp-debts li:last-child { border-bottom: 0; }
+.fp-debts li > span { display: flex; flex-direction: column; gap: 2px; }
+.fp-debts li > strong { white-space: nowrap; }

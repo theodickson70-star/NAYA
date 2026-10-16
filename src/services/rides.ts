@@ -6,6 +6,7 @@
 //
 // Kila badiliko linafanyika ndani ya transaction kwa "UPDATE … WHERE status = <inayotarajiwa>" au row lock,
 // na database ina unique indexes zinazozuia dereva/abiria kuwa na safari mbili zinazoendelea.
+import { assertNoDebt, fareState, getRidePaySettings } from './ride-payments.js';
 import { randomInt } from 'node:crypto';
 import { type Db, db, many, one, transaction } from '../db/pool.js';
 import { publish } from '../realtime/hub.js';
@@ -121,6 +122,10 @@ interface RideRow {
   auto_arrived: boolean;
   auto_started: boolean;
   completed_by: 'DRIVER' | 'PASSENGER' | 'AUTO' | 'ADMIN' | null;
+  /** Migration 031: nauli kwa simu / cash / deni */
+  fare_settlement: 'CASH' | 'MOBILE' | 'DEBT' | null;
+  fare_settled_at: Date | null;
+  debt_cleared_at: Date | null;
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
@@ -452,6 +457,7 @@ async function passengerView(client: Db, r: RideRow) {
     ...baseView(r),
     ratingForDriver: r.rating_for_driver,
     redispatched,
+    farePay: await fareState(client, r),
     // PIN ya kuanza safari: abiria anampa dereva akishapanda (inaonekana kwa abiria tu).
     pin: ['ACCEPTED', 'ARRIVED'].includes(r.status) ? r.start_pin : null,
     shared: live && r.share_token_hash !== null,
@@ -472,6 +478,8 @@ async function driverView(client: Db, r: RideRow) {
   return {
     ...baseView(r),
     ratingForPassenger: r.rating_for_passenger,
+    // Dereva haoni namba alizotumia mlipaji (anaweza kuwa mtu mwingine) wala sababu za mtandao
+    farePay: await fareState(client, r).then((f) => f && { ...f, pending: f.pending ? { id: f.pending.id } : null, last: null, numbersUsed: [] }),
     passenger: passenger && { name: passenger.full_name, phone: passenger.phone, hasPhoto: card?.hasPhoto ?? false, rating: card?.rating ?? null, trips: card?.trips ?? 0 },
     pinRequired: r.status === 'ARRIVED' && r.start_pin !== null,
     // Malipo ya ofa ya moja kwa moja: PENDING (inatumwa) · PAID · HELD (inasubiri ukaguzi) · FAILED · REJECTED · null (ya mkono)
@@ -523,6 +531,7 @@ export async function requestRide(
   input: { pickup: { locationId: string } | { lat: number; lng: number }; destination: { locationId: string }; vehicleType: VehicleType },
 ) {
   await assertPhoneVerified(db, passengerId);
+  await assertNoDebt(db, passengerId); // 0.22.0: deni la nauli → 402, app inampeleka "Deni langu"
   const online = await one(db, 'SELECT 1 FROM naya.drivers WHERE user_id = $1 AND is_online', [passengerId]);
   if (online) throw conflict('Uko online kama dereva. Nenda offline kwanza ili kuagiza safari.');
 
@@ -1070,12 +1079,13 @@ export async function advanceRide(driverId: string, rideId: string, step: keyof 
     void onPromoRideCompleted(rideId).catch((error) => console.error(`[payments] ofa ${rideId}: ${(error as Error).message}`));
   }
   const pays = tsh(ride.fare - ride.promo_discount);
+  const phonePay = step === 'complete' && (await getRidePaySettings()).enabled;
   const messages = {
     arrive: { title: 'Dereva amefika!', body: `Anakusubiri ${ride.pickup_name}.`, urgent: true },
     start: null,
     complete: {
       title: `Umefika ${ride.dest_name}`,
-      body: `Lipa dereva ${pays} taslimu.${ride.promo_discount > 0 ? ` Ofa ya NAYA imelipa ${tsh(ride.promo_discount)}.` : ''} Asante kwa kusafiri na NAYA.`,
+      body: `Lipa dereva ${pays}${phonePay ? ' kwa simu kwenye app au taslimu' : ' taslimu'}.${ride.promo_discount > 0 ? ` Ofa ya NAYA imelipa ${tsh(ride.promo_discount)}.` : ''} Asante kwa kusafiri na NAYA.`,
       urgent: false,
     },
   } as const;
@@ -1307,6 +1317,7 @@ export async function rideForAdmin(rideId: string) {
   );
   return {
     ...baseView(ride),
+    farePay: await fareState(db, ride),
     flags: ride.flags.filter((f) => f !== 'PIN_REMINDED'),
     autoArrived: ride.auto_arrived,
     ratingForDriver: ride.rating_for_driver,

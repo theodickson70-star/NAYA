@@ -58,7 +58,7 @@ const paySchema = z.object({
   phone: phoneField,
 });
 const listQuery = z.object({
-  kind: z.enum(['SUBSCRIPTION', 'PROMO_PAYOUT', 'WALLET_WITHDRAWAL']).optional(),
+  kind: z.enum(['SUBSCRIPTION', 'PROMO_PAYOUT', 'WALLET_WITHDRAWAL', 'RIDE_FARE']).optional(),
   status: z.enum(['PENDING', 'SUCCESS', 'FAILED']).optional(),
   q: z.string().trim().max(60).optional(),
 });

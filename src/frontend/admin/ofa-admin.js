@@ -3,10 +3,17 @@
 //   #/ofa/mpya               kuunda ofa
 //   #/ofa/<id>               ofa moja: kanuni, takwimu, safari zake, kubadilisha
 //   #/ofa/chunguza           kwa nini mteja fulani anaona / haoni ofa (namba ya simu)
-//   #/ofa/malipo             madereva wanaodaiwa na NAYA
-//   #/ofa/malipo/<driverId>  dereva mmoja: deni, namba za kutuma pesa, kuandika malipo, historia
+// Fedha → Malipo (0.18.0):
+//   #/malipo                    muhtasari: salio la Abliner, malipo yanayosubiri ukaguzi / yaliyoshindwa
+//   #/malipo/madereva           madereva wanaodaiwa na NAYA
+//   #/malipo/madereva/<id>      dereva mmoja: deni, namba za kutuma pesa, kuandika malipo, historia
+//   #/malipo/miamala            miamala yote ya simu
 import { escapeHtml as esc } from '/shared/api.js';
 import { flagBadges, formatDate, formatPhone, formatTsh } from '/shared/labels.js';
+import { toast as uiToast } from './ui.js';
+import { loadWallet } from './wallet-admin.js';
+import * as walletsAdmin from './wallets-admin.js';
+import * as nauliAdmin from './nauli-admin.js';
 
 let ctx = null;
 let host = null;
@@ -19,20 +26,7 @@ const n = (v) => Number(v ?? 0).toLocaleString('en-US');
 const STATUS = { ACTIVE: ['Inaendelea', 'ok'], PAUSED: ['Imesimamishwa', 'warn'], ENDED: ['Imeisha', 'muted'] };
 const PERIOD = { DAY: 'kwa siku', WEEK: 'kwa wiki', TOTAL: 'kipindi chote cha ofa' };
 const RIDE = { SEARCHING: 'Inatafuta', ACCEPTED: 'Dereva anakuja', ARRIVED: 'Amefika', IN_PROGRESS: 'Safarini', COMPLETED: 'Imekamilika', CANCELLED: 'Imeghairiwa', NO_DRIVER: 'Hakuna dereva' };
-function toast(message) {
-  let el = document.getElementById('ofa-toast');
-  if (!el) {
-    el = document.createElement('p');
-    el.id = 'ofa-toast';
-    el.className = 'ofa-toast';
-    el.setAttribute('role', 'status');
-    document.body.append(el);
-  }
-  el.textContent = message;
-  el.hidden = false;
-  clearTimeout(el._t);
-  el._t = setTimeout(() => (el.hidden = true), 3500);
-}
+const toast = (message) => uiToast(message);
 const showNumber = (network, phone) => (network === 'BANK' ? phone : formatPhone(phone));
 
 export function setup(context) {
@@ -41,6 +35,8 @@ export function setup(context) {
   host.addEventListener('click', onClick);
   host.addEventListener('submit', onSubmit);
   host.addEventListener('input', onInput);
+  walletsAdmin.setup({ api: ctx.api, onAuthError: ctx.onAuthError, tabs: () => tabs('wallet') }, host);
+  nauliAdmin.setup({ api: ctx.api, onAuthError: ctx.onAuthError, tabs: () => tabs('fare') }, host);
 }
 
 let view = 0; // kila ukurasa mpya: kazi za zamani (utafutaji uliochelewa n.k.) hazichori juu yake
@@ -50,22 +46,39 @@ export function open(parts) {
   view += 1;
   clearTimeout(searchTimer);
   clearTimeout(previewTimer);
-  const [, a, b] = parts;
+  const [root, a, b] = parts;
   host.innerHTML = '<p class="muted rp-loading">Inapakia…</p>';
-  if (a === 'malipo' && b) return loadPayoutDriver(b);
-  if (a === 'malipo') return loadPayouts();
+  if (root === 'malipo') {
+    if (a === 'miamala') return loadTransactions();
+    if (a === 'wallet') return walletsAdmin.open(b);
+    if (a === 'nauli') return nauliAdmin.open();
+    if (a === 'madereva' && b) return loadPayoutDriver(b);
+    if (a === 'madereva') return loadPayouts();
+    return loadFinanceHome();
+  }
   if (a === 'mpya') return renderForm(null);
   if (a === 'chunguza') return renderCheck();
   if (a) return loadOffer(a);
   return loadList();
 }
 
-const tabs = (current) => `<h1>Ofa za wateja</h1>
-  <nav class="rp-tabs" aria-label="Ofa">
-    <a href="#/ofa"${current === 'list' ? ' aria-current="page"' : ''}>Ofa</a>
-    <a href="#/ofa/chunguza"${current === 'check' ? ' aria-current="page"' : ''}>Chunguza mteja</a>
-    <a href="#/ofa/malipo"${current === 'pay' ? ' aria-current="page"' : ''}>Malipo kwa madereva</a>
-  </nav>`;
+const cur = (on) => (on ? ' aria-current="page"' : '');
+const tabs = (current) =>
+  ['home', 'pay', 'tx', 'wallet', 'fare'].includes(current)
+    ? `<div class="page-head"><div><h1>Malipo</h1><p class="muted">Salio la Abliner, malipo ya ofa kwa madereva na miamala yote ya simu.</p></div>
+        <a class="btn btn-ghost btn-small" href="#/mipangilio#malipo">Mipangilio ya malipo</a></div>
+      <nav class="rp-tabs" aria-label="Malipo">
+        <a href="#/malipo"${cur(current === 'home')}>Muhtasari</a>
+        <a href="#/malipo/madereva"${cur(current === 'pay')}>Madeni ya ofa kwa madereva</a>
+        <a href="#/malipo/miamala"${cur(current === 'tx')}>Miamala ya simu</a>
+        <a href="#/malipo/wallet"${cur(current === 'wallet')}>Wallet za madereva</a>
+        <a href="#/malipo/nauli"${cur(current === 'fare')}>Nauli kwa simu</a>
+      </nav>`
+    : `<div class="page-head"><div><h1>Ofa za wateja</h1><p class="muted">Punguzo kwa wateja — NAYA inamlipa dereva sehemu yake.</p></div></div>
+      <nav class="rp-tabs" aria-label="Ofa">
+        <a href="#/ofa"${cur(current === 'list')}>Ofa zote</a>
+        <a href="#/ofa/chunguza"${cur(current === 'check')}>Chunguza mteja</a>
+      </nav>`;
 
 const fail = (err) => {
   if (ctx.onAuthError(err)) return;
@@ -143,7 +156,7 @@ async function loadList() {
         <div class="rp-stat"><span>Safari za ofa</span><strong>${n(totals.rides)}</strong><small>Zilizokamilika</small></div>
         <div class="rp-stat"><span>Gharama ya NAYA</span><strong>${formatTsh(totals.cost)}</strong><small>Punguzo lote</small></div>
         <div class="rp-stat"><span>Imeshalipwa madereva</span><strong>${formatTsh(totals.paid)}</strong></div>
-        <a class="rp-stat rp-stat-link${totals.owed > 0 ? ' rp-stat-bad' : ''}" href="#/ofa/malipo"><span>Deni kwa madereva</span><strong>${formatTsh(totals.owed)}</strong><small>Fungua malipo</small></a>
+        <a class="rp-stat rp-stat-link${totals.owed > 0 ? ' rp-stat-bad' : ''}" href="#/malipo/madereva"><span>Deni kwa madereva</span><strong>${formatTsh(totals.owed)}</strong><small>Fungua malipo</small></a>
       </section>
       <div class="rp-toolbar"><a class="btn btn-ghost" href="#/ofa/chunguza">Mteja haoni ofa? Chunguza</a><a class="btn btn-primary" href="#/ofa/mpya">Unda ofa mpya</a></div>
       <div class="ofa-list">${promotions.length ? promotions.map(card).join('') : '<p class="empty">Bado hakuna ofa. Bonyeza "Unda ofa mpya".</p>'}</div>`;
@@ -347,6 +360,118 @@ async function loadFormCheck(v) {
   }
 }
 
+// ------------------------------------------------------------------ malipo ya papo hapo (kwa simu)
+
+const PAY_STATUS = { PENDING: ['warn', 'Inasubiri'], SUCCESS: ['ok', 'Imefaulu'], FAILED: ['bad', 'Imeshindwa'] };
+let txState = { kind: '', status: '', q: '' };
+
+/** Fedha → Malipo (#/malipo): salio la Abliner, hali ya malipo ya papo hapo, na malipo yanayohitaji uamuzi wa ofisi. */
+async function loadFinanceHome() {
+  const v = view;
+  host.innerHTML = `${tabs('home')}<div id="fin-wallet" class="wallet-slot"><div class="wallet-card is-loading" aria-busy="true"></div></div><div id="auto-pay"></div>`;
+  loadWallet(document.getElementById('fin-wallet'), { ctx, full: true });
+  const box = document.getElementById('auto-pay');
+  try {
+    const [o, q] = await Promise.all([ctx.api.get('/api/admin/payments/overview'), ctx.api.get('/api/admin/payments/queue')]);
+    if (!current(v) || !document.getElementById('auto-pay')) return;
+    if (!o.config.enabled) {
+      box.innerHTML = `<section class="panel auto-pay is-off"><h2>Malipo ya papo hapo</h2>
+        <p class="muted">Kampuni ya malipo bado haijaunganishwa (PAYMENT_PROVIDER kwenye Railway). Mpaka iunganishwe, lipa madereva kwa mkono kwenye <a href="#/malipo/madereva">Madeni ya ofa</a>.</p></section>`;
+      return;
+    }
+    const s = o.settings;
+    const rowsHeld = q.held
+      .map(
+        (r) => `<tr><td class="rp-nowrap"><a href="#/safari/${esc(r.id)}">${esc(formatDate(r.completedAt, true))}</a></td>
+          <td><a href="#/malipo/madereva/${esc(r.driverId)}"><strong>${esc(r.driverName)}</strong></a><span class="rp-sub">${esc(r.plate ?? '')}</span></td>
+          <td>${esc(r.from)} → ${esc(r.to)}${(r.flags ?? []).length ? `<span class="rp-sub">${flagBadges(r.flags, esc)}</span>` : ''}</td>
+          <td>${esc(r.reason ?? '')}</td>
+          <td class="num"><strong>${formatTsh(r.amount)}</strong><span class="rp-sub">${r.network ? `${esc(r.networkLabel)} ${esc(showNumber(r.network, r.payPhone))}` : 'Hajaweka namba'}</span></td>
+          <td class="rp-nowrap"><button class="btn btn-primary btn-small" type="button" data-auto="approve" data-id="${esc(r.id)}">Tuma</button>
+            <button class="btn btn-ghost btn-small" type="button" data-auto="reject" data-id="${esc(r.id)}">Kataa</button></td></tr>`,
+      )
+      .join('');
+    const rowsFailed = q.failed
+      .map(
+        (r) => `<tr><td class="rp-nowrap"><a href="#/safari/${esc(r.id)}">${esc(formatDate(r.completedAt, true))}</a></td>
+          <td><a href="#/malipo/madereva/${esc(r.driverId)}"><strong>${esc(r.driverName)}</strong></a><span class="rp-sub">${esc(r.plate ?? '')}</span></td>
+          <td>${esc(r.from)} → ${esc(r.to)}</td>
+          <td><span class="badge badge-bad">Imeshindwa</span> ${esc(r.reason ?? '')}<span class="rp-sub">Jaribio la ${n(r.attempt ?? 1)}</span></td>
+          <td class="num"><strong>${formatTsh(r.amount)}</strong><span class="rp-sub">${r.network ? `${esc(r.networkLabel)} ${esc(showNumber(r.network, r.payPhone))}` : ''}</span></td>
+          <td class="rp-nowrap"><button class="btn btn-primary btn-small" type="button" data-auto="approve" data-id="${esc(r.id)}">Jaribu tena</button>
+            <button class="btn btn-ghost btn-small" type="button" data-auto="reject" data-id="${esc(r.id)}">Kataa</button></td></tr>`,
+      )
+      .join('');
+    const head = '<thead><tr><th>Ilikamilika</th><th>Dereva</th><th>Safari</th><th>Sababu</th><th class="num">Kiasi</th><th></th></tr></thead>';
+    box.innerHTML = `<section class="panel auto-pay">
+      <div class="panel-head"><h2>Malipo ya ofa ya papo hapo</h2><span class="badge badge-${s.enabled ? 'ok' : 'muted'}">${s.enabled ? 'Yamewashwa' : 'Yamezimwa'}</span></div>
+      <p class="muted">Safari ya ofa ikikamilika, NAYA inamtumia dereva sehemu yake kwenye namba yake kuu — kama safari ni safi na ndani ya kikomo cha <strong>${formatTsh(s.dailyLimit)}</strong> kwa siku. Nyingine zinasubiri uamuzi wako hapa chini. <a href="#/mipangilio#malipo">Badilisha</a></p>
+      <p class="small muted">Siku 30 zilizopita: malipo ya ofa ${n(o.totals.payoutCount)} (${formatTsh(o.totals.payoutAmount)}) · ada kwa simu ${n(o.totals.subscriptionCount)} (${formatTsh(o.totals.subscriptionAmount)}) · <a href="#/malipo/miamala">Miamala yote</a></p>
+      ${q.held.length ? `<h3>Inasubiri ukaguzi <span class="badge badge-warn">${n(q.held.length)}</span></h3><div class="rp-scroll"><table class="rp-table">${head}<tbody>${rowsHeld}</tbody></table></div>` : ''}
+      ${q.failed.length ? `<h3>Yameshindwa kutumwa <span class="badge badge-bad">${n(q.failed.length)}</span></h3><div class="rp-scroll"><table class="rp-table">${head}<tbody>${rowsFailed}</tbody></table></div>` : ''}
+      ${
+        q.unconfirmed.length
+          ? `<h3>Hayajathibitishwa (zaidi ya dakika 5)</h3><p class="small muted">Kampuni ya malipo haijajibu bado. Usitume tena kwa mkono — angalia kwenye akaunti ya kampuni ya malipo kwa kumbukumbu hizi:</p>
+            <ul class="auto-unconfirmed">${q.unconfirmed.map((u) => `<li><strong>${esc(u.driverName)}</strong> · ${formatTsh(u.amount)} · ${esc(u.networkLabel ?? '')} ${esc(showNumber(u.network, u.phone))} · <code>${esc(u.reference)}</code></li>`).join('')}</ul>`
+          : ''
+      }
+      ${
+        (q.waiting ?? []).length
+          ? `<h3>Yanakusanywa <span class="badge badge-muted">${n(q.waiting.length)}</span></h3><p class="small muted">Deni dogo kuliko kima cha chini cha kutuma (${formatTsh(s.minPayout ?? 1000)}). Litatumwa lenyewe pamoja na safari zijazo za ofa za dereva huyo — hakuna unachohitaji kufanya.</p>
+            <ul class="auto-unconfirmed">${q.waiting.map((w) => `<li><a href="#/malipo/madereva/${esc(w.driverId)}"><strong>${esc(w.driverName)}</strong></a> · ${formatTsh(w.amount)} · safari ${n(w.rides)}</li>`).join('')}</ul>`
+          : ''
+      }
+      ${!q.held.length && !q.failed.length && !q.unconfirmed.length && !(q.waiting ?? []).length ? '<p class="empty">Hakuna malipo yanayosubiri.</p>' : ''}
+    </section>`;
+  } catch (err) {
+    fail(err);
+  }
+}
+
+async function loadTransactions() {
+  const v = view;
+  try {
+    const qs = new URLSearchParams();
+    if (txState.kind) qs.set('kind', txState.kind);
+    if (txState.status) qs.set('status', txState.status);
+    if (txState.q) qs.set('q', txState.q);
+    const rows = await ctx.api.get(`/api/admin/payments?${qs}`);
+    if (!current(v)) return;
+    const typing = document.activeElement?.id === 'tx-q';
+    const chip = (key, value, label) => `<button type="button" class="chip" data-tx="${key}" data-value="${value}" aria-pressed="${txState[key] === value}">${label}</button>`;
+    host.innerHTML = `${tabs('tx')}
+      <p class="rp-lead">Kila muamala wa pesa ya simu: ada ya mwezi iliyolipwa na madereva, na malipo ya ofa yaliyotumwa na NAYA. Linganisha na taarifa ya kampuni ya malipo kwa kumbukumbu.</p>
+      <div class="filters rp-chips" role="group" aria-label="Aina">${chip('kind', '', 'Yote')}${chip('kind', 'SUBSCRIPTION', 'Ada ya mwezi')}${chip('kind', 'PROMO_PAYOUT', 'Malipo ya ofa')}${chip('kind', 'WALLET_WITHDRAWAL', 'Kutoa wallet')}${chip('kind', 'RIDE_FARE', 'Nauli kwa simu')}</div>
+      <div class="filters rp-chips" role="group" aria-label="Hali">${chip('status', '', 'Hali zote')}${chip('status', 'SUCCESS', 'Imefaulu')}${chip('status', 'PENDING', 'Inasubiri')}${chip('status', 'FAILED', 'Imeshindwa')}</div>
+      <div class="rp-toolbar">
+        <input type="search" id="tx-q" class="search" placeholder="Tafuta jina, simu au kumbukumbu" value="${esc(txState.q)}" aria-label="Tafuta">
+        <button class="btn btn-ghost btn-small" type="button" data-tx-csv>Pakua Excel (CSV)</button>
+      </div>
+      ${rows.length
+        ? `<div class="rp-scroll"><table class="rp-table"><thead><tr><th>Muda</th><th>Aina</th><th>Jina</th><th>Namba</th><th class="num">Kiasi</th><th>Hali</th><th>Kumbukumbu</th></tr></thead><tbody>${rows
+            .map((t) => {
+              const [tone, label] = PAY_STATUS[t.status];
+              return `<tr><td class="rp-nowrap">${esc(formatDate(t.createdAt, true))}</td>
+                <td>${t.kind === 'SUBSCRIPTION' ? `Ada ya mwezi<span class="rp-sub">Imeingia${t.months ? ` · miezi ${n(t.months)}` : ''}</span>` : t.kind === 'WALLET_WITHDRAWAL' ? 'Kutoa wallet<span class="rp-sub">Imetoka</span>' : t.kind === 'RIDE_FARE' ? `${t.purpose === 'DEBT' ? 'Deni la nauli' : 'Nauli kwa simu'}<span class="rp-sub">Imeingia</span>` : 'Malipo ya ofa<span class="rp-sub">Imetoka</span>'}</td>
+                <td>${t.kind === 'RIDE_FARE' ? `<a href="#/wateja/${esc(t.driverId)}">${esc(t.driverName)}</a><span class="rp-sub">Abiria</span>` : `<a href="#/malipo/madereva/${esc(t.driverId)}">${esc(t.driverName)}</a>`}</td>
+                <td>${esc(t.networkLabel)}<span class="rp-sub">${esc(formatPhone(t.phone))}</span></td>
+                <td class="num"><strong>${formatTsh(t.amount)}</strong>${t.kind === 'WALLET_WITHDRAWAL' ? (t.fee ? `<span class="rp-sub">ada ${formatTsh(t.fee)} (dereva)</span>` : '') : t.kind === 'RIDE_FARE' ? (t.fee ? `<span class="rp-sub">nauli ${formatTsh(t.fare ?? t.amount)} + ada ${formatTsh(t.fee)}</span>` : '') : t.fee ? `<span class="rp-sub">+ ada ${formatTsh(t.fee)} (NAYA)</span>` : ''}</td>
+                <td><span class="badge badge-${tone}">${label}</span>${t.failureReason ? `<span class="rp-sub">${esc(t.failureReason)}</span>` : ''}</td>
+                <td><code>${esc(t.reference)}</code>${t.providerRef ? `<span class="rp-sub">${esc(t.providerRef)}</span>` : ''}</td></tr>`;
+            })
+            .join('')}</tbody></table></div>`
+        : '<p class="empty">Hakuna miamala bado.</p>'}`;
+    if (typing) {
+      const el = document.getElementById('tx-q');
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+    }
+  } catch (err) {
+    host.innerHTML = tabs('tx');
+    fail(err);
+  }
+}
+
 // ------------------------------------------------------------------ chunguza mteja
 
 function renderCheck() {
@@ -455,14 +580,14 @@ async function loadPayouts() {
         ? `<div class="rp-scroll"><table class="rp-table"><thead><tr><th>Dereva</th><th class="num">Safari za ofa</th><th class="num">NAYA inadaiwa</th><th class="num">Imelipwa</th><th class="num">Salio</th><th>Tuma kwenye namba</th><th>Malipo ya mwisho</th><th></th></tr></thead><tbody>${r.rows
             .map(
               (d) => `<tr>
-                <td><a class="rp-person" href="#/ofa/malipo/${esc(d.id)}"><strong>${esc(d.name)}</strong><span>${esc(formatPhone(d.phone))} · ${esc(d.plate ?? '')}</span></a></td>
+                <td><a class="rp-person" href="#/malipo/madereva/${esc(d.id)}"><strong>${esc(d.name)}</strong><span>${esc(formatPhone(d.phone))} · ${esc(d.plate ?? '')}</span></a></td>
                 <td class="num"><strong>${n(d.rides)}</strong><span class="rp-sub">Wiki hii ${n(d.weekRides)}</span></td>
                 <td class="num">${formatTsh(d.earned)}</td>
                 <td class="num">${formatTsh(d.paid)}</td>
                 <td class="num"><strong class="${d.balance > 0 ? 'ofa-owed' : ''}">${formatTsh(d.balance)}</strong></td>
                 <td>${d.network ? `<strong>${esc(d.networkLabel)}</strong><span class="rp-sub">${esc(showNumber(d.network, d.payPhone))} · ${esc(d.payName)}</span>` : '<span class="badge badge-bad">Hajaweka namba</span>'}</td>
                 <td class="rp-nowrap">${d.lastPaidAt ? esc(formatDate(d.lastPaidAt)) : '–'}</td>
-                <td>${d.balance > 0 ? `<a class="btn btn-primary btn-small" href="#/ofa/malipo/${esc(d.id)}">Lipa</a>` : `<a class="btn btn-ghost btn-small" href="#/ofa/malipo/${esc(d.id)}">Angalia</a>`}</td>
+                <td>${d.balance > 0 ? `<a class="btn btn-primary btn-small" href="#/malipo/madereva/${esc(d.id)}">Lipa</a>` : `<a class="btn btn-ghost btn-small" href="#/malipo/madereva/${esc(d.id)}">Angalia</a>`}</td>
               </tr>`,
             )
             .join('')}</tbody></table></div>`
@@ -509,7 +634,7 @@ async function loadPayoutDriver(driverId) {
             </form>`
           : `<p class="alert alert-warn" role="status">Dereva huyu bado hajaweka namba ya kupokea pesa. Mwambie afungue NAYA → Akaunti → <strong>Malipo ya ofa</strong> → Weka namba.</p>`
         : '';
-    host.innerHTML = `${tabs('pay')}<a class="back-link" href="#/ofa/malipo">Rudi kwa malipo</a>
+    host.innerHTML = `${tabs('pay')}<a class="back-link" href="#/malipo/madereva">Rudi kwa malipo</a>
       <div class="page-head"><div><h2 class="ofa-form-title">${esc(d.driver.name)}</h2><p class="muted">${esc(formatPhone(d.driver.phone))} · ${esc(d.driver.plate ?? '')}</p></div>
         <a class="btn btn-ghost btn-small" href="#/madereva/${esc(driverId)}">Fungua dereva</a></div>
       <section class="rp-stats">
@@ -531,10 +656,10 @@ async function loadPayoutDriver(driverId) {
                 (p) => `<tr class="${p.voidedAt ? 'is-void' : ''}">
                   <td class="rp-nowrap">${esc(formatDate(p.paidAt, true))}</td>
                   <td class="num"><strong>${formatTsh(p.amount)}</strong></td>
-                  <td>${esc(p.network)} ${esc(showNumber(p.network, p.phone))}<span class="rp-sub">${esc(p.accountName ?? '')}</span></td>
+                  <td>${p.network === 'WALLET' ? `Wallet ya NAYA<span class="rp-sub"><a href="#/malipo/wallet/${esc(driverId)}">Fungua wallet</a></span>` : `${esc(p.network)} ${esc(showNumber(p.network, p.phone))}<span class="rp-sub">${esc(p.accountName ?? '')}</span>`}</td>
                   <td>${esc(p.reference)}${p.note ? `<span class="rp-sub">${esc(p.note)}</span>` : ''}</td>
                   <td>${esc(p.paidBy)}</td>
-                  <td>${p.voidedAt ? `<span class="badge badge-muted" title="${esc(p.voidReason ?? '')}">Imefutwa</span>` : `<button class="link-btn link-danger" type="button" data-void="${esc(p.id)}" data-driver="${esc(driverId)}">Futa (nimekosea)</button>`}</td>
+                  <td>${p.voidedAt ? `<span class="badge badge-muted" title="${esc(p.voidReason ?? '')}">Imefutwa</span>` : p.network === 'WALLET' ? '<span class="small muted" title="Rekebisha kwenye wallet ikiwa kuna kosa">Kwenye wallet</span>' : `<button class="link-btn link-danger" type="button" data-void="${esc(p.id)}" data-driver="${esc(driverId)}">Futa (nimekosea)</button>`}</td>
                 </tr>`,
               )
               .join('')}</tbody></table></div>`
@@ -592,6 +717,50 @@ async function onClick(event) {
     host.querySelectorAll('[data-ofa-status="ACTIVE"]').forEach((b) => (b.disabled = false));
     return;
   }
+  const auto = event.target.closest('[data-auto]');
+  if (auto) {
+    const id = auto.dataset.id;
+    let body = {};
+    if (auto.dataset.auto === 'reject') {
+      const reason = prompt('Kwa nini unakataa malipo haya? (mf. safari hewa — abiria hakusafiri)');
+      if (!reason || reason.trim().length < 3) return;
+      body = { reason: reason.trim() };
+    } else if (!confirm('Tuma malipo haya kwa dereva sasa?')) return;
+    auto.disabled = true;
+    try {
+      const res = await ctx.api.post(`/api/admin/payments/rides/${id}/${auto.dataset.auto}`, body);
+      toast(auto.dataset.auto === 'reject' ? 'Malipo yamekataliwa' : res?.message ?? 'Malipo yanatumwa');
+      return loadFinanceHome();
+    } catch (err) {
+      auto.disabled = false;
+      return fail(err);
+    }
+  }
+  const tx = event.target.closest('[data-tx]');
+  if (tx) {
+    txState[tx.dataset.tx] = tx.dataset.value;
+    return loadTransactions();
+  }
+  if (event.target.closest('[data-tx-csv]')) {
+    const qs = new URLSearchParams();
+    if (txState.kind) qs.set('kind', txState.kind);
+    if (txState.status) qs.set('status', txState.status);
+    if (txState.q) qs.set('q', txState.q);
+    try {
+      const blob = await ctx.api.blob(`/api/admin/payments.csv?${qs}`);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `naya-malipo-ya-simu-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.append(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    } catch (err) {
+      fail(err);
+    }
+    return;
+  }
   const owed = event.target.closest('[data-pay-owed]');
   if (owed) {
     payState.owed = owed.dataset.payOwed === '1';
@@ -631,6 +800,14 @@ async function onClick(event) {
 
 function onInput(event) {
   if (event.target.closest('#ofa-form')) return updatePreview();
+  if (event.target.id === 'tx-q') {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      txState.q = event.target.value.trim();
+      loadTransactions();
+    }, 350);
+    return;
+  }
   if (event.target.id === 'pay-q') {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => {

@@ -26,6 +26,7 @@ import * as appUpdate from './update.js';
 import * as terms from './terms.js';
 import * as staff from './staff.js';
 import * as mywallet from './mywallet.js';
+import * as farepay from './farepay.js';
 import { initI18n, langSwitchHtml, onLangChange } from '/shared/i18n.js';
 import { finishSplash, previewSound, setSoundEnabled, soundEnabled, splashActive, splashReady } from './splash.js';
 
@@ -34,7 +35,7 @@ const api = createApi('naya_app_token');
 const $ = (id) => document.getElementById(id);
 const views = ['view-loading', 'view-intro', 'view-auth', 'view-verify', 'view-role', 'view-offline', 'view-app'];
 const MAX_BYTES = 3 * 1024 * 1024;
-const VERSION = '0.21.0';
+const VERSION = '0.22.0';
 
 let account = null; // { user, activeMode, driverStatus, canDrive }
 let driver = null; // wasifu wa udereva (mode ya Dereva)
@@ -815,8 +816,10 @@ function estimateBlock() {
     <button class="btn btn-primary btn-block" type="button" data-action="book">Agiza safari</button>
     <p class="muted small" style="margin-top:8px">${
       options.some((o) => o.promo)
-        ? 'Malipo: unalipa dereva kiasi kilichopunguzwa taslimu; NAYA inamlipa dereva kilichobaki.'
-        : 'Malipo: taslimu kwa dereva. Nauli ni makadirio kwa umbali wa barabara.'
+        ? `Malipo: unalipa kiasi kilichopunguzwa ${trip.estimate.ridePay ? 'kwa simu ukifika au taslimu' : 'taslimu'}; NAYA inamlipa dereva kilichobaki.`
+        : trip.estimate.ridePay
+          ? 'Malipo: ukifika, lipa kwa simu kwenye app (ada ndogo ya simu juu ya nauli) au taslimu kwa dereva.'
+          : 'Malipo: taslimu kwa dereva. Nauli ni makadirio kwa umbali wa barabara.'
     }</p>`;
 }
 
@@ -957,6 +960,7 @@ function renderAccount() {
   if (section === 'mipangilio') return renderSettings();
   if (section === 'ada') return renderSubscriptionPage();
   if (section === 'malipo-ya-ofa') return renderWalletPage();
+  if (section === 'deni') return farepay.renderDebtPage();
   if (section === 'wallet') return mywallet.render((location.hash.split('?')[0].split('/')[3] ?? '').trim());
   renderHub();
 }
@@ -1503,6 +1507,12 @@ $('app-content').addEventListener('click', async (event) => {
       tripHistory = null;
       passengerOffers = null;
     } catch (err) {
+      // 0.22.0: deni la nauli → "Deni langu" (lipa kwanza ndipo uagize)
+      if (err.status === 402) {
+        toast(err.message);
+        location.hash = '#/akaunti/deni';
+        return;
+      }
       if (handleError(err, 'book-error')) return;
       button.disabled = false;
       button.textContent = 'Agiza safari';
@@ -1646,6 +1656,7 @@ akaunti.init({
 });
 appUpdate.init({ api });
 staff.init({ api, toast, handleError, logout: () => logout(), account: () => account, reloadAccount: () => loadAccount() });
+farepay.init({ api, toast, handleError, myPhone: () => account?.user?.phone ?? null });
 rides.init({
   api,
   pushState: () => pushState(api),
@@ -1653,6 +1664,7 @@ rides.init({
   toast,
   handleError,
   firstName: () => firstName(),
+  myPhone: () => account?.user?.phone ?? null,
   emergency: () => account?.emergency ?? null,
   isPassengerHome: onPassengerHome,
   isDriverHome: () => account?.activeMode === 'DRIVER' && tab === 'home' && driver?.driver.status === 'APPROVED',

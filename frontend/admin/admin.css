@@ -1032,3 +1032,12 @@ a.kpi:hover, .queue-item:hover, .settings-tile:hover { transform: translateY(-2p
 .wl-resolve { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
 .wl-resolve .link-btn { font: inherit; font-size: 13px; font-weight: 700; color: var(--naya-green); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .wl-resolve .link-danger { color: var(--danger); }
+
+/* Nauli kwa simu (0.22.0) */
+.fa-settings { margin-top: 12px; }
+.fa-settings .actions { margin-top: 12px; }
+.fa-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin: 18px 0 8px; }
+.fa-head h3 { margin: 0; }
+.fa-act { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
+.fa-act .link-btn { font: inherit; font-size: 13px; font-weight: 700; color: var(--naya-green); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.fa-act .link-danger { color: var(--danger); }

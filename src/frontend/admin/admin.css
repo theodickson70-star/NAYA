@@ -537,6 +537,11 @@ a.kpi:hover { border-color: var(--naya-green); }
 .cand-list { display: grid; gap: 8px; margin-top: 10px; }
 .cand { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 12px; background: var(--white); border: 1px solid var(--line); }
 .cand small { display: block; color: var(--muted); }
+.cand.is-blocked { background: #FBFAF6; }
+.cand-why { display: block; margin-top: 3px; color: var(--danger); font-size: 14px; font-weight: 600; }
+.cand-sum { margin: 0 0 4px; }
+.cand-head { margin: 10px 0 0; font-size: 16px; }
+@media (max-width: 560px) { .cand { grid-template-columns: 1fr auto; } .cand > span:first-child { grid-column: 1 / -1; } }
 
 /* ---- Maoni ---- */
 .fb-list { display: grid; gap: 10px; }
@@ -725,3 +730,314 @@ a.kpi:hover { border-color: var(--naya-green); }
 
 .profile-avatar { overflow: hidden; }
 .profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+/* Malipo ya papo hapo (0.16.0) */
+.auto-pay { margin-top: 16px; }
+.auto-pay.is-off { background: var(--bg); }
+.auto-pay h3 { margin: 18px 0 8px; font-size: 16px; display: flex; gap: 8px; align-items: center; }
+.auto-pay-form { display: flex; flex-wrap: wrap; align-items: end; gap: 10px 14px; margin: 12px 0 6px; }
+.auto-pay-form label[for="ap-limit"] { margin: 0; font-size: 14px; }
+.auto-pay-form input[type="number"] { width: 140px; }
+.auto-pay-form .check { margin: 0 8px 8px 0; }
+.auto-pay-form .alert { flex-basis: 100%; }
+.auto-unconfirmed { margin: 6px 0 0; padding-left: 18px; font-size: 14px; display: grid; gap: 4px; }
+
+/* ---- Mfumo huru (Ada ya mwezi) ---- */
+.open-mode { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; align-items: center; margin: 4px 0 14px; padding: 16px 18px; border-radius: 14px; background: var(--white); border: 1px solid var(--line); }
+.open-mode.is-on { background: var(--naya-mint); border-color: var(--naya-green); }
+.open-mode h2 { margin: 0 0 4px; font-size: 18px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.open-mode p { margin: 0; }
+.open-mode .alert { grid-column: 1 / -1; }
+@media (max-width: 560px) { .open-mode { grid-template-columns: 1fr; } }
+.open-mode.is-on .badge-ok { background: var(--white); }
+
+/* ---- Abliner: kagua muunganiko ---- */
+.ap-check { margin: 6px 0 12px; }
+.ap-check .alert { margin: 8px 0 0; }
+.ap-check code { overflow-wrap: anywhere; }
+
+/* =====================================================================
+   0.18.0 — Mpangilio mpya wa ofisi: menyu ya makundi, alama inayoteleza,
+   kukunja menyu, kichwa cha ukurasa, Fedha → Malipo, Mipangilio ya mfumo
+   ===================================================================== */
+:root { --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1); }
+
+/* ---- Menyu ya pembeni ---- */
+.shell { transition: grid-template-columns 0.28s var(--ease-out); }
+.sidebar { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.18) transparent; }
+.side-nav { position: relative; gap: 1px; }
+.side-group { display: flex; align-items: center; gap: 10px; margin: 18px 12px 6px; font-size: 12px; font-weight: 700; color: rgba(255, 255, 255, 0.42); white-space: nowrap; }
+.side-group::after { content: ""; flex: 1; height: 1px; background: rgba(255, 255, 255, 0.08); }
+.side-nav a { position: relative; z-index: 1; padding: 9px 12px; font-size: 15px; white-space: nowrap; }
+.side-nav a:hover { background: rgba(255, 255, 255, 0.05); }
+.side-nav a[aria-current="page"] { background: transparent; color: var(--white); }
+.side-nav a[aria-current="page"] .ico { color: var(--warning); }
+.side-nav a[aria-current="page"] .nav-count-soft { background: rgba(124, 227, 168, 0.18); color: #9BEBBF; }
+.side-indicator {
+  position: absolute; left: 0; right: 0; top: 0; height: 42px; z-index: 0; pointer-events: none; opacity: 0;
+  border-radius: 12px; background: rgba(255, 255, 255, 0.11); box-shadow: inset 3px 0 0 var(--warning);
+  transition: transform 0.34s var(--ease-out), height 0.34s var(--ease-out), opacity 0.2s;
+}
+.nav-label { overflow: hidden; text-overflow: ellipsis; }
+.side-collapse {
+  display: flex; align-items: center; gap: 12px; margin-top: 10px; padding: 9px 12px; border: 0; border-radius: 12px;
+  background: transparent; color: rgba(255, 255, 255, 0.55); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.side-collapse:hover { background: rgba(255, 255, 255, 0.05); color: var(--white); }
+.side-collapse:focus-visible { outline: 3px solid var(--warning); outline-offset: 1px; }
+.side-collapse .ico { transition: transform 0.28s var(--ease-out); }
+
+/* Menyu iliyokunjwa: alama tu (jina linaonekana ukishikilia kipanya juu yake) */
+.shell.side-collapsed { --side-w: 78px; }
+.side-collapsed .sidebar { padding-left: 12px; padding-right: 12px; overflow-x: hidden; }
+.side-collapsed .side-wordmark, .side-collapsed .side-area, .side-collapsed .nav-label, .side-collapsed .side-me { display: none; }
+.side-collapsed .side-brand { justify-content: center; padding-left: 0; padding-right: 0; }
+.side-collapsed .side-group { margin: 12px 8px 6px; }
+.side-collapsed .side-group span { display: none; }
+.side-collapsed .side-nav a, .side-collapsed .side-collapse { justify-content: center; padding-left: 0; padding-right: 0; }
+.side-collapsed .side-nav .nav-count { position: absolute; top: 3px; right: 6px; min-width: 18px; padding: 0 5px; font-size: 11px; line-height: 18px; text-align: center; }
+.side-collapsed .side-collapse .ico { transform: rotate(180deg); }
+.side-collapsed .side-user { flex-direction: column; padding-left: 0; padding-right: 0; }
+.side-collapsed .side-logout { margin-left: 0; }
+
+/* ---- Kichwa cha juu ---- */
+.appbar-title { display: flex; align-items: baseline; gap: 8px; min-width: 0; flex: none; max-width: 34%; }
+.crumb-group { color: var(--muted); font-size: 14px; white-space: nowrap; }
+.crumb-group:not(:empty)::after { content: "/"; margin-left: 8px; color: var(--line); }
+.crumb-page { font-family: var(--font-display); font-weight: 800; font-size: 18px; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.appbar .global-search { margin-left: auto; }
+
+@media (max-width: 960px) {
+  .side-collapse { display: none; }
+  .shell.side-collapsed { --side-w: 248px; }
+  .sidebar { transition: transform 0.3s var(--ease-out); }
+  .side-scrim { animation: fade-in 0.25s ease both; }
+  /* Menyu ya simu ikifunguka, viungo vinaingia kwa mpangilio */
+  .menu-open .side-nav > a, .menu-open .side-group { animation: slide-in 0.38s var(--ease-out) both; }
+  .menu-open .side-nav > :nth-child(-n + 6) { animation-delay: 40ms; }
+  .menu-open .side-nav > :nth-child(n + 7):nth-child(-n + 14) { animation-delay: 90ms; }
+  .menu-open .side-nav > :nth-child(n + 15) { animation-delay: 140ms; }
+}
+@media (max-width: 760px) {
+  .appbar { flex-wrap: wrap; row-gap: 10px; padding-top: 10px; padding-bottom: 10px; }
+  .appbar-title { flex: 1; max-width: none; }
+  .crumb-group { display: none; }
+  .appbar .global-search { order: 3; flex-basis: 100%; max-width: none; margin-left: 0; }
+  .live-pill { margin-left: 0; }
+}
+
+/* ---- Mwendo: kurasa zinaingia taratibu ---- */
+.page-enter { animation: page-in 0.32s var(--ease-out) both; }
+@keyframes page-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes slide-in { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: none; } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* Muhtasari unafunguka mara ya kwanza: sehemu zinaingia moja baada ya nyingine */
+.ov-intro .overview-head { animation: rise 0.45s var(--ease-out) both; }
+.ov-intro .queue { animation: rise 0.45s var(--ease-out) 60ms both; }
+.ov-intro .kpi { animation: rise 0.5s var(--ease-out) both; }
+.ov-intro .kpi:nth-child(1) { animation-delay: 120ms; }
+.ov-intro .kpi:nth-child(2) { animation-delay: 160ms; }
+.ov-intro .kpi:nth-child(3) { animation-delay: 200ms; }
+.ov-intro .kpi:nth-child(4) { animation-delay: 240ms; }
+.ov-intro .kpi:nth-child(5) { animation-delay: 280ms; }
+.ov-intro .kpi:nth-child(6) { animation-delay: 320ms; }
+.ov-intro .kpi:nth-child(7) { animation-delay: 360ms; }
+.ov-intro .kpi:nth-child(8) { animation-delay: 400ms; }
+.ov-intro .overview-money { animation: rise 0.5s var(--ease-out) 440ms both; }
+.ov-intro .chart-panel { animation: rise 0.5s var(--ease-out) 500ms both; }
+.ov-intro .overview-split { animation: rise 0.5s var(--ease-out) 560ms both; }
+
+.kpi, .queue-item, .settings-tile { transition: border-color 0.18s, transform 0.18s var(--ease-out), box-shadow 0.18s; }
+a.kpi:hover, .queue-item:hover, .settings-tile:hover { transform: translateY(-2px); box-shadow: 0 10px 24px -16px rgba(6, 48, 28, 0.45); }
+
+/* ---- Kadi ya salio la Abliner ---- */
+.overview-money { margin-top: 14px; }
+.wallet-slot { margin-top: 18px; }
+.overview-money .wallet-slot { margin-top: 0; }
+.wallet-card {
+  position: relative; overflow: hidden; display: grid; grid-template-columns: minmax(220px, 1.1fr) 2fr; gap: 18px 28px; align-items: center;
+  padding: 22px 24px; border-radius: 20px; color: var(--white);
+  background: radial-gradient(120% 140% at 100% 0%, rgba(242, 183, 5, 0.16), transparent 45%), linear-gradient(135deg, #052618 0%, #0A6E47 100%);
+}
+.wallet-card.is-loading { min-height: 150px; background: linear-gradient(100deg, #E7EEEA 30%, #F3F7F5 50%, #E7EEEA 70%); background-size: 300% 100%; animation: shimmer 1.4s linear infinite; }
+@keyframes shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+.wallet-card.is-low { background: radial-gradient(120% 140% at 100% 0%, rgba(255, 196, 120, 0.2), transparent 45%), linear-gradient(135deg, #3B0D06 0%, #A8321F 100%); }
+.wallet-card.is-off { color: var(--ink); background: var(--white); border: 1px solid var(--line); }
+.wc-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.wc-label { font-size: 14px; color: rgba(255, 255, 255, 0.75); }
+.wc-balance { font-family: var(--font-display); font-weight: 800; font-size: clamp(32px, 4vw, 44px); line-height: 1.05; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.wc-balance-off { font-size: 26px; color: var(--muted); }
+.wc-status { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: rgba(255, 255, 255, 0.78); }
+.wc-status i { width: 8px; height: 8px; border-radius: 50%; background: #3BE08F; box-shadow: 0 0 0 4px rgba(59, 224, 143, 0.2); flex: none; }
+.is-low .wc-status i { background: #FFB4A6; box-shadow: 0 0 0 4px rgba(255, 180, 166, 0.25); animation: live-beat 1.6s ease-in-out infinite; }
+.is-off .wc-label, .is-off .wc-status { color: var(--muted); }
+.is-off .wc-status i { background: var(--offline); box-shadow: none; }
+.wc-flow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; border-radius: 14px; background: rgba(255, 255, 255, 0.08); }
+.is-off .wc-flow { background: var(--bg); }
+.wc-flow div { padding: 12px 14px; min-width: 0; }
+.wc-flow div + div { border-left: 1px solid rgba(255, 255, 255, 0.12); }
+.is-off .wc-flow div + div { border-left-color: var(--line); }
+.wc-flow dt { font-size: 13px; color: rgba(255, 255, 255, 0.7); }
+.is-off .wc-flow dt { color: var(--muted); }
+.wc-flow dd { margin: 2px 0 0; font-family: var(--font-display); font-weight: 800; font-size: 19px; font-variant-numeric: tabular-nums; }
+.wc-flow small { display: block; font-family: var(--font-body); font-weight: 400; font-size: 12px; opacity: 0.72; }
+.wc-actions { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; }
+.wc-btn {
+  display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; font: inherit; font-size: 14px; font-weight: 700;
+  color: inherit; text-decoration: none; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); cursor: pointer;
+  transition: background 0.15s;
+}
+.wc-btn:hover { background: rgba(255, 255, 255, 0.18); }
+.wc-btn:focus-visible { outline: 3px solid var(--warning); outline-offset: 2px; }
+.wc-btn .ico { width: 16px; height: 16px; }
+.wc-btn-strong { background: var(--warning); border-color: var(--warning); color: #2B2000; }
+.wc-btn-strong:hover { background: #FFC93A; }
+.is-off .wc-btn { background: var(--white); border-color: var(--line); }
+.is-off .wc-btn-strong { background: var(--naya-green); border-color: var(--naya-green); color: var(--white); }
+.wc-btn.spinning .ico { animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.wc-alert { grid-column: 1 / -1; margin: 0; padding: 10px 14px; border-radius: 12px; background: rgba(255, 255, 255, 0.14); font-size: 15px; }
+@media (max-width: 760px) {
+  .wallet-card { grid-template-columns: 1fr; padding: 18px; }
+  .wc-flow { grid-template-columns: 1fr; }
+  .wc-flow div + div { border-left: 0; border-top: 1px solid rgba(255, 255, 255, 0.12); }
+  .is-off .wc-flow div + div { border-top-color: var(--line); }
+  .wc-flow div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .wc-flow dd { text-align: right; }
+}
+
+/* ---- Mipangilio ya mfumo ---- */
+.settings-toc { position: sticky; top: 76px; z-index: 5; display: flex; gap: 4px; margin: 16px 0 8px; padding: 4px; background: #EAF1ED; border-radius: 14px; overflow-x: auto; scrollbar-width: none; }
+.settings-toc a { padding: 8px 14px; border-radius: 10px; color: var(--ink); font-weight: 700; font-size: 14px; text-decoration: none; white-space: nowrap; transition: background 0.15s; }
+.settings-toc a:hover { background: rgba(255, 255, 255, 0.7); }
+.settings-section { margin-top: 26px; scroll-margin-top: 140px; border-radius: 18px; }
+.settings-section > header { margin-bottom: 10px; }
+.settings-section > header h2 { margin: 0; }
+.settings-section > header p { margin: 2px 0 0; }
+.settings-section.flash { animation: flash 1.6s ease-out; }
+@keyframes flash { 0% { box-shadow: 0 0 0 0 rgba(242, 183, 5, 0); } 15% { box-shadow: 0 0 0 6px rgba(242, 183, 5, 0.45); } 100% { box-shadow: 0 0 0 14px rgba(242, 183, 5, 0); } }
+.settings-card { background: var(--white); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; margin: 0 0 12px; }
+.settings-card h3 { margin: 0 0 8px; font-size: 17px; }
+.settings-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+.settings-row h3 { margin-bottom: 2px; }
+.settings-row p { margin: 0; }
+.settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; margin-top: 10px; }
+.settings-section .open-mode { margin: 0 0 12px; }
+.settings-section .open-mode h3 { margin: 0 0 4px; font-size: 17px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.settings-section .sub-settings .pay-grid { margin-top: 0; }
+#set-check-out .alert { margin: 10px 0 0; }
+#set-check-out code { overflow-wrap: anywhere; }
+.settings-links { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.settings-tile { display: flex; flex-direction: column; gap: 4px; padding: 16px 18px; background: var(--white); border: 1px solid var(--line); border-radius: 16px; color: inherit; text-decoration: none; }
+.settings-tile strong { font-family: var(--font-display); font-size: 17px; color: var(--naya-green-dark); }
+.settings-tile span { color: var(--muted); font-size: 14px; }
+.settings-tile:hover { border-color: var(--naya-green); }
+.settings-link { margin: 18px 0 0; }
+.settings-link a { color: var(--naya-green); font-weight: 700; }
+@media (max-width: 760px) {
+  .settings-toc { top: 118px; }
+  .settings-grid, .settings-links { grid-template-columns: 1fr; }
+}
+
+/* ---- Ujumbe mfupi (toast) ---- */
+.admin-toast {
+  position: fixed; left: 50%; bottom: 24px; z-index: 1200; margin: 0; padding: 12px 18px; border-radius: 14px;
+  background: var(--ink); color: var(--white); font-weight: 700; box-shadow: 0 16px 36px -10px rgba(0, 0, 0, 0.4);
+  opacity: 0; transform: translate(-50%, 16px); pointer-events: none; transition: opacity 0.22s, transform 0.3s var(--ease-out);
+}
+.admin-toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+@media (prefers-reduced-motion: reduce) {
+  .shell, .sidebar, .side-indicator, .side-collapse .ico, .kpi, .queue-item, .settings-tile, .admin-toast, .wc-btn { transition: none; }
+  .page-enter, .ov-intro *, .menu-open .side-nav > *, .side-scrim, .settings-section.flash, .wallet-card.is-loading, .is-low .wc-status i, .wc-btn.spinning .ico { animation: none !important; }
+  a.kpi:hover, .queue-item:hover, .settings-tile:hover { transform: none; }
+}
+
+/* Menyu fupi zaidi (inatosha kwenye skrini ya laptop bila kusogeza) */
+.sidebar { padding-top: 14px; padding-bottom: 10px; }
+.side-brand { padding-bottom: 12px; }
+.side-group { margin: 12px 12px 4px; }
+.side-nav a { padding: 8px 12px; }
+.side-collapse { margin-top: 6px; padding: 8px 12px; }
+.side-user { padding-top: 10px; margin-top: 6px; }
+.auto-pay a:not(.btn), .page-head + .rp-tabs ~ * a:not(.btn):not(.wc-btn):not(.rp-person) { color: var(--naya-green); font-weight: 700; }
+.page-head a.btn { text-decoration: none; }
+
+/* =====================================================================
+   0.19.0 — NAYA Staff (ofisi)
+   ===================================================================== */
+.staff-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; margin-top: 16px; }
+.staff-card { background: var(--white); border: 1px solid var(--line); border-radius: 18px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+.staff-card.is-off { opacity: 0.72; }
+.staff-card header { display: flex; align-items: center; gap: 12px; }
+.staff-card header > span:nth-child(2) { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.staff-card header small { color: var(--muted); }
+.staff-avatar { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; flex: none; background: var(--naya-green-dark); color: var(--warning); font-weight: 800; font-family: var(--font-display); }
+.staff-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; margin: 0; background: var(--line); border-radius: 12px; overflow: hidden; }
+.staff-stats div { background: var(--bg); padding: 8px 10px; }
+.staff-stats dt { font-size: 12px; color: var(--muted); }
+.staff-stats dd { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 20px; }
+.staff-stats dd small { font-family: var(--font-body); font-weight: 400; font-size: 13px; color: var(--muted); }
+.staff-card .muted.small { margin: 0; }
+.staff-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.staff-actions .btn { text-decoration: none; }
+.btn-danger-text { color: var(--danger); }
+.staff-secret { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-top: 14px; padding: 18px 20px; border-radius: 18px; background: #FFF6D6; border: 1.5px solid var(--warning); animation: rise 0.4s var(--ease-out) both; }
+.staff-secret h3 { margin: 0 0 4px; }
+.staff-secret p { margin: 4px 0 0; }
+.staff-password { display: inline-block; margin-top: 10px !important; padding: 10px 18px; border-radius: 12px; background: var(--white); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 26px; font-weight: 700; letter-spacing: 0.12em; user-select: all; }
+.staff-tag { display: inline-block; margin-top: 4px; font-size: 12px; font-weight: 700; color: var(--naya-green-dark); background: var(--naya-mint); padding: 1px 8px; border-radius: 999px; }
+.staff-also { display: inline-block; margin-top: 3px; font-size: 12px; font-weight: 700; color: #6B4E00; background: #FFF1C2; padding: 1px 8px; border-radius: 999px; width: max-content; }
+.staff-who { margin: 10px 0 0; padding: 10px 14px; border-radius: 12px; background: var(--bg); font-size: 14px; }
+.staff-who.is-found { background: var(--naya-mint); color: var(--naya-green-dark); }
+.staff-who.is-bad { background: #FDECEA; color: #8A1C12; }
+.staff-form-note { margin: 10px 0 0; }
+.staff-link { margin-top: 14px; padding: 18px 20px; border-radius: 18px; background: var(--white); border: 1.5px solid var(--naya-green-dark); animation: rise 0.4s var(--ease-out) both; }
+.staff-link h3 { margin: 0 0 6px; }
+.staff-link p { margin: 4px 0 0; max-width: 70ch; }
+.staff-link .staff-link-who { display: flex; align-items: center; gap: 12px; margin: 10px 0 12px; }
+.staff-link .staff-link-who > span:last-child { display: flex; flex-direction: column; }
+.staff-link .staff-link-who small { color: var(--muted); }
+.staff-link ul { margin: 6px 0 0; padding-left: 20px; }
+.staff-link .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.staff-tag-big { font-size: 14px; padding: 4px 12px; margin: 6px 0 0; }
+.loc-pending { margin: 12px 0 14px; border-color: #F0D98A !important; background: #FFFBEA !important; }
+.loc-pending h2 { margin: 0 0 4px; display: flex; gap: 8px; align-items: center; }
+.pending-locs { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
+.pending-locs li { display: grid; grid-template-columns: 1fr auto auto auto; gap: 8px; align-items: center; padding: 10px 12px; border-radius: 12px; background: var(--white); border: 1px solid var(--line); }
+.pending-locs li > span { display: flex; flex-direction: column; min-width: 0; }
+.pending-locs small { color: var(--muted); }
+.pending-locs .btn { text-decoration: none; }
+@media (max-width: 640px) { .pending-locs li { grid-template-columns: 1fr 1fr 1fr; } .pending-locs li > span { grid-column: 1 / -1; } }
+@media (prefers-reduced-motion: reduce) { .staff-secret, .staff-link { animation: none; } }
+
+/* Wallet za madereva (0.21.0) */
+.wl-settings, .wl-adjust { margin-top: 12px; }
+.wl-settings .actions, .wl-adjust .actions { margin-top: 12px; }
+.wl-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+.wl-head h2 { margin: 0 0 4px; }
+.wl-head p { margin: 0; }
+.wl-head-bal { text-align: right; }
+.wl-head-bal span { display: block; color: var(--muted); font-size: 13px; }
+.wl-head-bal strong { font-size: 30px; color: var(--naya-green-dark); font-variant-numeric: tabular-nums; }
+.wl-facts .wl-small { font-size: 16px; line-height: 1.4; }
+.wl-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 10px; }
+.wl-kind { font-weight: 700; white-space: nowrap; }
+.wl-kind.is-in, .wl-in { color: var(--naya-green); }
+.wl-kind.is-out, .wl-out { color: var(--ink, #1d2b24); }
+.wl-kind.is-adj { color: var(--warning-ink); }
+@media (max-width: 640px) { .wl-head-bal { text-align: left; } }
+.wl-resolve { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+.wl-resolve .link-btn { font: inherit; font-size: 13px; font-weight: 700; color: var(--naya-green); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.wl-resolve .link-danger { color: var(--danger); }
+
+/* Nauli kwa simu (0.22.0) */
+.fa-settings { margin-top: 12px; }
+.fa-settings .actions { margin-top: 12px; }
+.fa-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin: 18px 0 8px; }
+.fa-head h3 { margin: 0; }
+.fa-act { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
+.fa-act .link-btn { font: inherit; font-size: 13px; font-weight: 700; color: var(--naya-green); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.fa-act .link-danger { color: var(--danger); }

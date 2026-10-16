@@ -13,7 +13,11 @@ import * as supportAdmin from './support-admin.js';
 import * as usersAdmin from './users-admin.js';
 import * as ridesAdmin from './rides-admin.js';
 import * as safetyAdmin from './safety-admin.js';
+import * as settingsAdmin from './settings-admin.js';
+import * as staffAdmin from './staff-admin.js';
 import * as subsAdmin from './subscriptions-admin.js';
+import { countUp, reducedMotion, toast } from './ui.js';
+import { loadWallet } from './wallet-admin.js';
 import {
   AUDIT_ACTIONS,
   DOCUMENT_ORDER,
@@ -31,7 +35,17 @@ const views = ['view-loading', 'view-login', 'view-offline', 'view-app'];
 const pages = [
   'page-overview', 'page-drivers', 'page-driver', 'page-locations', 'page-fares', 'page-rides', 'page-ride', 'page-subscriptions', 'page-sos',
   'page-live', 'page-users', 'page-user', 'page-support', 'page-ticket', 'page-reports', 'page-broadcast', 'page-feedback', 'page-offers',
+  'page-settings', 'page-staff',
 ];
+
+/** Kichwa cha juu (breadcrumb): kundi la menyu → ukurasa. */
+const TITLES = {
+  overview: ['', 'Muhtasari'], live: ['Operesheni', 'Ramani live'], rides: ['Operesheni', 'Safari'], sos: ['Operesheni', 'Dharura'],
+  drivers: ['Watu', 'Madereva'], users: ['Watu', 'Wateja'], finance: ['Fedha', 'Malipo'], subscriptions: ['Fedha', 'Ada ya mwezi'],
+  offers: ['Fedha', 'Ofa'], broadcast: ['Mawasiliano', 'Matangazo'], support: ['Mawasiliano', 'Msaada'], feedback: ['Mawasiliano', 'Maoni'],
+  reports: ['', 'Ripoti'], settings: ['Mipangilio', 'Mipangilio ya mfumo'], staff: ['Mipangilio', 'NAYA Staff'], fares: ['Mipangilio', 'Bei na nauli'], locations: ['Mipangilio', 'Maeneo'],
+};
+const DETAIL_TITLE = { 'page-driver': 'Dereva', 'page-ride': 'Safari moja', 'page-user': 'Mtumiaji', 'page-ticket': 'Ombi la msaada' };
 let me = null;
 
 function show(view) {
@@ -133,8 +147,14 @@ function enterApp(user) {
 // ---------- Njia (hash routing) ----------
 function route() {
   if (!me) return;
-  const [path, query] = location.hash.replace(/^#/, '').split('?');
+  const [rawPath, query] = location.hash.replace(/^#/, '').split('?');
+  const [path, section] = (rawPath || '/').split('#'); // #/mipangilio#ada → sehemu ya ukurasa
   const parts = (path || '/').split('/').filter(Boolean);
+  // Anwani za zamani (0.17 na kabla) → mahali mapya
+  if (parts[0] === 'ofa' && (parts[1] === 'malipo' || parts[1] === 'miamala')) {
+    location.replace(parts[1] === 'miamala' ? '#/malipo/miamala' : `#/malipo/madereva${parts[2] ? `/${parts[2]}` : ''}`);
+    return;
+  }
   const params = new URLSearchParams(query ?? '');
   let page = 'page-overview';
   if (parts[0] === 'madereva' && parts[1]) page = 'page-driver';
@@ -151,7 +171,9 @@ function route() {
   else if (parts[0] === 'msaada' && parts[1]) page = 'page-ticket';
   else if (parts[0] === 'msaada') page = 'page-support';
   else if (parts[0] === 'ripoti') page = 'page-reports';
-  else if (parts[0] === 'ofa') page = 'page-offers';
+  else if (parts[0] === 'ofa' || parts[0] === 'malipo') page = 'page-offers';
+  else if (parts[0] === 'mipangilio') page = 'page-settings';
+  else if (parts[0] === 'staff') page = 'page-staff';
   else if (parts[0] === 'matangazo') page = 'page-broadcast';
   else if (parts[0] === 'maoni') page = 'page-feedback';
   closeMenu();
@@ -159,18 +181,31 @@ function route() {
   liveAdmin.stop();
   reportsAdmin.stop();
   driverOnPage = null;
+  const wasHidden = $(page).hidden;
   for (const p of pages) $(p).hidden = p !== page;
+  if (wasHidden && !reducedMotion()) {
+    $(page).classList.remove('page-enter');
+    void $(page).offsetWidth;
+    $(page).classList.add('page-enter');
+  }
   const navFor = {
     'page-overview': 'overview', 'page-drivers': 'drivers', 'page-driver': 'drivers', 'page-locations': 'locations', 'page-fares': 'fares',
     'page-rides': 'rides', 'page-ride': 'rides', 'page-subscriptions': 'subscriptions', 'page-sos': 'sos', 'page-live': 'live',
-    'page-users': 'users', 'page-user': 'users', 'page-support': 'support', 'page-ticket': 'support', 'page-reports': 'reports', 'page-broadcast': 'broadcast', 'page-feedback': 'feedback', 'page-offers': 'offers',
+    'page-users': 'users', 'page-user': 'users', 'page-support': 'support', 'page-ticket': 'support', 'page-reports': 'reports', 'page-broadcast': 'broadcast', 'page-feedback': 'feedback',
+    'page-offers': parts[0] === 'malipo' ? 'finance' : 'offers', 'page-settings': 'settings', 'page-staff': 'staff',
   };
+  const navKey = navFor[page];
   for (const a of document.querySelectorAll('[data-nav]')) {
-    const active = a.dataset.nav === navFor[page];
+    const active = a.dataset.nav === navKey;
     if (active) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
   }
-  window.scrollTo(0, 0);
+  moveIndicator();
+  const [group, title] = TITLES[navKey] ?? ['', ''];
+  $('crumb-group').textContent = group;
+  $('crumb-page').textContent = DETAIL_TITLE[page] ?? title;
+  document.title = `${DETAIL_TITLE[page] ?? title} · NAYA Ofisi`;
+  if (!section) window.scrollTo(0, 0);
   if (page === 'page-overview') loadOverview();
   if (page === 'page-drivers') loadDrivers(params.get('hali') ?? driversState.status, params.get('q') ?? driversState.q);
   if (page === 'page-driver') loadDriver(parts[1]);
@@ -187,9 +222,51 @@ function route() {
   if (page === 'page-ticket') supportAdmin.loadTicket(parts[1]);
   if (page === 'page-reports') reportsAdmin.open(parts[1] ?? '', params);
   if (page === 'page-offers') ofaAdmin.open(parts);
+  if (page === 'page-settings') settingsAdmin.open(section);
+  if (page === 'page-staff') staffAdmin.loadPage();
+  if (page === 'page-locations') staffAdmin.loadPendingLocations();
   if (page === 'page-broadcast') broadcastAdmin.load();
   if (page === 'page-feedback') feedbackAdmin.load();
 }
+
+// ---------- Menyu ya pembeni: alama inayoteleza + kukunja ----------
+/** Alama ya ukurasa ulio wazi inateleza kwenda kwenye kiungo chake (badala ya kuruka). */
+function moveIndicator() {
+  const nav = $('side-nav');
+  const ind = $('side-indicator');
+  const active = nav.querySelector('a[aria-current="page"]');
+  if (!active) {
+    ind.style.opacity = '0';
+    return;
+  }
+  ind.style.opacity = '1';
+  ind.style.transform = `translateY(${active.offsetTop}px)`;
+  ind.style.height = `${active.offsetHeight}px`;
+  const box = $('sidebar');
+  const top = active.offsetTop;
+  if (top < box.scrollTop + 60 || top > box.scrollTop + box.clientHeight - 120) active.scrollIntoView({ block: 'nearest' });
+}
+for (const a of document.querySelectorAll('.side-nav a')) a.title = a.querySelector('.nav-label')?.textContent ?? '';
+
+function setCollapsed(on) {
+  $('view-app').classList.toggle('side-collapsed', on);
+  $('side-collapse').setAttribute('aria-pressed', String(on));
+  $('side-collapse').title = on ? 'Panua menyu' : 'Kunja menyu';
+  $('side-collapse').querySelector('.nav-label').textContent = on ? 'Panua menyu' : 'Kunja menyu';
+  try {
+    localStorage.setItem('naya_side_collapsed', on ? '1' : '0');
+  } catch {
+    // hifadhi ya browser imezuiwa — si muhimu
+  }
+  requestAnimationFrame(moveIndicator);
+}
+$('side-collapse').addEventListener('click', () => setCollapsed(!$('view-app').classList.contains('side-collapsed')));
+try {
+  if (localStorage.getItem('naya_side_collapsed') === '1') setCollapsed(true);
+} catch {
+  // si muhimu
+}
+window.addEventListener('resize', () => requestAnimationFrame(moveIndicator));
 
 // ---------- Menyu ya simu ----------
 function closeMenu() {
@@ -202,6 +279,7 @@ $('menu-button').addEventListener('click', () => {
   $('view-app').classList.toggle('menu-open', open);
   $('side-scrim').hidden = !open;
   $('menu-button').setAttribute('aria-expanded', String(open));
+  if (open) requestAnimationFrame(moveIndicator);
 });
 $('side-scrim').addEventListener('click', closeMenu);
 document.addEventListener('keydown', (event) => {
@@ -279,13 +357,27 @@ function setPendingBadge(count) {
   $('nav-pending').hidden = !count;
 }
 
+let overviewShown = false;
 async function loadOverview() {
+  const first = !overviewShown;
+  overviewShown = true;
+  if (first && !reducedMotion()) {
+    $('page-overview').classList.add('ov-intro');
+    setTimeout(() => $('page-overview').classList.remove('ov-intro'), 1400);
+  }
+  const walletP = loadWallet($('ov-wallet'), { ctx: { api, onAuthError: handleAuthError } });
+  const financeP = loadFinanceBadge();
+  const locationsP = loadLocationsBadge();
+  const driverWalletsP = api.get('/api/admin/wallets/summary').catch(() => null);
   $('greeting').textContent = `${greetingFor(new Date())}, ${me.fullName.split(' ')[0]}`;
   $('today').textContent = new Date().toLocaleDateString('sw-TZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   try {
     const data = await api.get('/api/admin/dashboard');
     $('dashboard-error').hidden = true;
     const n = (v) => Number(v).toLocaleString('sw-TZ');
+    const money = (v) => `TSh ${n(Math.round(v))}`;
+    // Mara ya kwanza namba kuu zinahesabu juu; baadaye zinabadilika moja kwa moja.
+    const put = (id, value, fmt = (v) => n(Math.round(v))) => (first ? countUp($(id), Number(value), fmt) : ($(id).textContent = fmt(Number(value))));
     $('stat-members').textContent = n(data.users.members);
     $('stat-drivers').textContent = n(data.drivers.APPROVED);
     $('stat-pending').textContent = n(data.drivers.PENDING);
@@ -295,13 +387,15 @@ async function loadOverview() {
     setDot('sys-db', data.system.database === 'ok' ? 'ok' : 'bad');
     $('sys-version').textContent = `NAYA ${data.system.version} · ${data.system.phase}`;
     renderSetup(data);
-    $('stat-active').textContent = n(data.rides.active);
-    $('stat-completed').textContent = n(data.rides.completedToday);
-    $('stat-value').textContent = `TSh ${n(data.rides.valueToday)}`;
-    $('stat-online').textContent = n(data.rides.driversOnline);
+    put('stat-active', data.rides.active);
+    put('stat-completed', data.rides.completedToday);
+    put('stat-value', data.rides.valueToday, money);
+    put('stat-online', data.rides.driversOnline);
+    put('stat-members', data.users.members);
+    put('stat-drivers', data.drivers.APPROVED);
     $('nav-active').textContent = data.rides.active;
     $('nav-active').hidden = !data.rides.active;
-    $('stat-sub-month').textContent = `TSh ${n(data.subscriptions.monthTotal)}`;
+    put('stat-sub-month', data.subscriptions.monthTotal, money);
     $('stat-sub-expired').textContent = n(data.subscriptions.expiredDrivers);
     $('stat-sos').textContent = n(data.sosOpen);
     $('stat-support').textContent = n(data.supportOpen);
@@ -309,7 +403,7 @@ async function loadOverview() {
     $('stat-apk-users').textContent = n(data.app?.users ?? 0);
     safetyAdmin.setOpenCount(data.sosOpen);
     setNavCounts(data);
-    renderQueue(data);
+    renderQueue(data, walletP, financeP, locationsP, driverWalletsP);
     loadTrend();
     setDot('sys-sms', data.sms.enabled ? 'ok' : 'wait');
     $('sys-sms-text').textContent = data.sms.enabled ? 'SMS (Beem) zimewashwa' : 'SMS (Beem) hazijawashwa — weka BEEM_API_KEY na BEEM_SECRET_KEY';
@@ -369,7 +463,7 @@ function setNavCounts(data) {
 }
 
 /** "Kazi zinazokusubiri": mambo yanayohitaji mtu wa ofisi sasa hivi, ya hatari kwanza. */
-async function renderQueue(data) {
+async function renderQueue(data, walletP = Promise.resolve(null), financeP = Promise.resolve(0), locationsP = Promise.resolve(0), driverWalletsP = Promise.resolve(null)) {
   let searching = 0;
   try {
     const live = await api.get('/api/admin/live');
@@ -377,19 +471,26 @@ async function renderQueue(data) {
   } catch {
     // si muhimu
   }
+  const [wallet, payoutsWaiting, locationsWaiting, dw] = await Promise.all([walletP.catch(() => null), financeP.catch(() => 0), locationsP.catch(() => 0), driverWalletsP.catch(() => null)]);
   const items = [
     [data.sosOpen, 'bad', 'Dharura zilizo wazi', 'Mpigie mtu aliyeomba msaada sasa hivi', '#/dharura', 'Shughulikia'],
+    [wallet?.low ? 1 : 0, 'bad', 'Salio la Abliner liko chini', `Chini ya TSh ${Number(wallet?.lowBalance ?? 0).toLocaleString('en-US')} — jaza salio ili malipo ya ofa yasishindwe`, '#/malipo', 'Fungua Malipo', '!'],
+    [dw?.short ? 1 : 0, 'bad', 'Salio la Abliner halitoshi wallet za madereva', `Madereva wanadai TSh ${Number(dw?.owed ?? 0).toLocaleString('en-US')} kwenye wallet zao — jaza salio ili wasikwame wakitoa`, '#/malipo/wallet', 'Fungua wallet', '!'],
+    [(dw?.stuck ?? 0) + (dw?.lateSuccess ?? 0), 'bad', 'Kutoa wallet kunahitaji ukaguzi wako', 'Kumekwama au kumefika baada ya pesa kurudishwa — kagua kwenye Abliner', '#/malipo/wallet', 'Kagua'],
+    [dw?.pinResets ?? 0, 'warn', 'Madereva wameomba PIN mpya ya wallet', 'Thibitisha ni wao kwa simu, kisha ruhusu', '#/malipo/wallet', 'Shughulikia'],
+    [payoutsWaiting, 'warn', 'Malipo ya ofa yanasubiri uamuzi wako', 'Yaliyoshikiliwa kwa ukaguzi au yaliyoshindwa kutumwa', '#/malipo', 'Amua'],
     [searching, 'bad', 'Wateja wanasubiri dereva', 'Mpe dereva maalum kutoka ramani au ukurasa wa safari', '#/ramani', 'Fungua ramani'],
     [data.supportOpen, 'warn', 'Maombi ya msaada yanasubiri jibu', 'Malalamiko na maswali kutoka kwenye app', '#/msaada?hali=OPEN', 'Jibu'],
     [data.feedbackNew, 'warn', 'Maoni mapya ya wateja na madereva', 'Yasome na uyafanyie kazi — mtoaji anajulishwa', '#/maoni', 'Soma'],
+    [locationsWaiting, 'warn', 'Maeneo yanasubiri uidhinishe', 'Yamependekezwa na NAYA Staff — wateja hawayaoni mpaka uyaidhinishe', '#/maeneo', 'Kagua'],
     [data.drivers.PENDING, 'warn', 'Madereva wanasubiri uthibitisho', 'Kagua nyaraka, kisha thibitisha au kataa', '#/madereva?hali=PENDING', 'Kagua'],
-    [data.subscriptions.expiredDrivers, 'warn', 'Madereva wenye ada iliyoisha', 'Hawapokei safari mpaka walipe', '#/ada', 'Angalia'],
+    [data.subscriptions.feeWaived ? 0 : data.subscriptions.expiredDrivers, 'warn', 'Madereva wenye ada iliyoisha', 'Hawapokei safari mpaka walipe', '#/ada', 'Angalia'],
     [data.rides.noDriverToday, 'warn', 'Safari zilizokosa dereva leo', 'Waombe madereva zaidi waende online saa za shughuli', '#/ripoti', 'Ripoti'],
   ].filter(([count]) => count > 0);
   $('queue-list').innerHTML = items.length
     ? items
         .map(
-          ([count, tone, title, sub, href, cta]) => `<li><a class="queue-item q-${tone}" href="${href}"><span class="q-num">${count}</span>
+          ([count, tone, title, sub, href, cta, label]) => `<li><a class="queue-item q-${tone}" href="${href}"><span class="q-num">${label ?? count}</span>
             <span class="q-text"><strong>${title}</strong><span>${sub}</span></span><span class="q-go">${cta}</span></a></li>`,
         )
         .join('')
@@ -462,7 +563,9 @@ async function loadDrivers(status, q) {
         (d) => `<a class="driver-row" href="#/madereva/${esc(d.id)}">
           <span><span class="driver-name">${esc(d.fullName)}</span><br><span class="driver-sub">${esc(formatPhone(d.phone))}</span></span>
           <span class="col-vehicle">${d.plateNumber ? `<span class="plate">${esc(d.plateNumber)}</span><br><span class="driver-sub">${esc(VEHICLE_TYPES[d.vehicleType] ?? '')}</span>` : '<span class="driver-sub">Chombo bado</span>'}</span>
-          <span class="col-date driver-sub">${d.submittedAt ? `Alituma ${esc(formatDate(d.submittedAt))}` : `Alijisajili ${esc(formatDate(d.createdAt))}`}</span>
+          <span class="col-date driver-sub">${d.submittedAt ? `Alituma ${esc(formatDate(d.submittedAt))}` : `Alijisajili ${esc(formatDate(d.createdAt))}`}${
+            d.registeredBy ? `<br><span class="staff-tag">NAYA Staff: ${esc(d.registeredBy)}</span>` : ''
+          }</span>
           <span>${badge(DRIVER_STATUS, d.status)}</span>
         </a>`,
       )
@@ -537,9 +640,10 @@ function renderDriver(data) {
     <div class="detail-head">
       <div>
         <h1>${esc(user.fullName)}</h1>
-        <p class="muted"><a href="tel:+${esc(user.phone)}">${esc(formatPhone(user.phone))}</a> · Alijisajili ${esc(formatDate(driver.createdAt))}${
+        <p class="muted"><a href="tel:+${esc(user.phone)}">${esc(formatPhone(user.phone))}</a> · ${data.registeredBy ? 'Alisajiliwa' : 'Alijisajili'} ${esc(formatDate(driver.createdAt))}${
           driver.submittedAt ? ` · Alituma ${esc(formatDate(driver.submittedAt, true))}` : ''
         }</p>
+        ${data.registeredBy ? `<p class="staff-tag staff-tag-big">Amesajiliwa na NAYA Staff: <strong>${esc(data.registeredBy.name)}</strong> · ${esc(formatPhone(data.registeredBy.phone))}</p>` : ''}
       </div>
       ${badge(DRIVER_STATUS, driver.status)}
     </div>
@@ -733,6 +837,36 @@ async function loadPendingCount() {
   } catch {
     // si muhimu
   }
+  loadFinanceBadge();
+  loadLocationsBadge();
+}
+
+function setLocationsBadge(n) {
+  $('nav-locations').textContent = n;
+  $('nav-locations').hidden = !n;
+}
+/** Menyu → Maeneo: maeneo yaliyopendekezwa na NAYA Staff yanayosubiri kuidhinishwa. */
+async function loadLocationsBadge() {
+  try {
+    const rows = await api.get('/api/admin/locations/pending');
+    setLocationsBadge(rows.length);
+    return rows.length;
+  } catch {
+    return 0;
+  }
+}
+
+/** Menyu → Malipo: idadi ya malipo ya ofa yanayosubiri uamuzi wa ofisi (ukaguzi / yaliyoshindwa). */
+async function loadFinanceBadge() {
+  try {
+    const o = await api.get('/api/admin/payments/overview');
+    const count = (o.queue?.held ?? 0) + (o.queue?.failed ?? 0);
+    $('nav-finance').textContent = count;
+    $('nav-finance').hidden = !count;
+    return count;
+  } catch {
+    return 0;
+  }
 }
 
 // ---------- Kutoka ----------
@@ -787,6 +921,8 @@ supportAdmin.setup({ api, onAuthError: handleAuthError });
 liveAdmin.setup({ api, onAuthError: handleAuthError });
 reportsAdmin.setup({ api, onAuthError: handleAuthError });
 ofaAdmin.setup({ api, onAuthError: handleAuthError });
+settingsAdmin.setup({ api, onAuthError: handleAuthError, toast });
+staffAdmin.setup({ api, onAuthError: handleAuthError, onPendingChange: setLocationsBadge, onApproved: () => places.loadLocations($('location-q').value) });
 broadcastAdmin.setup({ api, onAuthError: handleAuthError });
 feedbackAdmin.setup({ api, onAuthError: handleAuthError });
 start();
