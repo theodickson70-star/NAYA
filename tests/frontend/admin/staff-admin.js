@@ -3,6 +3,7 @@
 import { escapeHtml as esc } from '/shared/api.js';
 import { formatDate, formatPhone, LOCATION_CATEGORIES } from '/shared/labels.js';
 import { toast } from './ui.js';
+import { watchPhone } from '/shared/namelookup.js';
 
 const $ = (id) => document.getElementById(id);
 let ctx = null; // { api, onAuthError, onPendingChange(n) }
@@ -18,6 +19,48 @@ function fail(err, boxId) {
 export function setup(context) {
   ctx = context;
   $('staff-form').addEventListener('submit', createStaff);
+  // Namba kwanza → jina linajazwa (akaunti ya NAYA iliyopo, au jina la mtandao kupitia Abliner)
+  const name = $('staff-name');
+  name.addEventListener('input', () => delete name.dataset.auto);
+  watchPhone($('staff-phone'), {
+    api: ctx.api,
+    path: '/api/admin/staff/lookup',
+    body: (phone) => ({ phone }),
+    onState: (st) => {
+      const box = $('staff-who');
+      if (st.state === 'idle') return (box.hidden = true);
+      box.hidden = false;
+      if (st.state === 'loading') {
+        box.className = 'staff-who';
+        box.textContent = 'Inatafuta jina…';
+        return;
+      }
+      if (st.state === 'error') {
+        if (ctx.onAuthError(st.err)) return;
+        box.className = 'staff-who is-bad';
+        box.textContent = st.message;
+        return;
+      }
+      const r = st.result;
+      let fill = null;
+      if (r.exists) {
+        box.className = r.blocked ? 'staff-who is-bad' : 'staff-who is-found';
+        box.innerHTML = r.blocked ? esc(r.blocked) : `Ana akaunti ya NAYA: <strong>${esc(r.fullName)}</strong> · ${esc(accountKind(r.driverStatus))}`;
+        fill = r.fullName;
+      } else if (r.networkName) {
+        box.className = 'staff-who is-found';
+        box.innerHTML = `Jina kwenye ${esc(r.networkLabel ?? 'mtandao')}: <strong>${esc(r.networkName)}</strong> — namba mpya kwa NAYA`;
+        fill = r.networkName;
+      } else {
+        box.className = 'staff-who';
+        box.textContent = r.lookupAvailable ? 'Mtandao haujathibitisha jina la namba hii — liandike mwenyewe.' : 'Namba mpya kwa NAYA — andika jina lake.';
+      }
+      if (fill && (!name.value.trim() || name.dataset.auto)) {
+        name.value = fill;
+        name.dataset.auto = '1';
+      }
+    },
+  });
   $('staff-list').addEventListener('click', onListClick);
   $('staff-link').addEventListener('click', onLinkClick);
   $('staff-secret').addEventListener('click', (e) => {
@@ -185,6 +228,7 @@ async function createStaff(event) {
     }
     const r = await ctx.api.post('/api/admin/staff', input);
     form.reset();
+    $('staff-who').hidden = true;
     await loadPage();
     showSecret(r, 'NAYA Staff ameongezwa');
   } catch (err) {
@@ -202,6 +246,7 @@ async function onLinkClick(event) {
   try {
     const r = await ctx.api.post('/api/admin/staff', { fullName: linkCandidate.fullName, phone: linkCandidate.phone, linkExisting: true });
     $('staff-form').reset();
+    $('staff-who').hidden = true;
     await loadPage();
     toast('Ruhusa ya NAYA Staff imeongezwa');
     showLinked(r);

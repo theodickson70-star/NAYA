@@ -15,7 +15,7 @@ export const METHODS = {
   BANK: 'Benki',
 };
 /** Njia zinazoandikwa na mfumo tu (hazichaguliwi na ofisi). */
-const AUTO_METHODS = { CONTROL: 'Control number' };
+const AUTO_METHODS = { CONTROL: 'Control number', WALLET: 'Wallet ya dereva' };
 const STATE = {
   ACTIVE: ['ok', 'Iko hai'],
   GRACE: ['warn', 'Siku za kulipa'],

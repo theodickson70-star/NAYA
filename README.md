@@ -115,6 +115,21 @@ Alama za kutiliwa shaka (`rides.flags`), zinaonekana kwa ofisi kwenye safari, Ri
 DRIVER, PASSENGER, AUTO au ADMIN. Migration `021_safari_rahisi.sql` inaongeza safu tu (haifuti data); safari zinazoendelea zisizo
 za ofa zinaondolewa PIN ili zisikwame.
 
+## Wallet ya dereva (0.21.0)
+
+Kila dereva aliyethibitishwa ana wallet yake ndani ya NAYA (inafunguliwa yenyewe). Pesa halisi iko kwenye akaunti ya NAYA kwa Abliner; wallet ni deni la NAYA kwa dereva, linalorekodiwa mstari kwa mstari (ledger).
+
+- **Mapato yanaingia wallet:** malipo ya ofa yanaingia kwenye wallet badala ya kutumwa kila safari (Ofisi → Malipo → Wallet za madereva → Mipangilio; ukiondoa alama, malipo yanatumwa moja kwa moja kama zamani).
+- **Kutoa pesa:** dereva anachagua kiasi → anaona ada ya mtandao na atakachopokea (kutoka Abliner) → anaweka PIN → pesa inatumwa **kwenye namba yake kuu iliyothibitishwa tu** (jina la mtandao). Kiwango cha chini TSh 1,000, kikomo TSh 100,000 kwa siku (vinabadilika kwenye mipangilio). Ada ya mtandao inabebwa na dereva.
+- **PIN ya wallet (tarakimu 4):** dereva anaitengeneza mwenyewe kwa password ya akaunti; ofisi haiioni (inahifadhiwa kama hash). PIN rahisi (1234, 0000, tarakimu za mwisho za simu) zinakataliwa. Makosa 5 → imefungwa dakika 30; makosa 10 → imefungwa mpaka ofisi ifungue.
+- **Nimesahau PIN:** dereva anaomba → ofisi inampigia kuthibitisha → "Ruhusu PIN mpya" → dereva anaweka PIN mpya kwa password yake → kutoa kunasubiri saa 24.
+- **Namba ya malipo:** kubadilisha au kufuta namba kuu kunahitaji PIN na kunaanzisha saa 24 za usalama (dereva anapata SMS).
+- **Ada ya mwezi kwa salio:** "Lipa ada" kwenye wallet (PIN). Ofisi ikibatilisha malipo hayo, pesa inarudi kwenye wallet.
+- **Kutoa kukishindwa:** pesa yote inarudi kwenye wallet mara moja; tatizo la mtandao → inabaki "inasubiri" na mfumo unakagua hali (hautumi mara mbili).
+- **Ofisi:** Fedha → Malipo → **Wallet za madereva** — deni la wallet zote dhidi ya salio la Abliner (onyo likiwa halitoshi), maombi ya PIN, orodha, na kwa kila dereva: historia kamili, kusimamisha/kufungua, kufungua PIN, kuruhusu PIN mpya, marekebisho (kiasi + sababu, yanaonekana kwa dereva).
+- Muhtasari wa ofisi unaonyesha "Salio la Abliner halitoshi wallet za madereva" na "Madereva wameomba PIN mpya ya wallet".
+- Hakuna commission. Migration 030 inaongeza `naya.wallets` na `naya.wallet_entries` tu — haifuti wala kubadilisha data iliyopo.
+
 ## Jina la mwenye namba na Control Number (0.20.0)
 
 Kutoka nyaraka za Abliner (hakuna endpoint iliyobuniwa): `GET /api/v1/lookup?phone=` → `{ phone, name, network }`

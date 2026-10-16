@@ -2,7 +2,7 @@
 //   Dereva: GET /api/driver/subscription
 //   Ofisi:  /api/admin/settings/subscription, /api/admin/subscriptions, /api/admin/drivers/:id/subscription…
 import type { FastifyInstance } from 'fastify';
-import { guessNetwork, paymentsConfig, pendingSubscriptionPayment } from '../services/payments/index.js';
+import { guessNetwork, openControlNumbers, paymentsConfig, pendingSubscriptionPayment } from '../services/payments/index.js';
 import { z } from 'zod';
 import { ADMIN_ROLES, requireRole } from '../middleware/auth.js';
 import {
@@ -67,7 +67,19 @@ export async function subscriptionRoutes(app: FastifyInstance): Promise<void> {
     // Malipo kwa simu: yamewashwa? + ombi linalosubiri (app ikifunguliwa upya inaendelea kusubiri PIN)
     const config = paymentsConfig();
     const pending = config.enabled ? await pendingSubscriptionPayment(request.currentUser.id) : null;
-    return ok({ ...sub, online: { enabled: config.enabled, networks: config.networks, suggestedNetwork: guessNetwork(request.currentUser.phone), pending } });
+    // Control number (BillPay): kulipa kutoka benki / app yoyote / wakala — zisizolipwa bado zinaonyeshwa
+    const control = config.controlNumbers ? await openControlNumbers(request.currentUser.id) : [];
+    return ok({
+      ...sub,
+      online: {
+        enabled: config.enabled,
+        networks: config.networks,
+        suggestedNetwork: guessNetwork(request.currentUser.phone),
+        pending,
+        controlNumbers: config.controlNumbers,
+        control,
+      },
+    });
   });
 
   app.get('/api/admin/settings/subscription', adminOnly, async () => ok(await getSettings()));

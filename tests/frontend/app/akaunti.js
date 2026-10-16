@@ -24,6 +24,7 @@ const ICON = {
   help: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13v-1a8 8 0 0 1 16 0v1"/><rect x="3" y="13" width="4" height="6" rx="1.5"/><rect x="17" y="13" width="4" height="6" rx="1.5"/><path d="M19 19c0 1.5-2 2.5-5 2.5"/></svg>',
   gear: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>',
   card: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3 10h18M7 15h4"/></svg>',
+  wallet: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3"/><rect x="3.5" y="8" width="17" height="11" rx="2.5"/><path d="M16 13.5h2"/></svg>',
   coins: '<svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="9" cy="7" rx="6" ry="3"/><path d="M3 7v5c0 1.7 2.7 3 6 3s6-1.3 6-3V7"/><path d="M9 15v2c0 1.7 2.7 3 6 3s6-1.3 6-3v-5c0-1.7-2.7-3-6-3"/></svg>',
   phone: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>',
   chat: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1.5-4A8 8 0 1 1 9 19.5z"/><path d="M9 10.5c.5 2 2 3.5 4 4l1.5-1.2 2 1"/></svg>',
@@ -127,8 +128,9 @@ export function renderHub({ modeCardHtml, version }) {
       driverPaid
         ? `<nav class="card acct-menu" aria-label="Udereva">
             <h2 class="acct-menu-title">Udereva</h2>
+            ${row({ href: '#/akaunti/wallet', icon: 'wallet', title: 'Wallet yangu', sub: 'Salio, kutoa pesa na historia', id: 'acct-wallet' })}
             ${row({ href: '#/akaunti/ada', icon: 'card', title: 'Ada ya mwezi', sub: 'Hali ya ada na malipo yako' })}
-            ${row({ href: '#/akaunti/malipo-ya-ofa', icon: 'coins', title: 'Malipo ya ofa', sub: 'NAYA inakudai kiasi gani, na namba zako' })}
+            ${row({ href: '#/akaunti/malipo-ya-ofa', icon: 'coins', title: 'Malipo ya ofa na namba zangu', sub: 'Safari za ofa na namba za kupokea pesa' })}
           </nav>`
         : ''
     }
@@ -140,6 +142,15 @@ export function renderHub({ modeCardHtml, version }) {
 }
 
 async function loadHubMeta() {
+  if ($('acct-wallet')) {
+    ctx.api
+      .get('/api/driver/wallet')
+      .then((w) => {
+        const sub = $('acct-wallet-sub');
+        if (sub) sub.innerHTML = `Salio: <strong>${formatTsh(w.balance)}</strong>${w.pin.set ? '' : ' · tengeneza PIN'}`;
+      })
+      .catch(() => {});
+  }
   try {
     profile = await ctx.api.get('/api/account/profile');
     const el = $('acct-meta');

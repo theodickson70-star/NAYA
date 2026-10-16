@@ -8,6 +8,7 @@
 import { type Db, db, many, one, transaction } from '../db/pool.js';
 import { AppError, badRequest, conflict, isUniqueViolation, notFound } from '../utils/http.js';
 import { writeAudit } from './audit.js';
+import { lockWallet, postEntry } from './wallet-ledger.js';
 import { notify, notifyAdmins } from './notify.js';
 
 export const PERIOD_DAYS = 30;
@@ -28,8 +29,8 @@ const DEFAULTS: SubscriptionSettings = {
 };
 
 export const PAYMENT_METHODS = ['CASH', 'MPESA', 'AIRTEL', 'TIGO', 'HALOPESA', 'BANK'] as const;
-/** CONTROL = control number (BillPay) — inaandikwa na mfumo tu, ofisi haichagui. */
-export type PaymentMethod = (typeof PAYMENT_METHODS)[number] | 'CONTROL';
+/** CONTROL = control number (BillPay), WALLET = salio la wallet — vinaandikwa na mfumo tu, ofisi haichagui. */
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number] | 'CONTROL' | 'WALLET';
 
 export async function getSettings(client: Db = db): Promise<SubscriptionSettings> {
   const row = await one<{ value: Partial<SubscriptionSettings> }>(client, `SELECT value FROM naya.settings WHERE key = 'subscription'`);
@@ -222,9 +223,9 @@ export async function recordPayment(
 export async function voidPayment(adminId: string, driverId: string, paymentId: string, reason: string) {
   await transaction(async (client) => {
     await client.query('SELECT 1 FROM naya.drivers WHERE user_id = $1 FOR UPDATE', [driverId]);
-    const latest = await one<{ id: string; previous_paid_until: Date | null; amount: number }>(
+    const latest = await one<{ id: string; previous_paid_until: Date | null; amount: number; method: string }>(
       client,
-      `SELECT id, previous_paid_until, amount FROM naya.subscription_payments
+      `SELECT id, previous_paid_until, amount, method FROM naya.subscription_payments
         WHERE driver_id = $1 AND voided_at IS NULL ORDER BY created_at DESC LIMIT 1`,
       [driverId],
     );
@@ -235,6 +236,11 @@ export async function voidPayment(adminId: string, driverId: string, paymentId: 
       [paymentId, adminId, reason],
     );
     await client.query('UPDATE naya.drivers SET paid_until = $2, updated_at = now() WHERE user_id = $1', [driverId, latest.previous_paid_until]);
+    // Ada iliyolipwa kwa salio la wallet → pesa inarudi kwenye wallet ya dereva (si kupotea)
+    if (latest.method === 'WALLET') {
+      await lockWallet(client, driverId);
+      await postEntry(client, driverId, { amount: latest.amount, kind: 'ADJUSTMENT', note: `Ada iliyobatilishwa imerudishwa: ${reason}`, createdBy: adminId });
+    }
     await writeAudit(client, {
       actorId: adminId,
       action: 'subscription.voided',

@@ -30,6 +30,7 @@ import {
   staffHome,
   submitDriver,
 } from '../services/staff.js';
+import { lookupForUser } from '../services/name-lookup.js';
 import { badRequest, ok } from '../utils/http.js';
 import { phoneSchema } from '../validators/auth.js';
 import { documentTypeParam, vehicleSchema } from '../validators/drivers.js';
@@ -108,7 +109,11 @@ export async function staffRoutes(app: FastifyInstance): Promise<void> {
   // Namba tayari ina akaunti? (abiria/dereva → "Mpe ruhusa ya NAYA Staff?")
   app.post('/api/admin/staff/lookup', adminOnly, async (request) => {
     const { phone } = z.object({ phone: phoneSchema }).parse(request.body);
-    return ok(await lookupStaffPhone(phone));
+    const found = await lookupStaffPhone(phone);
+    if (found.exists) return ok(found);
+    // Namba mpya kwa NAYA: jina kutoka mtandao (Abliner Name Lookup), ofisi inaweza kulirekebisha.
+    const net = await lookupForUser(request.currentUser, phone, 'STAFF');
+    return ok({ ...found, lookupAvailable: net.available, networkName: net.found ? net.displayName : null, networkLabel: net.networkLabel });
   });
   app.post('/api/admin/staff/:id/suspend', adminOnly, async (request) => ok(await setStaffActive(aid(request), idParam.parse(request.params).id, false)));
   app.post('/api/admin/staff/:id/activate', adminOnly, async (request) => ok(await setStaffActive(aid(request), idParam.parse(request.params).id, true)));

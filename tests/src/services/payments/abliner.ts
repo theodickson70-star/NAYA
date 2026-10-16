@@ -9,6 +9,10 @@
 //   Kutuma       POST /api/v1/withdrawals { amount, method: "mobile", currency: "TZS", recipient, reference }
 //   Hali         GET  /api/v1/transactions?customer_reference=…  (au ?id=…) → { status, data: [...] }
 //   Salio        GET  /api/v1/balance (kwa "Kagua muunganiko" ya ofisi — haigusi pesa)
+//   Jina         GET  /api/v1/lookup?phone=2557… → { status, data: { phone, name, network } }; 404 name_not_found = haijathibitishwa
+//   Control no.  POST /api/v1/control-numbers { amount, description, payment_mode: "EXACT"|"PARTIAL", reference, customer_name? }
+//                → { data: { id, control_number, reference, amount, payment_mode, description } }. Mteja akilipa, webhook ya
+//                deposits (transaction.completed) inakuja.
 //   Webhook      x-webhook-signature = hex HMAC-SHA256 ya `${x-webhook-timestamp}.${rawBody}` (ABLINER_WEBHOOK_SECRET),
 //                timestamp > sekunde 300 → kataa; x-webhook-id ni ileile kwenye kujaribu tena (kwa kuzuia marudio).
 //                Events: transaction.completed | transaction.failed | withdrawal.completed | withdrawal.failed
@@ -20,7 +24,7 @@
 //   - Hali nyingine yoyote isiyo "completed"/"failed" inachukuliwa kama "bado" (PENDING) — kamwe si mafanikio.
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { FastifyRequest } from 'fastify';
-import type { FeeMode, PaymentProvider, PaymentRequest, ProviderResult, ProviderStatus, WebhookResult } from './provider.js';
+import { type ControlNumberRequest, type FeeMode, networkFromName, type PaymentProvider, type PaymentRequest, type ProviderResult, type ProviderStatus, type WebhookResult } from './provider.js';
 
 const DEFAULT_BASE = 'https://abliner.net';
 const TIMEOUT_MS = 20_000;
@@ -239,6 +243,50 @@ export const abliner: PaymentProvider = {
     }
   },
 
+  /** GET /api/v1/withdrawals/preview?method=mobile&amount=… → fee_tzs (nyaraka). */
+  async previewFee(amount: number) {
+    const cfg = requireConfig();
+    const d = unwrap(await call(cfg, 'GET', `/api/v1/withdrawals/preview?method=mobile&amount=${amount}`));
+    const fee = Number(d.fee_tzs);
+    if (!Number.isFinite(fee) || fee < 0) throw new Error('preview haina fee_tzs');
+    return fee;
+  },
+
+  async lookupName(phone: string) {
+    const cfg = requireConfig();
+    try {
+      const d = unwrap(await call(cfg, 'GET', `/api/v1/lookup?phone=${encodeURIComponent(phone)}`));
+      const name = typeof d.name === 'string' ? d.name.replace(/\s+/g, ' ').trim().slice(0, 120) : '';
+      if (!name) return { found: false };
+      return { found: true, name, network: networkFromName(d.network) };
+    } catch (error) {
+      // Nyaraka: 404 name_not_found = mtandao haukuthibitisha namba hii. Kosa jingine lolote = huduma haipatikani (throw).
+      if (error instanceof AblinerError && error.httpStatus === 404 && error.code === 'name_not_found') return { found: false };
+      throw error;
+    }
+  },
+
+  async createControlNumber(req: ControlNumberRequest) {
+    const cfg = requireConfig();
+    const body = {
+      amount: req.amount,
+      description: req.description,
+      payment_mode: 'EXACT',
+      reference: req.reference,
+      ...(req.customerName ? { customer_name: req.customerName } : {}),
+    };
+    const ts = Math.floor(Date.now() / 1000).toString();
+    const d = unwrap(
+      await call(cfg, 'POST', '/api/v1/control-numbers', {
+        body,
+        headers: { 'idempotency-key': req.reference, 'x-abliner-timestamp': ts, 'x-abliner-signature': sign(cfg.webhookSecret, ts, JSON.stringify(body)) },
+      }),
+    );
+    const controlNumber = d.control_number === undefined || d.control_number === null ? '' : String(d.control_number).trim();
+    if (!/^[0-9A-Za-z-]{4,40}$/.test(controlNumber)) throw new Error('Abliner haikurudisha control number');
+    return { controlNumber, providerRef: str(d.id) };
+  },
+
   async status(reference: string, _direction: 'IN' | 'OUT', providerRef?: string | null): Promise<ProviderResult> {
     const cfg = requireConfig();
     const tx = await findTransaction(cfg, reference, providerRef);
@@ -267,18 +315,21 @@ export const abliner: PaymentProvider = {
     const event = String(payload.event ?? '');
     const data = (payload.data && typeof payload.data === 'object' ? payload.data : {}) as Json;
     const eventId = str(header('x-webhook-id')) ?? str(payload.id);
-    const reference = str(data.customer_reference);
+    // Deposits: reference yetu ni customer_reference; control numbers: inaweza kuja kama reference.
+    const reference = str(data.customer_reference) ?? str(data.reference);
     const known = ['transaction.completed', 'transaction.failed', 'withdrawal.completed', 'withdrawal.failed'];
-    if (!known.includes(event) || !reference) return { ignore: true, eventId, event };
+    const txId = str(data.id);
+    if (!known.includes(event) || (!reference && !txId)) return { ignore: true, eventId, event };
     // Tukio linaamua; data.status ikipingana na tukio → tusiamini (bado PENDING, worker itauliza).
     const byEvent: ProviderStatus = event.endsWith('.completed') ? 'SUCCESS' : 'FAILED';
     const byData = data.status === undefined ? byEvent : mapStatus(data.status);
     const status: ProviderStatus = byData === byEvent ? byEvent : 'PENDING';
     return {
-      reference,
+      reference: reference ?? '',
       status,
       amount: typeof data.amount === 'number' ? data.amount : Number.isFinite(Number(data.amount)) && data.amount !== null && data.amount !== undefined ? Number(data.amount) : null,
       providerRef: receipt(data),
+      txId,
       message: status === 'FAILED' ? (str(data.message) ?? (event.startsWith('withdrawal') ? 'Kutuma pesa kumeshindwa.' : 'Malipo hayakukamilika — mteja amekataa au hakuingiza PIN.')) : null,
       eventId,
       event,

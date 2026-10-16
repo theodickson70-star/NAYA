@@ -14,6 +14,7 @@ import {
   checkCustomerOffers,
   createPromotion,
   deletePayoutAccount,
+  payoutAccounts,
   driverPayoutDetail,
   driverPayoutsReport,
   driverPromoWallet,
@@ -31,7 +32,10 @@ import {
   updatePromotion,
   voidPayout,
 } from '../services/promotions.js';
+import { db, one } from '../db/pool.js';
+import { getDriverWalletSettings } from '../services/wallet-ledger.js';
 import { lookupForUser } from '../services/name-lookup.js';
+import { guardPayoutAccountChange } from '../services/wallet.js';
 import { badRequest, conflict, ok } from '../utils/http.js';
 import { normalizeTzPhone } from '../utils/phone.js';
 import { getAutoPayout, paymentsConfig, releaseHeldForAccount } from '../services/payments/index.js';
@@ -93,6 +97,8 @@ const accountSchema = z
       z.string().trim().min(3, 'Weka jina la mwenye namba (kama lilivyosajiliwa)').max(80).optional(),
     ),
     primary: z.boolean().optional(),
+    /** PIN ya wallet (inahitajika dereva akishaiweka) */
+    pin: z.string().max(8).optional(),
   })
   .transform((v, ctx) => {
     if (v.network === 'BANK') {
@@ -130,11 +136,17 @@ export async function ofaRoutes(app: FastifyInstance): Promise<void> {
   app.get('/api/driver/promo-wallet', user, async (request) => {
     const config = paymentsConfig();
     const settings = await getAutoPayout();
+    const walletSettings = await getDriverWalletSettings();
     // auto = malipo ya papo hapo yamewashwa (kampuni ya malipo inaruhusu kutuma + ofisi imewasha)
-    return ok({ ...(await driverPromoWallet(uid(request))), auto: { enabled: config.canDisburse && settings.enabled, dailyLimit: settings.dailyLimit }, nameLookup: config.nameLookup });
+    return ok({ ...(await driverPromoWallet(uid(request))), auto: { enabled: config.canDisburse && settings.enabled, dailyLimit: settings.dailyLimit }, nameLookup: config.nameLookup,
+      // Wallet (0.21.0): malipo ya ofa yanaingia kwenye wallet? PIN ya wallet imewekwa (inahitajika kubadilisha namba)?
+      toWallet: walletSettings.promoToWallet,
+      walletPin: !!(await one<{ pin_hash: string | null }>(db, 'SELECT pin_hash FROM naya.wallets WHERE driver_id = $1', [uid(request)]))?.pin_hash });
   });
   app.post('/api/driver/payout-accounts', { ...user, config: { rateLimit: { max: 20, timeWindow: '10 minutes' } } }, async (request) => {
     const input = accountSchema.parse(request.body);
+    // Wallet (0.21.0): PIN ya wallet inahitajika (kama imewekwa); namba kuu ikibadilika → kutoa kunasubiri saa 24.
+    await guardPayoutAccountChange(uid(request), { network: input.network, phone: input.phone, primary: !!input.primary, id: input.id }, input.pin);
     // Pesa ya simu: jina linathibitishwa na mtandao (Abliner Name Lookup). Huduma isipopatikana → jina la dereva mwenyewe.
     let verified: { name: string; network: string | null } | null = null;
     if (['MPESA', 'MIXX', 'AIRTEL', 'HALOPESA'].includes(input.network)) {
@@ -149,11 +161,20 @@ export async function ofaRoutes(app: FastifyInstance): Promise<void> {
       accountName: verified?.name ?? input.accountName!,
       verifiedName: verified?.name ?? null,
     });
+    // (saa 24 za namba mpya kuu zinaanzishwa ndani ya savePayoutAccount — transaction ileile)
     // Safari zilizosubiri malipo kwa kukosa namba: zitumwe sasa (malipo ya simu yakiwa yamewashwa)
     await releaseHeldForAccount(uid(request)).catch(() => {});
     return ok(saved);
   });
-  app.post('/api/driver/payout-accounts/:id/delete', user, async (request) => ok(await deletePayoutAccount(uid(request), idParam.parse(request.params).id)));
+  app.post('/api/driver/payout-accounts/:id/delete', user, async (request) => {
+    const { id } = idParam.parse(request.params);
+    const { pin } = z.object({ pin: z.string().max(8).optional() }).parse(request.body ?? {});
+    // Wallet: kufuta namba kunahitaji PIN; namba kuu ikifutwa na nyingine kuwa kuu → saa 24 (ndani ya deletePayoutAccount)
+    const before = await payoutAccounts(db, uid(request));
+    const next = before.find((a) => a.id !== id);
+    await guardPayoutAccountChange(uid(request), { network: next?.network ?? '', phone: next?.phone ?? '', primary: false }, pin);
+    return ok(await deletePayoutAccount(uid(request), id));
+  });
 
   // ---- Ofisi: ofa
   app.get('/api/admin/promotions', adminOnly, async () => ok(await listPromotions()));

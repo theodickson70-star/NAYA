@@ -14,6 +14,8 @@ export const METHODS = {
   HALOPESA: 'HaloPesa',
   BANK: 'Benki',
 };
+/** Njia zinazoandikwa na mfumo tu (hazichaguliwi na ofisi). */
+const AUTO_METHODS = { CONTROL: 'Control number', WALLET: 'Wallet ya dereva' };
 const STATE = {
   ACTIVE: ['ok', 'Iko hai'],
   GRACE: ['warn', 'Siku za kulipa'],
@@ -214,7 +216,7 @@ function renderDriverPanel(driverId, sub) {
         : `<ul class="history">${sub.payments
             .map(
               (p) => `<li class="${p.voidedAt ? 'voided' : ''}">
-                <span><strong>${formatTsh(p.amount)}</strong> · miezi ${p.months} · ${esc(METHODS[p.method] ?? p.method)}${p.reference ? ` · ${esc(p.reference)}` : ''}</span>
+                <span><strong>${formatTsh(p.amount)}</strong> · miezi ${p.months} · ${esc(METHODS[p.method] ?? AUTO_METHODS[p.method] ?? p.method)}${p.reference ? ` · ${esc(p.reference)}` : ''}</span>
                 <span class="muted">${esc(formatDate(p.createdAt, true))} · na ${esc(p.recordedBy)} · mpaka ${esc(formatDate(p.periodEnd))}</span>
                 ${p.note ? `<span class="note">${esc(p.note)}</span>` : ''}
                 ${p.voidedAt ? `<span class="note">Yamebatilishwa na ${esc(p.voidedBy ?? '')}: ${esc(p.voidReason ?? '')}</span>` : ''}

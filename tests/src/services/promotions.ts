@@ -230,8 +230,22 @@ interface AccountRow {
   phone: string;
   account_name: string;
   is_primary: boolean;
+  verified_name?: string | null;
+  name_changed_to?: string | null;
+  name_changed_at?: Date | null;
 }
-const accountView = (a: AccountRow) => ({ id: a.id, network: a.network, networkLabel: NETWORK_LABEL[a.network], phone: a.phone, accountName: a.account_name, primary: a.is_primary });
+const accountView = (a: AccountRow) => ({
+  id: a.id,
+  network: a.network,
+  networkLabel: NETWORK_LABEL[a.network],
+  phone: a.phone,
+  accountName: a.account_name,
+  primary: a.is_primary,
+  /** Jina limethibitishwa na mtandao (0.20.0) */
+  verified: !!a.verified_name,
+  /** Jina la namba limebadilika kwenye mtandao (laini imehamishwa?) — malipo yamesimama mpaka dereva athibitishe upya */
+  nameChanged: a.name_changed_at ? { to: a.name_changed_to ?? null, at: a.name_changed_at } : null,
+});
 
 export async function payoutAccounts(client: Db, driverId: string) {
   const rows = await many<AccountRow>(client, 'SELECT * FROM naya.driver_payout_accounts WHERE driver_id = $1 ORDER BY is_primary DESC, created_at', [driverId]);
@@ -279,18 +293,53 @@ export async function driverPromoWallet(driverId: string) {
     ...balance,
     accounts,
     trips,
-    payouts: (payouts as { network: Network }[]).map((p) => ({ ...p, networkLabel: NETWORK_LABEL[p.network] ?? p.network })),
+    payouts: (payouts as { network: Network }[]).map((p) => ({ ...p, networkLabel: NETWORK_LABEL[p.network] ?? ((p.network as string) === 'WALLET' ? 'Wallet ya NAYA' : p.network) })),
   };
+}
+
+// Wallet (0.21.0): namba kuu ya kupokea pesa ikibadilika → kutoa kunasubiri saa 24.
+// Inafanyika NDANI ya transaction ileile ya kubadilisha namba, baada ya kufunga safu ya dereva kisha wallet
+// (mpangilio uleule wa kutoa pesa) — hivyo kutoa hakuwezi "kupita katikati" kabla saa 24 hazijaanza.
+const PAYOUT_HOLD_HOURS = 24;
+async function lockForPayoutChange(client: Db, driverId: string) {
+  await client.query('SELECT 1 FROM naya.drivers WHERE user_id = $1 FOR UPDATE', [driverId]);
+  await client.query(`INSERT INTO naya.wallets (driver_id) VALUES ($1) ON CONFLICT (driver_id) DO NOTHING`, [driverId]);
+  await client.query('SELECT 1 FROM naya.wallets WHERE driver_id = $1 FOR UPDATE', [driverId]);
+  return one<{ network: string; phone: string }>(client, 'SELECT network, phone FROM naya.driver_payout_accounts WHERE driver_id = $1 AND is_primary', [driverId]);
+}
+async function holdIfPrimaryChanged(client: Db, driverId: string, before: { network: string; phone: string } | null) {
+  if (!before) return false; // namba ya kwanza kabisa: hakuna cha kulinda
+  const now = await one<{ network: string; phone: string }>(client, 'SELECT network, phone FROM naya.driver_payout_accounts WHERE driver_id = $1 AND is_primary', [driverId]);
+  if (now && now.network === before.network && now.phone === before.phone) return false;
+  await client.query(
+    `UPDATE naya.wallets SET hold_until = greatest(coalesce(hold_until, now()), now() + make_interval(hours => ${PAYOUT_HOLD_HOURS})),
+            hold_reason = 'namba mpya ya malipo', updated_at = now() WHERE driver_id = $1`,
+    [driverId],
+  );
+  await writeAudit(client, { actorId: driverId, action: 'wallet.payout_number_changed', targetType: 'driver', targetId: driverId });
+  return true;
+}
+function notifyPayoutHold(driverId: string) {
+  notify({
+    userId: driverId,
+    event: 'driver',
+    kind: 'wallet_hold',
+    title: 'Namba mpya ya malipo',
+    body: `Namba yako kuu ya malipo imebadilishwa. Kwa usalama, kutoa pesa kutawezekana baada ya saa ${PAYOUT_HOLD_HOURS}. Kama si wewe, wasiliana na ofisi ya NAYA sasa hivi.`,
+    sms: 'NAYA: Namba yako ya malipo imebadilishwa. Kama si wewe, wasiliana na ofisi ya NAYA sasa hivi.',
+  }).catch(() => {});
 }
 
 export async function savePayoutAccount(
   driverId: string,
-  input: { id?: string; network: Network; phone: string; accountName: string; primary?: boolean },
+  input: { id?: string; network: Network; phone: string; accountName: string; primary?: boolean; verifiedName?: string | null },
 ) {
   const driver = await one(db, 'SELECT 1 FROM naya.drivers WHERE user_id = $1', [driverId]);
   if (!driver) throw notFound('Bado hujaomba kuwa dereva.');
+  let hold = false;
   try {
     await transaction(async (client) => {
+      const before = await lockForPayoutChange(client, driverId);
       const count = await one<{ n: number }>(client, 'SELECT count(*)::int AS n FROM naya.driver_payout_accounts WHERE driver_id = $1', [driverId]);
       const makePrimary = input.primary || (count?.n ?? 0) === 0 || (!!input.id && (await one(client, 'SELECT 1 FROM naya.driver_payout_accounts WHERE id = $1 AND is_primary', [input.id])) !== null);
       if (!input.id && (count?.n ?? 0) >= 3) throw conflict('Unaweza kuweka namba 3 tu. Futa moja kwanza.');
@@ -298,27 +347,34 @@ export async function savePayoutAccount(
       if (input.id) {
         const updated = await one(
           client,
-          `UPDATE naya.driver_payout_accounts SET network = $3, phone = $4, account_name = $5, is_primary = $6, updated_at = now()
+          `UPDATE naya.driver_payout_accounts SET network = $3, phone = $4, account_name = $5, is_primary = $6,
+                  verified_name = $7, verified_at = CASE WHEN $8::boolean THEN now() ELSE NULL END,
+                  name_changed_to = NULL, name_changed_at = NULL, updated_at = now()
             WHERE id = $1 AND driver_id = $2 RETURNING id`,
-          [input.id, driverId, input.network, input.phone, input.accountName, makePrimary],
+          [input.id, driverId, input.network, input.phone, input.accountName, makePrimary, input.verifiedName ?? null, !!input.verifiedName],
         );
         if (!updated) throw notFound('Namba hii haikupatikana.');
       } else {
         await client.query(
-          `INSERT INTO naya.driver_payout_accounts (driver_id, network, phone, account_name, is_primary) VALUES ($1, $2, $3, $4, $5)`,
-          [driverId, input.network, input.phone, input.accountName, makePrimary],
+          `INSERT INTO naya.driver_payout_accounts (driver_id, network, phone, account_name, is_primary, verified_name, verified_at)
+           VALUES ($1, $2, $3, $4, $5, $6, CASE WHEN $7::boolean THEN now() ELSE NULL END)`,
+          [driverId, input.network, input.phone, input.accountName, makePrimary, input.verifiedName ?? null, !!input.verifiedName],
         );
       }
+      hold = await holdIfPrimaryChanged(client, driverId, before);
     });
   } catch (error) {
     if (isUniqueViolation(error)) throw conflict('Namba hii tayari imewekwa.');
     throw error;
   }
+  if (hold) notifyPayoutHold(driverId);
   return payoutAccounts(db, driverId);
 }
 
 export async function deletePayoutAccount(driverId: string, id: string) {
+  let hold = false;
   await transaction(async (client) => {
+    const before = await lockForPayoutChange(client, driverId);
     const gone = await one<{ is_primary: boolean }>(client, 'DELETE FROM naya.driver_payout_accounts WHERE id = $1 AND driver_id = $2 RETURNING is_primary', [id, driverId]);
     if (!gone) throw notFound('Namba hii haikupatikana.');
     if (gone.is_primary) {
@@ -328,7 +384,11 @@ export async function deletePayoutAccount(driverId: string, id: string) {
         [driverId],
       );
     }
+    // Namba kuu imefutwa na nyingine imekuwa kuu → saa 24 (zikiwa hakuna namba nyingine: hakuna pa kutuma hata hivyo)
+    const left = await one(client, 'SELECT 1 FROM naya.driver_payout_accounts WHERE driver_id = $1 LIMIT 1', [driverId]);
+    if (left) hold = await holdIfPrimaryChanged(client, driverId, before);
   });
+  if (hold) notifyPayoutHold(driverId);
   return payoutAccounts(db, driverId);
 }
 
@@ -588,6 +648,10 @@ export async function recordPayout(
 
 export async function voidPayout(adminId: string, payoutId: string, reason: string) {
   const row = await transaction(async (client) => {
+    const kind = await one<{ network: string }>(client, 'SELECT network FROM naya.promo_payouts WHERE id = $1', [payoutId]);
+    if (kind?.network === 'WALLET') {
+      throw conflict('Malipo haya yaliingia kwenye wallet ya dereva. Tumia "Marekebisho" kwenye wallet yake badala ya kufuta.');
+    }
     const r = await one<{ driver_id: string; amount: number }>(
       client,
       `UPDATE naya.promo_payouts SET voided_at = now(), voided_by = $2, void_reason = $3 WHERE id = $1 AND voided_at IS NULL RETURNING driver_id, amount`,

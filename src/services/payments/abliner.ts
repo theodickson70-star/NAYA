@@ -243,6 +243,15 @@ export const abliner: PaymentProvider = {
     }
   },
 
+  /** GET /api/v1/withdrawals/preview?method=mobile&amount=… → fee_tzs (nyaraka). */
+  async previewFee(amount: number) {
+    const cfg = requireConfig();
+    const d = unwrap(await call(cfg, 'GET', `/api/v1/withdrawals/preview?method=mobile&amount=${amount}`));
+    const fee = Number(d.fee_tzs);
+    if (!Number.isFinite(fee) || fee < 0) throw new Error('preview haina fee_tzs');
+    return fee;
+  },
+
   async lookupName(phone: string) {
     const cfg = requireConfig();
     try {

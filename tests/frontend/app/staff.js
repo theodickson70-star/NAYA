@@ -10,6 +10,7 @@
 import { escapeHtml as esc } from '/shared/api.js';
 import { DOCUMENT_ORDER, DOCUMENT_STATUS, formatDate, formatPhone, LOCATION_CATEGORIES } from '/shared/labels.js';
 import { preparePhoto } from './photo.js';
+import { watchPhone } from '/shared/namelookup.js';
 
 const $ = (id) => document.getElementById(id);
 let ctx = null; // { api, toast, handleError, logout, account() }
@@ -143,10 +144,11 @@ function renderRegister() {
     <p class="lead">Jaza taarifa za dereva na chombo chake. Hatua inayofuata ni kupiga picha za nyaraka.</p>
     <form class="card sf-form" id="sf-register" novalidate>
       <h2>Dereva</h2>
-      <label for="sf-name">Jina kamili</label>
-      <input id="sf-name" name="fullName" autocomplete="off" required>
       <label for="sf-phone">Namba ya simu ya dereva</label>
       <input id="sf-phone" name="phone" inputmode="tel" placeholder="07XX XXX XXX" required>
+      <p class="sf-who" id="sf-who" aria-live="polite" hidden></p>
+      <label for="sf-name">Jina kamili <span class="optional">(linajazwa lenyewe kutoka mtandaoni)</span></label>
+      <input id="sf-name" name="fullName" autocomplete="off" required>
       <h2>Chombo</h2>
       <fieldset class="choice">
         <legend>Aina ya chombo</legend>
@@ -166,6 +168,41 @@ function renderRegister() {
       <p class="alert alert-danger" id="sf-register-error" role="alert" hidden></p>
       <button class="btn btn-primary btn-block" type="submit">Sajili na endelea kwa picha</button>
     </form>`;
+  const name = $('sf-name');
+  name.addEventListener('input', () => delete name.dataset.auto);
+  watchPhone($('sf-phone'), {
+    api: ctx.api,
+    purpose: 'DRIVER_REG',
+    onState: (st) => {
+      const box = $('sf-who');
+      if (!box) return;
+      if (st.state === 'idle') return (box.hidden = true);
+      box.hidden = false;
+      if (st.state === 'loading') {
+        box.className = 'sf-who is-loading';
+        box.textContent = 'Inatafuta jina la mwenye namba…';
+        return;
+      }
+      const r = st.result;
+      if (st.state === 'error' || !r?.available) {
+        box.className = 'sf-who is-muted';
+        box.textContent = 'Jina halikupatikana kwa sasa — liandike mwenyewe.';
+        return;
+      }
+      if (!r.found) {
+        box.className = 'sf-who is-bad';
+        box.textContent = 'Mtandao haujathibitisha namba hii. Hakikisha ni namba sahihi ya dereva.';
+        return;
+      }
+      box.className = 'sf-who is-found';
+      box.innerHTML = `Jina kwenye ${esc(r.networkLabel ?? 'mtandao')}: <strong>${esc(r.name)}</strong>`;
+      // Jaza jina kama halijaandikwa (au lilijazwa na sisi); staff anaweza kulirekebisha.
+      if (!name.value.trim() || name.dataset.auto) {
+        name.value = r.displayName;
+        name.dataset.auto = '1';
+      }
+    },
+  });
 }
 
 // ------------------------------------------------------------------ dereva mmoja

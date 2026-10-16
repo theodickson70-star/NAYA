@@ -32,6 +32,7 @@ let mode: { deposit?: 'ok' | 'invalid_phone' | 'server_error'; withdrawal?: 'ok'
 const feeOf = (amount: number) => Math.ceil(amount * 0.04); // ada ya bandia ya kutuma (4%)
 let counter = 0;
 let mock: Server;
+const lookupNames = new Map<string, string>(); // 2557… → jina (Name Lookup ya bandia)
 
 function hmac(ts: string, body: string) {
   return createHmac('sha256', SECRET).update(`${ts}.${body}`).digest('hex');
@@ -79,6 +80,19 @@ function startMock() {
         const tx = { id: `wd-${++counter}`, type: 'withdrawal', status: 'pending', amount: b.amount, currency: b.currency ?? 'TZS', method: b.method, recipient: b.recipient, reference: `ABLW${counter}`, customer_reference: b.reference };
         txs.set(b.reference, tx);
         return send(res, 200, tx);
+      }
+      if (req.method === 'GET' && url.pathname === '/api/v1/lookup') {
+        const phone = url.searchParams.get('phone') ?? '';
+        const name = lookupNames.get(phone);
+        if (name) return send(res, 200, { status: 'success', data: { phone, name, network: 'vodacom' } }); // umbo la nyaraka
+        if (phone.endsWith('8888')) return send(res, 404, { status: 'error', code: 'name_not_found', message: 'Name not found' });
+        return send(res, 503, { status: 'error', code: 'lookup_unavailable' });
+      }
+      if (req.method === 'POST' && url.pathname === '/api/v1/control-numbers') {
+        const b = JSON.parse(body);
+        if (!['EXACT', 'PARTIAL'].includes(b.payment_mode) || !b.reference || !(b.amount > 0)) return send(res, 422, { status: 'error', code: 'validation_failed' });
+        const tx = { id: `tx_cn${++counter}`, control_number: `99341234${String(counter).padStart(4, '0')}`, reference: b.reference, amount: b.amount, payment_mode: b.payment_mode, description: b.description };
+        return send(res, 200, { status: 'success', data: tx });
       }
       send(res, 404, { status: 'error', code: 'not_found' });
     });
@@ -198,6 +212,8 @@ before(async () => {
      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
   );
   await db.query(`INSERT INTO naya.settings (key, value) VALUES ('auto_payout', '{"enabled": true, "dailyLimit": 10000}') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`);
+  // Majaribio haya ni ya malipo ya ofa ya MOJA KWA MOJA (si wallet) — mfumo huo bado unapatikana kwenye mipangilio.
+  await db.query(`INSERT INTO naya.settings (key, value) VALUES ('driver_wallet', '{"promoToWallet": false}') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`);
   for (const [name, p] of [[`Pickup AB${s}`, A], [`Dest AB${s}`, B]] as const) {
     const r = await db.query(`INSERT INTO naya.locations (name, category, lat, lng) VALUES ($1, 'OTHER', $2, $3) RETURNING id`, [name, p.lat, p.lng]);
     locationIds.push(r.rows[0].id);
@@ -216,7 +232,9 @@ before(async () => {
 });
 
 after(async () => {
+  await db.query(`DELETE FROM naya.settings WHERE key = 'driver_wallet'`);
   await db.query('DELETE FROM naya.payment_webhook_events WHERE event_id LIKE $1', [`evt_${s}_%`]);
+  await db.query(`DELETE FROM naya.phone_names WHERE phone LIKE '255764%'`);
   await db.query('DELETE FROM naya.promo_payouts WHERE driver_id = ANY($1::uuid[])', [userIds]);
   await db.query('DELETE FROM naya.subscription_payments WHERE driver_id = ANY($1::uuid[])', [userIds]);
   await db.query('UPDATE naya.rides SET promo_payment_id = NULL WHERE passenger_id = ANY($1::uuid[]) OR driver_id = ANY($1::uuid[])', [userIds]);
@@ -514,6 +532,45 @@ describe('Abliner — malipo ya ofa kwa bodaboda (withdrawal)', () => {
     await db.query(`UPDATE naya.payments SET created_at = (date_trunc('day', now() AT TIME ZONE 'Africa/Dar_es_Salaam') AT TIME ZONE 'Africa/Dar_es_Salaam') - interval '1 minute' WHERE user_id = $1 AND kind = 'PROMO_PAYOUT'`, [ids.d1]);
     assert.equal((await call('POST', `/api/admin/payments/rides/${rideId}/approve`, {}, 'admin')).status, 200);
     assert.equal((await ride(rideId)).promo_payout_state, 'PENDING');
+  });
+
+  it('Name Lookup: GET /lookup?phone= (Bearer) → jina + mtandao; 404 name_not_found → haipo; kosa jingine → huduma haipatikani', async () => {
+    lookupNames.set(`255764${s}`, 'AULERIA GERVAS NANGALE');
+    const r = await call('POST', '/api/name-lookup', { phone: `0764${s}` }, 'd1');
+    assert.equal(r.status, 200, r.json.message);
+    assert.equal(r.json.data.name, 'AULERIA GERVAS NANGALE');
+    assert.equal(r.json.data.displayName, 'Auleria Gervas Nangale');
+    assert.equal(r.json.data.network, 'MPESA');
+    const req = seen.filter((x) => x.path === '/api/v1/lookup').at(-1)!;
+    assert.equal(req.method, 'GET');
+    assert.equal(req.headers.authorization, `Bearer ${KEY}`);
+    const nf = (await call('POST', '/api/name-lookup', { phone: '0764128888' }, 'd1')).json.data;
+    assert.deepEqual([nf.available, nf.found], [true, false]);
+    const down = (await call('POST', '/api/name-lookup', { phone: '0764127777' }, 'd1')).json.data;
+    assert.equal(down.available, false);
+    await db.query(`DELETE FROM naya.phone_names WHERE phone IN ($1, '255764128888')`, [`255764${s}`]);
+  });
+
+  it('Control number: POST /control-numbers (EXACT, reference yetu); webhook kwa id ya muamala → ada inaongezwa', async () => {
+    const r = await call('POST', '/api/driver/subscription/control-number', { months: 1 }, 'd1');
+    assert.equal(r.status, 200, r.json.message);
+    assert.match(r.json.data.controlNumber, /^99341234\d{4}$/);
+    const req = posts('/api/v1/control-numbers').at(-1)!;
+    const b = JSON.parse(req.body);
+    assert.equal(b.payment_mode, 'EXACT');
+    assert.equal(b.reference, r.json.data.reference);
+    assert.equal(b.amount, 5000);
+    assert.equal(req.headers.authorization, `Bearer ${KEY}`);
+    const txId = (await payment(r.json.data.id)).provider_ref;
+    assert.match(txId, /^tx_cn/);
+    const before = await paidUntil('d1');
+    // Abliner inatuma tukio la deposits (transaction.completed) bila customer_reference — tunaoanisha kwa id
+    const hook = await webhook('transaction.completed', { id: txId, status: 'completed', amount: 5000, provider_reference: `CN${s}` });
+    assert.equal(hook.status, 200);
+    assert.equal((await payment(r.json.data.id)).status, 'SUCCESS');
+    assert.ok((await paidUntil('d1')) > before);
+    // id ya muamala usio control number → haibadilishi chochote
+    assert.equal((await webhook('transaction.completed', { id: 'dep-1', status: 'completed', amount: 5000 })).json.data.ignored, true);
   });
 
   it('bila PAYMENT_PROVIDER=abliner, webhook ya abliner → 404 (hakuna kinachochakatwa)', async () => {

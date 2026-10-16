@@ -7,6 +7,7 @@ import { watchPhone } from '/shared/namelookup.js';
 const $ = (id) => document.getElementById(id);
 let ctx = null; // { api, handleError, toast }
 let editing = null; // id ya namba inayobadilishwa, 'new' = mpya, null = fomu imefungwa
+let deleting = null; // id ya namba inayofutwa (inasubiri PIN)
 let wallet = null;
 let lookup = null; // watchPhone ya fomu iliyo wazi
 let who = null; // { phone, result } — jina la namba kutoka mtandao (0.20.0)
@@ -70,6 +71,13 @@ function accountForm(a) {
       <input id="wl-name" autocomplete="name" value="${esc(a?.accountName ?? '')}">
     </div>
     ${wallet.accounts.length > (a ? 1 : 0) ? `<label class="check"><input type="checkbox" id="wl-primary"${a?.primary ? ' checked' : ''}> Namba kuu (NAYA itatuma hapa)</label>` : ''}
+    ${
+      wallet.walletPin
+        ? `<label for="wl-pin">PIN ya wallet</label>
+    <input class="mw-pin" id="wl-pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="••••">
+    ${wallet.accounts.length ? '<p class="small muted">Ukibadilisha namba kuu, kutoa pesa kutasubiri saa 24 kwa usalama.</p>' : ''}`
+        : ''
+    }
     <p class="alert alert-danger" id="wl-error" role="alert" hidden></p>
     <div class="wallet-form-actions">
       <button class="btn btn-primary" type="submit">Hifadhi namba</button>
@@ -166,6 +174,17 @@ function render() {
               <button class="link-btn" type="button" data-wallet="edit" data-id="${esc(a.id)}">Badilisha</button>
               <button class="link-btn link-danger" type="button" data-wallet="delete" data-id="${esc(a.id)}">Futa</button>
             </span>
+            ${
+              deleting === a.id
+                ? `<span class="wl-del">
+                    <label for="wl-del-pin">Weka PIN ya wallet kufuta namba hii${a.primary && w.accounts.length > 1 ? ' (namba nyingine itakuwa kuu; kutoa kutasubiri saa 24)' : ''}</label>
+                    <input class="mw-pin" id="wl-del-pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="••••">
+                    <p class="alert alert-danger" id="wl-del-error" role="alert" hidden></p>
+                    <span class="wallet-form-actions"><button class="btn btn-small btn-danger" type="button" data-wallet="delete-confirm">Futa namba</button>
+                    <button class="btn btn-small btn-ghost" type="button" data-wallet="delete-cancel">Acha</button></span>
+                  </span>`
+                : ''
+            }
           </li>`,
     )
     .join('');
@@ -201,7 +220,9 @@ function render() {
       <small>Safari za ofa ${w.rides} · Jumla ${formatTsh(w.earned)} · Umeshatumiwa ${formatTsh(w.paid)}</small>
     </div>
     ${
-      w.auto?.enabled
+      w.toWallet
+        ? `<p class="wallet-auto">${AUTO_ICON}<span><strong>Malipo ya ofa yanaingia kwenye Wallet yako</strong> Safari ya ofa ikikamilika, NAYA inaweka sehemu yake kwenye wallet yako papo hapo. Toa pesa wakati wowote. <a href="#/akaunti/wallet">Fungua Wallet yangu</a></span></p>`
+        : w.auto?.enabled
         ? `<p class="wallet-auto">${AUTO_ICON}<span><strong>Malipo ya papo hapo</strong> Safari ya ofa ikikamilika, NAYA inatuma sehemu yake kwenye namba yako kuu ya pesa ya simu yenyewe (hadi ${formatTsh(w.auto.dailyLimit)} kwa siku; zaidi ya hapo ofisi inakagua kwanza).</span></p>`
         : ''
     }
@@ -226,12 +247,31 @@ async function onClick(event) {
   else if (what === 'edit') editing = btn.dataset.id;
   else if (what === 'cancel') editing = null;
   else if (what === 'delete') {
+    if (wallet.walletPin) {
+      deleting = btn.dataset.id;
+      render();
+      $('wl-del-pin')?.focus();
+      return;
+    }
     if (!confirm('Futa namba hii ya kupokea malipo?')) return;
     try {
       wallet.accounts = await ctx.api.post(`/api/driver/payout-accounts/${btn.dataset.id}/delete`, {});
       ctx.toast('Namba imefutwa');
     } catch (err) {
       if (!ctx.handleError(err)) ctx.toast(err.message);
+    }
+  } else if (what === 'delete-cancel') {
+    deleting = null;
+  } else if (what === 'delete-confirm') {
+    btn.disabled = true;
+    try {
+      wallet.accounts = await ctx.api.post(`/api/driver/payout-accounts/${deleting}/delete`, { pin: $('wl-del-pin').value });
+      deleting = null;
+      ctx.toast('Namba imefutwa');
+    } catch (err) {
+      btn.disabled = false;
+      if (!ctx.handleError(err, 'wl-del-error')) return;
+      return;
     }
   }
   render();
@@ -269,6 +309,7 @@ async function onSubmit(event) {
       accountName: $('wl-name-wrap').hidden ? '' : $('wl-name').value,
       ...(form.dataset.id ? { id: form.dataset.id } : {}),
       ...($('wl-primary') ? { primary: $('wl-primary').checked } : {}),
+      ...($('wl-pin') ? { pin: $('wl-pin').value } : {}),
     };
     wallet.accounts = await ctx.api.post('/api/driver/payout-accounts', body);
     editing = null;

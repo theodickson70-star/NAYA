@@ -102,6 +102,8 @@ before(async () => {
      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
   );
   await db.query(`INSERT INTO naya.settings (key, value) VALUES ('auto_payout', '{"enabled": true, "dailyLimit": 10000, "minPayout": 1000}') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`);
+  // Majaribio haya ni ya malipo ya ofa ya MOJA KWA MOJA (si wallet) — mfumo huo bado unapatikana kwenye mipangilio.
+  await db.query(`INSERT INTO naya.settings (key, value) VALUES ('driver_wallet', '{"promoToWallet": false}') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`);
   for (const [name, p] of [[`Pickup NL${s}`, A], [`Dest NL${s}`, B]] as const) {
     const r = await db.query(`INSERT INTO naya.locations (name, category, lat, lng) VALUES ($1, 'OTHER', $2, $3) RETURNING id`, [name, p.lat, p.lng]);
     locationIds.push(r.rows[0].id);
@@ -121,6 +123,7 @@ before(async () => {
 });
 
 after(async () => {
+  await db.query(`DELETE FROM naya.settings WHERE key = 'driver_wallet'`);
   delete process.env.SIM_NAMES;
   await db.query('DELETE FROM naya.promo_payouts WHERE driver_id = ANY($1::uuid[])', [userIds]);
   await db.query('DELETE FROM naya.subscription_payments WHERE driver_id = ANY($1::uuid[])', [userIds]);

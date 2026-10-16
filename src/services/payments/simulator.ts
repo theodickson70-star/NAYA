@@ -26,6 +26,9 @@ export const simulator: PaymentProvider = {
     state.set(req.reference, r);
     return r;
   },
+  async previewFee(amount: number) {
+    return Math.ceil(amount * 0.02); // ada ya bandia ya kutuma: 2%
+  },
   async lookupName(phone: string) {
     if (phone.endsWith('9999')) throw new Error('simulator: lookup haipatikani');
     if (phone.endsWith('8888')) return { found: false };

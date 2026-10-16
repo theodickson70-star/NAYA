@@ -25,6 +25,7 @@ import * as malipo from './malipo.js';
 import * as appUpdate from './update.js';
 import * as terms from './terms.js';
 import * as staff from './staff.js';
+import * as mywallet from './mywallet.js';
 import { initI18n, langSwitchHtml, onLangChange } from '/shared/i18n.js';
 import { finishSplash, previewSound, setSoundEnabled, soundEnabled, splashActive, splashReady } from './splash.js';
 
@@ -33,7 +34,7 @@ const api = createApi('naya_app_token');
 const $ = (id) => document.getElementById(id);
 const views = ['view-loading', 'view-intro', 'view-auth', 'view-verify', 'view-role', 'view-offline', 'view-app'];
 const MAX_BYTES = 3 * 1024 * 1024;
-const VERSION = '0.19.1';
+const VERSION = '0.21.0';
 
 let account = null; // { user, activeMode, driverStatus, canDrive }
 let driver = null; // wasifu wa udereva (mode ya Dereva)
@@ -503,6 +504,8 @@ function startRealtime() {
         return;
       }
       rides.onRealtime(type, data);
+      // Wallet yangu ikiwa wazi: pesa imeingia / imetumwa → onyesha salio jipya
+      if (type === 'driver' && location.hash === '#/akaunti/wallet') mywallet.render('');
     },
   });
 }
@@ -954,6 +957,7 @@ function renderAccount() {
   if (section === 'mipangilio') return renderSettings();
   if (section === 'ada') return renderSubscriptionPage();
   if (section === 'malipo-ya-ofa') return renderWalletPage();
+  if (section === 'wallet') return mywallet.render((location.hash.split('?')[0].split('/')[3] ?? '').trim());
   renderHub();
 }
 
@@ -1087,7 +1091,7 @@ const SUB_STATE = {
   EXPIRED: ['bad', 'Imeisha'],
   NONE: ['muted', 'Haijaanza'],
 };
-const PAY_METHODS = { CASH: 'Taslimu', MPESA: 'M-Pesa', AIRTEL: 'Airtel Money', TIGO: 'Mixx by Yas (Tigo Pesa)', HALOPESA: 'HaloPesa', BANK: 'Benki' };
+const PAY_METHODS = { CASH: 'Taslimu', MPESA: 'M-Pesa', AIRTEL: 'Airtel Money', TIGO: 'Mixx by Yas (Tigo Pesa)', HALOPESA: 'HaloPesa', BANK: 'Benki', CONTROL: 'Control number' };
 
 async function loadSubscriptionSection() {
   try {
@@ -1615,6 +1619,7 @@ feedback.init({
   },
 });
 wallet.init({ api, handleError, toast });
+mywallet.init({ api, handleError, toast });
 malipo.init({
   api,
   handleError,

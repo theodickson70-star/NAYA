@@ -34,6 +34,22 @@ export interface CallbackResult extends ProviderResult {
   reference: string;
   /** Kiasi kilichothibitishwa na kampuni (TZS) — kikipingana na chetu, muamala haubadilishwi. */
   amount?: number | null;
+  /** id ya muamala kwa kampuni (mf. tx_… ya control number) — kwa kuoanisha reference ikikosekana. */
+  txId?: string | null;
+}
+
+/** Jina la mwenye namba kama lilivyosajiliwa kwenye mtandao. found=false → mtandao haukuthibitisha namba hii. */
+export interface NameLookupResult {
+  found: boolean;
+  name?: string | null;
+  network?: MobileNetwork | null;
+}
+
+export interface ControlNumberRequest {
+  reference: string;
+  amount: number;
+  description: string;
+  customerName?: string | null;
 }
 
 /** Webhook iliyothibitishwa: matokeo ya muamala wetu, au tukio lisilotuhusu (mf. SMS top-up) → 200 bila kubadilisha kitu. */
@@ -54,6 +70,12 @@ export interface PaymentProvider {
    * feeMode 'deducted' = kampuni inakata ada kutoka kwa pesa ya mpokeaji → NAYA inaongeza; 'on_top' = ada inakatwa kwenye salio letu.
    */
   quoteDisbursement?(net: number, feeMode: FeeMode): Promise<{ send: number; fee: number; source: 'preview' | 'estimate' }>;
+  /** Si lazima: ada ya kutuma `amount` kwa simu (TZS) — kwa kumwonyesha dereva kabla ya kutoa wallet. */
+  previewFee?(amount: number): Promise<number>;
+  /** Si lazima: jina la mwenye namba (kabla ya kutuma pesa). Kampuni haipatikani → throw (si "haipo"). */
+  lookupName?(phone: string): Promise<NameLookupResult>;
+  /** Si lazima: control number ya kulipa kutoka benki / app yoyote ya pesa ya simu (kiasi kamili). */
+  createControlNumber?(req: ControlNumberRequest): Promise<{ controlNumber: string; providerRef: string | null }>;
   /** Hali ya muamala kwa reference yetu (kwa kuhakiki tusipopata callback). */
   status(reference: string, direction: 'IN' | 'OUT', providerRef?: string | null): Promise<ProviderResult>;
   /** Callback kutoka kampuni ya malipo — lazima ithibitishe saini/siri; ikishindwa → throw. */
@@ -84,6 +106,16 @@ export function providerProblem(): string | null {
   if (name === 'abliner' && !ablinerConfig()) return 'PAYMENT_PROVIDER=abliner lakini ABLINER_API_KEY au ABLINER_WEBHOOK_SECRET haipo kwenye Railway → Variables.';
   if (name && !['none', 'simulator', 'abliner'].includes(name)) return `PAYMENT_PROVIDER "${name}" haijulikani. Tumia "abliner".`;
   if (name === 'simulator' && (process.env.NODE_ENV ?? '').trim() === 'production') return 'PAYMENT_PROVIDER=simulator haifanyi kazi production.';
+  return null;
+}
+
+/** Jina la mtandao kutoka kampuni ya malipo (vodacom, tigo/yas, airtel, halotel…) → letu. */
+export function networkFromName(raw: unknown): MobileNetwork | null {
+  const s = String(raw ?? '').toLowerCase();
+  if (/voda|m-?pesa/.test(s)) return 'MPESA';
+  if (/tigo|yas|mixx/.test(s)) return 'MIXX';
+  if (/airtel/.test(s)) return 'AIRTEL';
+  if (/halo/.test(s)) return 'HALOPESA';
   return null;
 }
 

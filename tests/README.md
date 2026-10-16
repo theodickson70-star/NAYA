@@ -115,6 +115,40 @@ Alama za kutiliwa shaka (`rides.flags`), zinaonekana kwa ofisi kwenye safari, Ri
 DRIVER, PASSENGER, AUTO au ADMIN. Migration `021_safari_rahisi.sql` inaongeza safu tu (haifuti data); safari zinazoendelea zisizo
 za ofa zinaondolewa PIN ili zisikwame.
 
+## Wallet ya dereva (0.21.0)
+
+Kila dereva aliyethibitishwa ana wallet yake ndani ya NAYA (inafunguliwa yenyewe). Pesa halisi iko kwenye akaunti ya NAYA kwa Abliner; wallet ni deni la NAYA kwa dereva, linalorekodiwa mstari kwa mstari (ledger).
+
+- **Mapato yanaingia wallet:** malipo ya ofa yanaingia kwenye wallet badala ya kutumwa kila safari (Ofisi → Malipo → Wallet za madereva → Mipangilio; ukiondoa alama, malipo yanatumwa moja kwa moja kama zamani).
+- **Kutoa pesa:** dereva anachagua kiasi → anaona ada ya mtandao na atakachopokea (kutoka Abliner) → anaweka PIN → pesa inatumwa **kwenye namba yake kuu iliyothibitishwa tu** (jina la mtandao). Kiwango cha chini TSh 1,000, kikomo TSh 100,000 kwa siku (vinabadilika kwenye mipangilio). Ada ya mtandao inabebwa na dereva.
+- **PIN ya wallet (tarakimu 4):** dereva anaitengeneza mwenyewe kwa password ya akaunti; ofisi haiioni (inahifadhiwa kama hash). PIN rahisi (1234, 0000, tarakimu za mwisho za simu) zinakataliwa. Makosa 5 → imefungwa dakika 30; makosa 10 → imefungwa mpaka ofisi ifungue.
+- **Nimesahau PIN:** dereva anaomba → ofisi inampigia kuthibitisha → "Ruhusu PIN mpya" → dereva anaweka PIN mpya kwa password yake → kutoa kunasubiri saa 24.
+- **Namba ya malipo:** kubadilisha au kufuta namba kuu kunahitaji PIN na kunaanzisha saa 24 za usalama (dereva anapata SMS).
+- **Ada ya mwezi kwa salio:** "Lipa ada" kwenye wallet (PIN). Ofisi ikibatilisha malipo hayo, pesa inarudi kwenye wallet.
+- **Kutoa kukishindwa:** pesa yote inarudi kwenye wallet mara moja; tatizo la mtandao → inabaki "inasubiri" na mfumo unakagua hali (hautumi mara mbili).
+- **Ofisi:** Fedha → Malipo → **Wallet za madereva** — deni la wallet zote dhidi ya salio la Abliner (onyo likiwa halitoshi), maombi ya PIN, orodha, na kwa kila dereva: historia kamili, kusimamisha/kufungua, kufungua PIN, kuruhusu PIN mpya, marekebisho (kiasi + sababu, yanaonekana kwa dereva).
+- Muhtasari wa ofisi unaonyesha "Salio la Abliner halitoshi wallet za madereva" na "Madereva wameomba PIN mpya ya wallet".
+- Hakuna commission. Migration 030 inaongeza `naya.wallets` na `naya.wallet_entries` tu — haifuti wala kubadilisha data iliyopo.
+
+## Jina la mwenye namba na Control Number (0.20.0)
+
+Kutoka nyaraka za Abliner (hakuna endpoint iliyobuniwa): `GET /api/v1/lookup?phone=` → `{ phone, name, network }`
+(404 `name_not_found` = haijathibitishwa) na `POST /api/v1/control-numbers` `{ amount, description, payment_mode, reference, customer_name? }`
+→ `{ id, control_number, … }`; ikilipwa, webhook ileile ya deposits (`transaction.completed`) inakuja. **Hakuna cha kubadilisha
+Railway wala Abliner.** Migration `029_majina_na_control.sql` inaongeza `phone_names` (cache), `name_lookups` (kumbukumbu),
+safu za uthibitisho kwenye `driver_payout_accounts`, na njia `CONTROL` kwenye kumbukumbu za ada (haifuti data).
+
+- **Namba tu → jina linatokea**: namba za malipo za dereva (anathibitisha "jina hili ni sahihi"; jina la mtandao ndilo linahifadhiwa),
+  Ofisi → Ongeza staff, NAYA Staff → Sajili bodaboda. Huduma isipopatikana, jina linaandikwa kwa mkono kama zamani.
+- **Faragha**: `POST /api/name-lookup` ni kwa dereva, NAYA Staff na ofisi tu; kikomo cha namba tofauti kwa saa 24
+  (dereva 15, staff 80, ofisi 300); kila ombi linaandikwa. Namba haiandikwi kwenye logs.
+- **Kinga ya malipo**: kabla ya kumtumia dereva pesa, jina la namba linaangaliwa tena (cache ≤ saa 6). Likiwa la mtu mwingine
+  (laini imehamishwa) au mtandao haulijui → pesa haitumwi, safari inaonyesha sababu, dereva anapata arifa. Akithibitisha namba
+  upya kwenye app, malipo yaliyosimama yanatumwa yenyewe. Huduma ya majina ikiwa chini → malipo yanaendelea.
+- **Control number ya ada**: Akaunti → Ada ya mwezi → "Pata control number" (kiasi kamili, `EXACT`; siku 7). Dereva analipa
+  kutoka M-Pesa, Mixx, Airtel Money, HaloPesa au benki; siku zinaongezwa zenyewe. Namba ileile kwa miezi ileile; zisizozidi 3
+  zisizolipwa. Ikilipwa baada ya kuisha muda bado inakubaliwa.
+
 ## Ruhusa ya NAYA Staff kwa akaunti iliyopo (0.19.1)
 
 Namba moja = akaunti moja. Ofisi ikiandika namba ambayo tayari ina akaunti (abiria au dereva), haipati kosa tena:

@@ -70,6 +70,8 @@ export interface PaymentProvider {
    * feeMode 'deducted' = kampuni inakata ada kutoka kwa pesa ya mpokeaji → NAYA inaongeza; 'on_top' = ada inakatwa kwenye salio letu.
    */
   quoteDisbursement?(net: number, feeMode: FeeMode): Promise<{ send: number; fee: number; source: 'preview' | 'estimate' }>;
+  /** Si lazima: ada ya kutuma `amount` kwa simu (TZS) — kwa kumwonyesha dereva kabla ya kutoa wallet. */
+  previewFee?(amount: number): Promise<number>;
   /** Si lazima: jina la mwenye namba (kabla ya kutuma pesa). Kampuni haipatikani → throw (si "haipo"). */
   lookupName?(phone: string): Promise<NameLookupResult>;
   /** Si lazima: control number ya kulipa kutoka benki / app yoyote ya pesa ya simu (kiasi kamili). */

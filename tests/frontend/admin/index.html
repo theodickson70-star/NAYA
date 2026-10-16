@@ -507,11 +507,12 @@
       <form class="settings-card staff-form" id="staff-form" novalidate>
         <h2>Ongeza staff</h2>
         <div class="settings-grid">
-          <div><label for="staff-name">Jina kamili</label><input id="staff-name" autocomplete="off" required></div>
           <div><label for="staff-phone">Namba ya simu</label><input id="staff-phone" inputmode="tel" placeholder="07XX XXX XXX" required></div>
+          <div><label for="staff-name">Jina kamili <span class="muted small">(linajazwa lenyewe)</span></label><input id="staff-name" autocomplete="off" required></div>
         </div>
+        <p class="staff-who" id="staff-who" aria-live="polite" hidden></p>
         <p class="alert alert-danger" id="staff-form-error" role="alert" hidden></p>
-        <p class="muted small staff-form-note">Kama namba tayari ina akaunti ya NAYA (abiria au dereva), utaulizwa kumpa ruhusa ya staff kwenye akaunti hiyo hiyo.</p>
+        <p class="muted small staff-form-note">Andika namba kwanza — jina linatoka kwenye akaunti yake ya NAYA au mtandaoni. Kama namba tayari ina akaunti ya NAYA (abiria au dereva), utaulizwa kumpa ruhusa ya staff kwenye akaunti hiyo hiyo.</p>
         <div class="actions"><button class="btn btn-primary" type="submit">Ongeza staff</button></div>
       </form>
       <section class="staff-link" id="staff-link" aria-live="polite" hidden></section>

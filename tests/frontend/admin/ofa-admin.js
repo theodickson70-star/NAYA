@@ -12,6 +12,7 @@ import { escapeHtml as esc } from '/shared/api.js';
 import { flagBadges, formatDate, formatPhone, formatTsh } from '/shared/labels.js';
 import { toast as uiToast } from './ui.js';
 import { loadWallet } from './wallet-admin.js';
+import * as walletsAdmin from './wallets-admin.js';
 
 let ctx = null;
 let host = null;
@@ -33,6 +34,7 @@ export function setup(context) {
   host.addEventListener('click', onClick);
   host.addEventListener('submit', onSubmit);
   host.addEventListener('input', onInput);
+  walletsAdmin.setup({ api: ctx.api, onAuthError: ctx.onAuthError, tabs: () => tabs('wallet') }, host);
 }
 
 let view = 0; // kila ukurasa mpya: kazi za zamani (utafutaji uliochelewa n.k.) hazichori juu yake
@@ -46,6 +48,7 @@ export function open(parts) {
   host.innerHTML = '<p class="muted rp-loading">Inapakia…</p>';
   if (root === 'malipo') {
     if (a === 'miamala') return loadTransactions();
+    if (a === 'wallet') return walletsAdmin.open(b);
     if (a === 'madereva' && b) return loadPayoutDriver(b);
     if (a === 'madereva') return loadPayouts();
     return loadFinanceHome();
@@ -58,13 +61,14 @@ export function open(parts) {
 
 const cur = (on) => (on ? ' aria-current="page"' : '');
 const tabs = (current) =>
-  ['home', 'pay', 'tx'].includes(current)
+  ['home', 'pay', 'tx', 'wallet'].includes(current)
     ? `<div class="page-head"><div><h1>Malipo</h1><p class="muted">Salio la Abliner, malipo ya ofa kwa madereva na miamala yote ya simu.</p></div>
         <a class="btn btn-ghost btn-small" href="#/mipangilio#malipo">Mipangilio ya malipo</a></div>
       <nav class="rp-tabs" aria-label="Malipo">
         <a href="#/malipo"${cur(current === 'home')}>Muhtasari</a>
         <a href="#/malipo/madereva"${cur(current === 'pay')}>Madeni ya ofa kwa madereva</a>
         <a href="#/malipo/miamala"${cur(current === 'tx')}>Miamala ya simu</a>
+        <a href="#/malipo/wallet"${cur(current === 'wallet')}>Wallet za madereva</a>
       </nav>`
     : `<div class="page-head"><div><h1>Ofa za wateja</h1><p class="muted">Punguzo kwa wateja — NAYA inamlipa dereva sehemu yake.</p></div></div>
       <nav class="rp-tabs" aria-label="Ofa">
@@ -433,7 +437,7 @@ async function loadTransactions() {
     const chip = (key, value, label) => `<button type="button" class="chip" data-tx="${key}" data-value="${value}" aria-pressed="${txState[key] === value}">${label}</button>`;
     host.innerHTML = `${tabs('tx')}
       <p class="rp-lead">Kila muamala wa pesa ya simu: ada ya mwezi iliyolipwa na madereva, na malipo ya ofa yaliyotumwa na NAYA. Linganisha na taarifa ya kampuni ya malipo kwa kumbukumbu.</p>
-      <div class="filters rp-chips" role="group" aria-label="Aina">${chip('kind', '', 'Yote')}${chip('kind', 'SUBSCRIPTION', 'Ada ya mwezi')}${chip('kind', 'PROMO_PAYOUT', 'Malipo ya ofa')}</div>
+      <div class="filters rp-chips" role="group" aria-label="Aina">${chip('kind', '', 'Yote')}${chip('kind', 'SUBSCRIPTION', 'Ada ya mwezi')}${chip('kind', 'PROMO_PAYOUT', 'Malipo ya ofa')}${chip('kind', 'WALLET_WITHDRAWAL', 'Kutoa wallet')}</div>
       <div class="filters rp-chips" role="group" aria-label="Hali">${chip('status', '', 'Hali zote')}${chip('status', 'SUCCESS', 'Imefaulu')}${chip('status', 'PENDING', 'Inasubiri')}${chip('status', 'FAILED', 'Imeshindwa')}</div>
       <div class="rp-toolbar">
         <input type="search" id="tx-q" class="search" placeholder="Tafuta jina, simu au kumbukumbu" value="${esc(txState.q)}" aria-label="Tafuta">
@@ -444,10 +448,10 @@ async function loadTransactions() {
             .map((t) => {
               const [tone, label] = PAY_STATUS[t.status];
               return `<tr><td class="rp-nowrap">${esc(formatDate(t.createdAt, true))}</td>
-                <td>${t.kind === 'SUBSCRIPTION' ? `Ada ya mwezi<span class="rp-sub">Imeingia${t.months ? ` · miezi ${n(t.months)}` : ''}</span>` : 'Malipo ya ofa<span class="rp-sub">Imetoka</span>'}</td>
+                <td>${t.kind === 'SUBSCRIPTION' ? `Ada ya mwezi<span class="rp-sub">Imeingia${t.months ? ` · miezi ${n(t.months)}` : ''}</span>` : t.kind === 'WALLET_WITHDRAWAL' ? 'Kutoa wallet<span class="rp-sub">Imetoka</span>' : 'Malipo ya ofa<span class="rp-sub">Imetoka</span>'}</td>
                 <td><a href="#/malipo/madereva/${esc(t.driverId)}">${esc(t.driverName)}</a></td>
                 <td>${esc(t.networkLabel)}<span class="rp-sub">${esc(formatPhone(t.phone))}</span></td>
-                <td class="num"><strong>${formatTsh(t.amount)}</strong>${t.fee ? `<span class="rp-sub">+ ada ${formatTsh(t.fee)} (NAYA)</span>` : ''}</td>
+                <td class="num"><strong>${formatTsh(t.amount)}</strong>${t.kind === 'WALLET_WITHDRAWAL' ? (t.fee ? `<span class="rp-sub">ada ${formatTsh(t.fee)} (dereva)</span>` : '') : t.fee ? `<span class="rp-sub">+ ada ${formatTsh(t.fee)} (NAYA)</span>` : ''}</td>
                 <td><span class="badge badge-${tone}">${label}</span>${t.failureReason ? `<span class="rp-sub">${esc(t.failureReason)}</span>` : ''}</td>
                 <td><code>${esc(t.reference)}</code>${t.providerRef ? `<span class="rp-sub">${esc(t.providerRef)}</span>` : ''}</td></tr>`;
             })
@@ -648,10 +652,10 @@ async function loadPayoutDriver(driverId) {
                 (p) => `<tr class="${p.voidedAt ? 'is-void' : ''}">
                   <td class="rp-nowrap">${esc(formatDate(p.paidAt, true))}</td>
                   <td class="num"><strong>${formatTsh(p.amount)}</strong></td>
-                  <td>${esc(p.network)} ${esc(showNumber(p.network, p.phone))}<span class="rp-sub">${esc(p.accountName ?? '')}</span></td>
+                  <td>${p.network === 'WALLET' ? `Wallet ya NAYA<span class="rp-sub"><a href="#/malipo/wallet/${esc(driverId)}">Fungua wallet</a></span>` : `${esc(p.network)} ${esc(showNumber(p.network, p.phone))}<span class="rp-sub">${esc(p.accountName ?? '')}</span>`}</td>
                   <td>${esc(p.reference)}${p.note ? `<span class="rp-sub">${esc(p.note)}</span>` : ''}</td>
                   <td>${esc(p.paidBy)}</td>
-                  <td>${p.voidedAt ? `<span class="badge badge-muted" title="${esc(p.voidReason ?? '')}">Imefutwa</span>` : `<button class="link-btn link-danger" type="button" data-void="${esc(p.id)}" data-driver="${esc(driverId)}">Futa (nimekosea)</button>`}</td>
+                  <td>${p.voidedAt ? `<span class="badge badge-muted" title="${esc(p.voidReason ?? '')}">Imefutwa</span>` : p.network === 'WALLET' ? '<span class="small muted" title="Rekebisha kwenye wallet ikiwa kuna kosa">Kwenye wallet</span>' : `<button class="link-btn link-danger" type="button" data-void="${esc(p.id)}" data-driver="${esc(driverId)}">Futa (nimekosea)</button>`}</td>
                 </tr>`,
               )
               .join('')}</tbody></table></div>`

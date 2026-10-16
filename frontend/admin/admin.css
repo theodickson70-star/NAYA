@@ -1012,3 +1012,23 @@ a.kpi:hover, .queue-item:hover, .settings-tile:hover { transform: translateY(-2p
 .pending-locs .btn { text-decoration: none; }
 @media (max-width: 640px) { .pending-locs li { grid-template-columns: 1fr 1fr 1fr; } .pending-locs li > span { grid-column: 1 / -1; } }
 @media (prefers-reduced-motion: reduce) { .staff-secret, .staff-link { animation: none; } }
+
+/* Wallet za madereva (0.21.0) */
+.wl-settings, .wl-adjust { margin-top: 12px; }
+.wl-settings .actions, .wl-adjust .actions { margin-top: 12px; }
+.wl-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+.wl-head h2 { margin: 0 0 4px; }
+.wl-head p { margin: 0; }
+.wl-head-bal { text-align: right; }
+.wl-head-bal span { display: block; color: var(--muted); font-size: 13px; }
+.wl-head-bal strong { font-size: 30px; color: var(--naya-green-dark); font-variant-numeric: tabular-nums; }
+.wl-facts .wl-small { font-size: 16px; line-height: 1.4; }
+.wl-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 10px; }
+.wl-kind { font-weight: 700; white-space: nowrap; }
+.wl-kind.is-in, .wl-in { color: var(--naya-green); }
+.wl-kind.is-out, .wl-out { color: var(--ink, #1d2b24); }
+.wl-kind.is-adj { color: var(--warning-ink); }
+@media (max-width: 640px) { .wl-head-bal { text-align: left; } }
+.wl-resolve { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+.wl-resolve .link-btn { font: inherit; font-size: 13px; font-weight: 700; color: var(--naya-green); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.wl-resolve .link-danger { color: var(--danger); }

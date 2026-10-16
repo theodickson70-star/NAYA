@@ -37,11 +37,11 @@ export function stop() {
 /** Sehemu ya "Lipa kwa simu" ndani ya ukurasa wa Ada ya mwezi. sub = GET /api/driver/subscription. */
 export function sectionHtml(sub) {
   const o = sub.online;
-  if (!o?.enabled) return '';
-  if (o.pending) return `<div id="pay-box">${waitingHtml(o.pending)}</div>${controlHtml(sub)}`;
+  if (!o?.enabled) return walletLink();
+  if (o.pending) return `${walletLink()}<div id="pay-box">${waitingHtml(o.pending)}</div>${controlHtml(sub)}`;
   const months = [1, 2, 3];
   const net = o.suggestedNetwork ?? o.networks[0]?.code;
-  return `<div id="pay-box"><form class="pay-form" id="pay-form" data-fee="${sub.monthlyFee}" novalidate>
+  return `${walletLink()}<div id="pay-box"><form class="pay-form" id="pay-form" data-fee="${sub.monthlyFee}" novalidate>
       <h3>Lipa kwa simu sasa</h3>
       <p class="muted small">Utapokea ombi kwenye simu yako — ingiza PIN yako ya pesa ya simu kuthibitisha. Siku zinaongezwa papo hapo.</p>
       <fieldset class="pay-months"><legend>Miezi</legend>
@@ -59,6 +59,10 @@ export function sectionHtml(sub) {
       <button class="btn btn-primary btn-block btn-big" type="submit" id="pay-submit">Lipa ${formatTsh(sub.monthlyFee)}</button>
     </form></div>${controlHtml(sub)}`;
 }
+
+/** 0.21.0: ada inaweza kulipwa kwa salio la Wallet ya dereva (PIN, bila M-Pesa). */
+const walletLink = () =>
+  `<a class="mw-paylink" href="#/akaunti/wallet/ada"><span><strong>Lipa kwa salio la Wallet</strong><span class="muted">Kwa PIN yako ya wallet — bila kusubiri M-Pesa</span></span><span aria-hidden="true">›</span></a>`;
 
 // ------------------------------------------------------------------ control number (BillPay)
 
