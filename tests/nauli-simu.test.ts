@@ -127,6 +127,8 @@ after(async () => {
   await db.query('DELETE FROM naya.promo_payouts WHERE driver_id = ANY($1::uuid[])', [userIds]);
   await db.query('DELETE FROM naya.subscription_payments WHERE driver_id = ANY($1::uuid[])', [userIds]);
   await db.query('UPDATE naya.rides SET promo_payment_id = NULL, fare_payment_id = NULL WHERE passenger_id = ANY($1::uuid[]) OR driver_id = ANY($1::uuid[])', [userIds]);
+  await db.query('DELETE FROM naya.customer_wallet_entries WHERE user_id = ANY($1::uuid[])', [userIds]);
+  await db.query('DELETE FROM naya.customer_wallets WHERE user_id = ANY($1::uuid[])', [userIds]);
   await db.query('DELETE FROM naya.payments WHERE user_id = ANY($1::uuid[])', [userIds]);
   await db.query('DELETE FROM naya.ride_offers WHERE driver_id = ANY($1::uuid[])', [userIds]);
   await db.query('DELETE FROM naya.notifications WHERE user_id = ANY($1::uuid[])', [userIds]);
@@ -315,7 +317,7 @@ describe('Nauli kwa simu — imewashwa', () => {
     await applyResult(p.reference, { status: 'FAILED', message: 'Kampuni ya malipo haikujibu' });
     assert.equal((await lastPay('p2')).status, 'FAILED');
     const bal = Number((await db.query('SELECT balance FROM naya.wallets WHERE driver_id = $1', [ids.d1])).rows[0].balance);
-    await applyResult(p.reference, { status: 'SUCCESS', providerRef: 'LATE-OK' });
+    await applyResult(p.reference, { status: 'SUCCESS', providerRef: `LATE-OK-${s}` });
     assert.equal((await lastPay('p2')).status, 'SUCCESS');
     assert.equal((await db.query('SELECT fare_settlement FROM naya.rides WHERE id = $1', [id])).rows[0].fare_settlement, 'MOBILE');
     assert.equal(Number((await db.query('SELECT balance FROM naya.wallets WHERE driver_id = $1', [ids.d1])).rows[0].balance), bal + 3000);

@@ -29,19 +29,20 @@ export function open() {
 async function load() {
   const v = view;
   try {
-    const [s, debts, refunds] = await Promise.all([
+    const [s, debts, refunds, cw] = await Promise.all([
       ctx.api.get('/api/admin/ride-payments/summary'),
       ctx.api.get(`/api/admin/ride-debts?open=${showAll ? 0 : 1}`),
       ctx.api.get(`/api/admin/ride-refunds?open=${showAll ? 0 : 1}`),
+      ctx.api.get('/api/admin/customer-wallets/summary'),
     ]);
-    if (v === view) render(s, debts, refunds);
+    if (v === view) render(s, debts, refunds, cw);
   } catch (err) {
     if (v !== view || ctx.onAuthError(err)) return;
     host.insertAdjacentHTML('beforeend', `<p class="alert alert-danger" role="alert">${esc(err.message)}</p>`);
   }
 }
 
-function render(s, debts, refunds) {
+function render(s, debts, refunds, cw) {
   const st = s.settings;
   const example = 3000;
   const fee = Math.max(Math.round(st.feeMin), Math.ceil((example * st.feePercent) / 100));
@@ -93,6 +94,7 @@ function render(s, debts, refunds) {
         .join('')}</tbody></table></div>`
         : ''
     }
+    ${salioHtml(cw)}
     <div class="fa-head"><h3>Madeni ya abiria</h3>
       <div class="filters rp-chips" role="group" aria-label="Madeni"><button type="button" class="chip" data-fa="open" aria-pressed="${!showAll}">Yasiyolipwa</button><button type="button" class="chip" data-fa="all" aria-pressed="${showAll}">Yote</button></div></div>
     <p class="alert alert-danger" id="fa-error" role="alert" hidden></p>
@@ -124,6 +126,28 @@ async function onClick(event) {
     showAll = chip.dataset.fa === 'all';
     view += 1;
     return load();
+  }
+  const co = event.target.closest('[data-cashout]');
+  if (co) {
+    const sent = prompt(`Umemtumia ${co.dataset.name} kiasi gani kwenye ${co.dataset.phone} kupitia Abliner? (salio lake: ${formatTsh(Number(co.dataset.amount))})`, co.dataset.amount);
+    const amount = Number(String(sent ?? '').replace(/[^\d]/g, ''));
+    if (!amount) return;
+    const note = prompt('Andika kumbukumbu ya muamala wa Abliner (Send):');
+    if (!note || note.trim().length < 3) return;
+    co.disabled = true;
+    try {
+      await ctx.api.post(`/api/admin/customer-wallets/${co.dataset.cashout}/cashout-done`, { amount, note: note.trim() });
+      toast('Imeandikwa: salio limerudishwa');
+      view += 1;
+      load();
+    } catch (err) {
+      co.disabled = false;
+      if (ctx.onAuthError(err)) return;
+      const box = document.getElementById('cw-error');
+      box.textContent = err.message;
+      box.hidden = false;
+    }
+    return;
   }
   const rf = event.target.closest('[data-refund]');
   if (rf) {
@@ -167,6 +191,7 @@ async function onClick(event) {
 }
 
 async function onSubmit(event) {
+  if (event.target.id === 'cw-settings' && active()) return onSalioSubmit(event);
   if (event.target.id !== 'fa-settings' || !active()) return;
   event.preventDefault();
   const box = document.getElementById('fa-settings-error');
@@ -180,6 +205,70 @@ async function onSubmit(event) {
       feeMin: Number(String(document.getElementById('fa-min').value).replace(/[^\d]/g, '')) || 0,
     });
     toast('Mipangilio ya nauli kwa simu imehifadhiwa');
+    view += 1;
+    load();
+  } catch (err) {
+    button.disabled = false;
+    if (ctx.onAuthError(err)) return;
+    box.textContent = err.message;
+    box.hidden = false;
+  }
+}
+
+// ------------------------------------------------------------------ Salio la abiria (0.23.0)
+
+function salioHtml(cw) {
+  const st = cw.settings;
+  return `<section class="fa-salio">
+    <div class="fa-head"><h3>Salio la abiria (NAYA Wallet)</h3></div>
+    <p class="small muted">Abiria wanaweka pesa kwa simu (ada ileile ya nauli kwa simu) na kulipia safari / deni kwa bonyezo moja. Salio linatumika ndani ya NAYA tu. Kabla ya kuwasha kwa watu wengi, thibitisha na Benki Kuu (BoT) au mwanasheria kuhusu kuhifadhi pesa za wateja.</p>
+    ${!cw.providerReady ? '<p class="alert alert-danger" role="alert">Kampuni ya malipo haijaunganishwa — salio la abiria haliwezi kuwashwa.</p>' : ''}
+    <section class="rp-stats">
+      <div class="rp-stat${st.enabled ? ' rp-stat-hero' : ''}"><span>Hali</span><strong>${st.enabled ? 'Imewashwa' : 'Imezimwa'}</strong><small>Kikomo ${formatTsh(st.maxBalance)} kwa abiria</small></div>
+      <div class="rp-stat"><span>Salio za abiria wote</span><strong>${formatTsh(cw.total)}</strong><small>Abiria ${n(cw.holders)} wana salio (deni la NAYA)</small></div>
+      <div class="rp-stat${cw.requests ? ' rp-stat-bad' : ''}"><span>Maombi ya kurudishiwa</span><strong>${n(cw.requests)}</strong><small>Watumie kwa Abliner (Send)</small></div>
+    </section>
+    <form class="settings-card fa-settings" id="cw-settings" novalidate>
+      <label class="check"><input type="checkbox" id="cw-on"${st.enabled ? ' checked' : ''}${cw.providerReady ? '' : ' disabled'}> Abiria waweze kuweka pesa kwenye salio la NAYA</label>
+      <div class="settings-grid">
+        <div><label for="cw-max">Kikomo cha salio kwa abiria (TSh)</label><input id="cw-max" inputmode="numeric" value="${esc(st.maxBalance)}"></div>
+        <div><label for="cw-min">Kiwango cha chini cha kuweka (TSh)</label><input id="cw-min" inputmode="numeric" value="${esc(st.minTopup)}"></div>
+      </div>
+      <p class="alert alert-danger" id="cw-settings-error" role="alert" hidden></p>
+      <div class="actions"><button class="btn btn-primary btn-small" type="submit">Hifadhi</button></div>
+    </form>
+    <p class="alert alert-danger" id="cw-error" role="alert" hidden></p>
+    ${
+      cw.cashouts.length
+        ? `<div class="rp-scroll"><table class="rp-table"><thead><tr><th>Abiria</th><th>Tuma kwenye</th><th class="num">Salio</th><th>Aliomba</th><th></th></tr></thead><tbody>${cw.cashouts
+            .map(
+              (c) => `<tr>
+                <td><a href="#/wateja/${esc(c.id)}">${esc(c.name)}</a><span class="rp-sub">${esc(formatPhone(c.phone))}</span></td>
+                <td>${esc(formatPhone(c.cashoutPhone ?? c.phone))}</td>
+                <td class="num"><strong>${formatTsh(c.balance)}</strong></td>
+                <td class="rp-nowrap">${esc(formatDate(c.requestedAt, true))}</td>
+                <td><span class="fa-act"><button class="link-btn" type="button" data-cashout="${esc(c.id)}" data-amount="${esc(c.balance)}" data-name="${esc(c.name)}" data-phone="${esc(formatPhone(c.cashoutPhone ?? c.phone))}">Nimerudisha</button></span></td>
+              </tr>`,
+            )
+            .join('')}</tbody></table></div>`
+        : ''
+    }
+  </section>`;
+}
+
+async function onSalioSubmit(event) {
+  event.preventDefault();
+  const box = document.getElementById('cw-settings-error');
+  box.hidden = true;
+  const button = event.target.querySelector('button[type="submit"]');
+  button.disabled = true;
+  try {
+    await ctx.api.put('/api/admin/settings/customer-wallet', {
+      enabled: document.getElementById('cw-on').checked,
+      maxBalance: Number(String(document.getElementById('cw-max').value).replace(/[^\d]/g, '')) || 0,
+      minTopup: Number(String(document.getElementById('cw-min').value).replace(/[^\d]/g, '')) || 0,
+    });
+    toast('Mipangilio ya salio la abiria imehifadhiwa');
     view += 1;
     load();
   } catch (err) {

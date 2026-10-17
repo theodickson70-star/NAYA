@@ -27,6 +27,7 @@ import * as terms from './terms.js';
 import * as staff from './staff.js';
 import * as mywallet from './mywallet.js';
 import * as farepay from './farepay.js';
+import * as salio from './salio.js';
 import { initI18n, langSwitchHtml, onLangChange } from '/shared/i18n.js';
 import { finishSplash, previewSound, setSoundEnabled, soundEnabled, splashActive, splashReady } from './splash.js';
 
@@ -35,7 +36,7 @@ const api = createApi('naya_app_token');
 const $ = (id) => document.getElementById(id);
 const views = ['view-loading', 'view-intro', 'view-auth', 'view-verify', 'view-role', 'view-offline', 'view-app'];
 const MAX_BYTES = 3 * 1024 * 1024;
-const VERSION = '0.22.1';
+const VERSION = '0.23.0';
 
 let account = null; // { user, activeMode, driverStatus, canDrive }
 let driver = null; // wasifu wa udereva (mode ya Dereva)
@@ -486,6 +487,7 @@ function startRealtime() {
           setSupportDot();
           if (tab === 'home') route();
           else if (tab === 'account' && location.hash === '#/akaunti') renderAccount();
+          else if (location.hash === '#/akaunti/salio') salio.render();
         } catch (err) {
           handleError(err);
         }
@@ -961,6 +963,7 @@ function renderAccount() {
   if (section === 'ada') return renderSubscriptionPage();
   if (section === 'malipo-ya-ofa') return renderWalletPage();
   if (section === 'deni') return farepay.renderDebtPage();
+  if (section === 'salio') return salio.render();
   if (section === 'wallet') return mywallet.render((location.hash.split('?')[0].split('/')[3] ?? '').trim());
   renderHub();
 }
@@ -1657,6 +1660,7 @@ akaunti.init({
 appUpdate.init({ api });
 staff.init({ api, toast, handleError, logout: () => logout(), account: () => account, reloadAccount: () => loadAccount() });
 farepay.init({ api, toast, handleError, myPhone: () => account?.user?.phone ?? null });
+salio.init({ api, toast, handleError, myPhone: () => account?.user?.phone ?? null });
 rides.init({
   api,
   pushState: () => pushState(api),

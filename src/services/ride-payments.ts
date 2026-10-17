@@ -10,6 +10,8 @@ import { writeAudit } from './audit.js';
 import { notify, notifyAdmins } from './notify.js';
 import { applyResult, guessNetwork, insertPayment, myPayment, type PaymentRow } from './payments/index.js';
 import { getProvider, type MobileNetwork, type ProviderResult } from './payments/provider.js';
+import { customerWalletBrief, getCustomerWalletSettings, lockCustomerWallet, postCustomerEntry, startTopup } from './customer-wallet.js';
+import { lockWallet, postEntry } from './wallet-ledger.js';
 
 export interface RidePaySettings {
   /** Abiria wanaweza kulipa kwa simu (ofisi inawasha baada ya kuweka ada ya Abliner) */
@@ -90,10 +92,12 @@ const withinWindow = (r: Pick<FareRide, 'completed_at'>) => !!r.completed_at && 
  */
 export async function fareState(client: Db, r: FareRide, settings?: RidePaySettings) {
   const early = PAY_EARLY.includes(r.status);
-  const ended = ['CANCELLED', 'NO_DRIVER'].includes(r.status) || (r.status === 'SEARCHING' && r.fare_settlement === 'MOBILE');
-  if (r.status !== 'COMPLETED' && !early && !(ended && r.fare_settlement === 'MOBILE')) return null;
+  const prepaid = r.fare_settlement === 'MOBILE' || r.fare_settlement === 'WALLET';
+  const ended = ['CANCELLED', 'NO_DRIVER'].includes(r.status) || (r.status === 'SEARCHING' && prepaid);
+  if (r.status !== 'COMPLETED' && !early && !(ended && prepaid)) return null;
   const s = settings ?? (await getRidePaySettings(client));
-  if (!s.enabled && !r.fare_settlement) return null;
+  const cw = await customerWalletBrief(client, r.passenger_id);
+  if (!s.enabled && !cw.enabled && !r.fare_settlement) return null;
   const due = Math.max(0, r.fare - r.promo_discount);
   const fee = fareFee(s, due);
   const pays = s.enabled ? await ridePayments(client, r) : [];
@@ -104,7 +108,7 @@ export async function fareState(client: Db, r: FareRide, settings?: RidePaySetti
   const done = r.status === 'COMPLETED';
   return {
     enabled: s.enabled,
-    settlement: r.fare_settlement as 'CASH' | 'MOBILE' | 'DEBT' | null,
+    settlement: r.fare_settlement as 'CASH' | 'MOBILE' | 'DEBT' | 'WALLET' | null,
     settledAt: r.fare_settled_at,
     debtCleared: r.fare_settlement === 'DEBT' ? !!r.debt_cleared_at : null,
     due,
@@ -120,6 +124,8 @@ export async function fareState(client: Db, r: FareRide, settings?: RidePaySetti
     refund: (r.fare_refund as 'NEEDED' | 'DONE' | null | undefined) ?? null,
     /** Abiria anaweza kubonyeza "Lipa kwa simu" sasa */
     canPay: s.enabled && open && !pending && due > 0,
+    /** 0.23.0 Salio la NAYA la abiria (dereva haoni — rides.ts inaliondoa) */
+    wallet: cw.enabled ? { balance: cw.balance, canPay: open && !pending && due > 0 && cw.balance >= due } : null,
     /** Dereva anaweza kuandika cash / deni sasa (safari ikishakamilika tu) */
     canSettle: done && open && !pending && due > 0,
     canDebt: done && s.enabled && open && !pending && due > 0,
@@ -160,6 +166,7 @@ export async function payRideFare(passengerId: string, rideId: string, input: { 
     }
     if (r.fare_settlement === 'CASH') throw conflict('Dereva ameandika kwamba umelipa taslimu.');
     if (r.fare_settlement === 'MOBILE') throw conflict('Safari hii imeshalipwa kwa simu.');
+    if (r.fare_settlement === 'WALLET') throw conflict('Safari hii imeshalipwa kwa salio lako la NAYA.');
     if (r.fare_settlement === 'DEBT') throw conflict('Safari hii imekuwa deni — lipa kupitia "Deni langu".');
     if (r.status === 'COMPLETED' && !withinWindow(r)) throw conflict('Muda wa kulipa safari hii umepita.');
     const due = Math.max(0, r.fare - r.promo_discount);
@@ -214,7 +221,9 @@ export async function myDebt(passengerId: string) {
         [passengerId, PENDING_HOLD_MINUTES],
       )
     : null;
+  const cw = await customerWalletBrief(db, passengerId);
   return {
+    wallet: cw.enabled ? { balance: cw.balance, canPay: due > 0 && cw.balance >= due && !pending } : null,
     enabled: s.enabled,
     due,
     fee,
@@ -288,7 +297,9 @@ export async function driverSettle(driverId: string, rideId: string, how: 'CASH'
     const r = await one<FareRide>(client, 'SELECT * FROM naya.rides WHERE id = $1 FOR UPDATE', [rideId]);
     if (!r || r.driver_id !== driverId) throw notFound('Safari haikupatikana');
     if (r.status !== 'COMPLETED') throw conflict('Safari bado haijakamilika.');
-    if (r.fare_settlement) throw conflict(r.fare_settlement === 'MOBILE' ? 'Abiria ameshalipa kwa simu — pesa iko kwenye wallet yako.' : 'Malipo ya safari hii yameshaandikwa.');
+    if (r.fare_settlement) {
+      throw conflict(['MOBILE', 'WALLET'].includes(r.fare_settlement) ? 'Abiria ameshalipa kupitia NAYA — pesa iko kwenye wallet yako.' : 'Malipo ya safari hii yameshaandikwa.');
+    }
     if (!withinWindow(r)) throw conflict('Muda wa kuandika malipo ya safari hii umepita.');
     if (Math.max(0, r.fare - r.promo_discount) <= 0) throw conflict('Safari hii haina cha kulipa.');
     if (how === 'DEBT' && !s.enabled) throw forbidden('Deni linawezekana malipo ya simu yakiwa yamewashwa na ofisi.');
@@ -425,4 +436,127 @@ export async function markRefunded(adminId: string, rideId: string, note: string
     body: 'Ofisi ya NAYA imekurudishia pesa uliyolipa kwa safari ambayo haikufanyika.',
   });
   return listRefunds(true);
+}
+
+// ------------------------------------------------------------------ salio la abiria (0.23.0)
+
+/** Abiria: weka pesa kwenye salio (ombi la PIN). Ada ni ileile ya nauli kwa simu (juu ya kiasi). */
+export async function startCustomerTopup(userId: string, input: { amount: number; phone: string; network?: string | null }) {
+  const s = await getRidePaySettings();
+  const paymentId = await startTopup(userId, input, {
+    feeOf: (amount) => fareFee(s, amount),
+    insert: (client, p) => insertPayment(client, { kind: 'CUSTOMER_TOPUP', direction: 'IN', ...p }),
+    collect: async (id) => {
+      const pay = (await one<PaymentRow>(db, 'SELECT * FROM naya.payments WHERE id = $1', [id]))!;
+      return startCollect(userId, pay, 'NAYA kuweka salio');
+    },
+  });
+  return myPayment(userId, paymentId);
+}
+
+export async function topupFee(amount: number) {
+  return fareFee(await getRidePaySettings(), amount);
+}
+
+/**
+ * Abiria: lipa nauli ya safari kwa salio (dereva akishakubali → mpaka ikamilike, au saa 24 baada ya kukamilika).
+ * Safari ikiwa imekamilika → dereva anapata papo hapo; ikiendelea → creditPrepaidFare ikikamilika.
+ * Mpangilio wa kufunga: dereva → safari → salio la abiria → wallet ya dereva.
+ */
+export async function payRideFromWallet(passengerId: string, rideId: string) {
+  const cws = await getCustomerWalletSettings();
+  if (!cws.enabled) throw conflict('Wallet ya NAYA haijawashwa kwa sasa.');
+  const out = await transaction(async (client) => {
+    const who = await one<{ driver_id: string | null }>(client, 'SELECT driver_id FROM naya.rides WHERE id = $1', [rideId]);
+    if (who?.driver_id) await client.query('SELECT 1 FROM naya.drivers WHERE user_id = $1 FOR UPDATE', [who.driver_id]);
+    const r = await one<FareRide>(client, 'SELECT * FROM naya.rides WHERE id = $1 FOR UPDATE', [rideId]);
+    if (!r || r.passenger_id !== passengerId) throw notFound('Safari haikupatikana');
+    if (r.status !== 'COMPLETED' && !PAY_EARLY.includes(r.status)) {
+      throw conflict(r.status === 'SEARCHING' ? 'Utaweza kulipa dereva akishakubali safari.' : 'Safari hii haipo tena.');
+    }
+    if (r.fare_settlement) throw conflict(r.fare_settlement === 'CASH' ? 'Dereva ameandika kwamba umelipa taslimu.' : 'Safari hii imeshalipwa.');
+    if (r.status === 'COMPLETED' && !withinWindow(r)) throw conflict('Muda wa kulipa safari hii umepita.');
+    if (r.driver_id !== who?.driver_id) throw conflict('Safari imebadilika — jaribu tena.');
+    const due = Math.max(0, r.fare - r.promo_discount);
+    if (due <= 0) throw conflict('Safari hii haina cha kulipa.');
+    const pays = await ridePayments(client, r);
+    if (pays.some(isPending)) throw conflict('Ombi la kulipa kwa simu linasubiri — subiri lithibitishwe kwanza.');
+    if (pays.some((p) => p.status === 'SUCCESS')) throw conflict('Safari hii imeshalipwa kwa simu.');
+    const w = await lockCustomerWallet(client, passengerId);
+    if (w.status !== 'ACTIVE') throw conflict('Wallet yako imesimamishwa na ofisi ya NAYA.');
+    if (w.cashout_requested_at) throw conflict('Una ombi la kurudishiwa salio — ghairi ombi hilo kwanza ndipo ulipe kwa salio.');
+    if (w.balance < due) throw conflict(`Salio lako (${tsh(w.balance)}) halitoshi kulipa ${tsh(due)}. Weka pesa au lipa kwa simu.`);
+    await postCustomerEntry(client, passengerId, { amount: -due, kind: 'RIDE_PAYMENT', rideId, note: `${r.status === 'COMPLETED' ? 'Nauli' : 'Nauli (mapema)'}` });
+    await client.query(`UPDATE naya.rides SET fare_settlement = 'WALLET', fare_settled_at = now(), updated_at = now() WHERE id = $1`, [rideId]);
+    let credited = false;
+    if (r.status === 'COMPLETED' && r.driver_id) {
+      await lockWallet(client, r.driver_id);
+      await postEntry(client, r.driver_id, { amount: due, kind: 'RIDE_EARNING', rideId, note: 'Nauli — abiria alilipa kwa salio la NAYA' });
+      credited = true;
+    }
+    return { driverId: r.driver_id, due, credited };
+  });
+  if (out.driverId) {
+    await notify({
+      userId: out.driverId,
+      event: 'driver',
+      rideId,
+      kind: out.credited ? 'ride_fare_wallet' : 'ride_fare_prepaid',
+      title: 'Abiria amelipa kwa salio la NAYA',
+      body: out.credited ? `${tsh(out.due)} ya nauli imeingia kwenye wallet yako.` : 'Usimdai nauli. Pesa itaingia kwenye wallet yako ukimaliza safari.',
+    });
+  }
+  await notify({ userId: passengerId, event: 'ride', rideId });
+  return { paid: out.due };
+}
+
+/** Abiria: lipa deni lote kwa salio — kila dereva aliyemdai anapata kwenye wallet yake papo hapo. */
+export async function payDebtFromWallet(passengerId: string) {
+  const cws = await getCustomerWalletSettings();
+  if (!cws.enabled) throw conflict('Wallet ya NAYA haijawashwa kwa sasa.');
+  const credited = await transaction(async (client) => {
+    await client.query('SELECT 1 FROM naya.users WHERE id = $1 FOR UPDATE', [passengerId]);
+    const list = await many<{ id: string; driver_id: string | null }>(
+      client,
+      `SELECT id, driver_id FROM naya.rides WHERE passenger_id = $1 AND fare_settlement = 'DEBT' AND debt_cleared_at IS NULL`,
+      [passengerId],
+    );
+    if (!list.length) throw conflict('Huna deni.');
+    list.sort((x, y) => (x.driver_id ?? '').localeCompare(y.driver_id ?? '') || x.id.localeCompare(y.id));
+    const rides: { id: string; driverId: string | null; due: number }[] = [];
+    for (const it of list) {
+      const hasDriver = it.driver_id ? !!(await one(client, 'SELECT 1 FROM naya.drivers WHERE user_id = $1 FOR UPDATE', [it.driver_id])) : false;
+      const r = await one<FareRide>(client, 'SELECT * FROM naya.rides WHERE id = $1 FOR UPDATE', [it.id]);
+      if (!r || r.fare_settlement !== 'DEBT' || r.debt_cleared_at) continue;
+      rides.push({ id: r.id, driverId: hasDriver ? r.driver_id : null, due: Math.max(0, r.fare - r.promo_discount) });
+    }
+    const total = rides.reduce((t, r) => t + r.due, 0);
+    if (total <= 0) throw conflict('Huna deni.');
+    const pending = await one(
+      client,
+      `SELECT 1 FROM naya.payments WHERE user_id = $1 AND kind = 'RIDE_FARE' AND meta->>'purpose' = 'DEBT' AND status = 'PENDING' AND created_at > now() - interval '3 minutes'`,
+      [passengerId],
+    );
+    if (pending) throw conflict('Ombi la kulipa deni kwa simu linasubiri — subiri lithibitishwe kwanza.');
+    const w = await lockCustomerWallet(client, passengerId);
+    if (w.status !== 'ACTIVE') throw conflict('Wallet yako imesimamishwa na ofisi ya NAYA.');
+    if (w.cashout_requested_at) throw conflict('Una ombi la kurudishiwa salio — ghairi ombi hilo kwanza ndipo ulipe kwa salio.');
+    if (w.balance < total) throw conflict(`Salio lako (${tsh(w.balance)}) halitoshi kulipa deni la ${tsh(total)}.`);
+    const out: { rideId: string; driverId: string; amount: number }[] = [];
+    for (const r of rides) {
+      if (r.due > 0) await postCustomerEntry(client, passengerId, { amount: -r.due, kind: 'DEBT_PAYMENT', rideId: r.id, note: 'Deni la nauli' });
+      await client.query(`UPDATE naya.rides SET debt_cleared_at = now(), debt_cleared_how = 'WALLET', updated_at = now() WHERE id = $1`, [r.id]);
+      if (r.driverId && r.due > 0) {
+        await lockWallet(client, r.driverId);
+        await postEntry(client, r.driverId, { amount: r.due, kind: 'RIDE_EARNING', rideId: r.id, note: 'Deni la abiria limelipwa kwa salio la NAYA' });
+        out.push({ rideId: r.id, driverId: r.driverId, amount: r.due });
+      }
+    }
+    return out;
+  });
+  for (const c of credited) {
+    await notify({ userId: c.driverId, event: 'driver', rideId: c.rideId, kind: 'ride_fare_wallet', title: 'Deni la abiria limelipwa', body: `${tsh(c.amount)} (deni la safari iliyopita) imeingia kwenye wallet yako ya NAYA.` });
+  }
+  await notifyAdmins();
+  return myDebt(passengerId);
 }

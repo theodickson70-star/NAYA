@@ -279,7 +279,7 @@ export function renderPassengerRide(ride) {
         ? cancelOpen
           ? `<div class="card confirm">
               <p><strong>Ghairi safari hii?</strong></p>
-              ${ride.farePay?.settlement === 'MOBILE' ? `<p class="muted">Umeshalipa ${formatTsh(ride.farePay.total)} kwa simu. Ukighairi, ofisi ya NAYA itakurudishia pesa.</p>` : ''}
+              ${ride.farePay?.settlement === 'MOBILE' ? `<p class="muted">Umeshalipa ${formatTsh(ride.farePay.total)} kwa simu. Ukighairi, ofisi ya NAYA itakurudishia pesa.</p>` : ride.farePay?.settlement === 'WALLET' ? `<p class="muted">Umeshalipa ${formatTsh(ride.farePay.due)} kwa salio. Ukighairi, pesa inarudi kwenye salio lako papo hapo.</p>` : ''}
               <p class="alert alert-danger" id="cancel-error" role="alert" hidden></p>
               <div class="actions"><button class="btn btn-danger" type="button" data-ride="cancel-confirm">Ndiyo, ghairi</button>
               <button class="btn btn-ghost" type="button" data-ride="cancel-keep">Hapana</button></div>
@@ -750,8 +750,8 @@ function driverRideHtml(ride) {
   };
   if (ride.status === 'COMPLETED') {
     return `<section class="ride-head ride-done" role="status"><span class="ride-pulse" aria-hidden="true"></span>
-        <h1>${ride.farePay?.settlement === 'MOBILE' ? 'Umelipwa' : 'Pokea'} ${formatTsh(ride.passengerPays ?? ride.fare)}</h1><p>${
-          ride.farePay?.settlement === 'MOBILE' ? `Kwa simu kutoka kwa ${esc(p?.name ?? 'abiria')} — iko kwenye wallet yako.` : ride.farePay?.enabled ? `Kutoka kwa ${esc(p?.name ?? 'abiria')}: kwa simu (app yake) au taslimu.` : `Taslimu kutoka kwa ${esc(p?.name ?? 'abiria')}.`
+        <h1>${['MOBILE', 'WALLET'].includes(ride.farePay?.settlement) ? 'Umelipwa' : 'Pokea'} ${formatTsh(ride.passengerPays ?? ride.fare)}</h1><p>${
+          ['MOBILE', 'WALLET'].includes(ride.farePay?.settlement) ? `${ride.farePay.settlement === 'WALLET' ? 'Kwa salio la NAYA' : 'Kwa simu'} kutoka kwa ${esc(p?.name ?? 'abiria')} — iko kwenye wallet yako.` : ride.farePay?.enabled ? `Kutoka kwa ${esc(p?.name ?? 'abiria')}: kwa simu (app yake) au taslimu.` : `Taslimu kutoka kwa ${esc(p?.name ?? 'abiria')}.`
         }${ride.promo ? ` ${payoutLine(ride)}` : ''}</p></section>
       ${farepay.driverSectionHtml(ride, fareUi)}
       <form class="card" id="rate-passenger-form">
@@ -784,7 +784,7 @@ function driverRideHtml(ride) {
     <section class="card">
       <div class="driver-top">
         <span class="driver-photo pax-photo" id="pax-photo">${paxInitials(p?.name)}</span>
-        <span class="driver-who"><strong>${esc(p?.name ?? 'Abiria')}</strong><span class="muted">${esc(paxMeta(p))}</span><span class="muted">Abiria · nauli ${formatTsh(ride.passengerPays ?? ride.fare)}${ride.farePay?.settlement === 'MOBILE' ? ' · imelipwa kwa simu ✓' : ''}</span></span>
+        <span class="driver-who"><strong>${esc(p?.name ?? 'Abiria')}</strong><span class="muted">${esc(paxMeta(p))}</span><span class="muted">Abiria · nauli ${formatTsh(ride.passengerPays ?? ride.fare)}${['MOBILE', 'WALLET'].includes(ride.farePay?.settlement) ? ' · imelipwa kupitia NAYA ✓' : ''}</span></span>
       </div>
       ${farepay.driverLiveNote(ride)}
       <div class="actions two">
@@ -927,6 +927,21 @@ async function onClick(event) {
     renderPassengerRide(passengerRide);
     if (action === 'fare-open') $('fp-phone')?.focus();
     return;
+  }
+  if (action === 'fare-wallet' && passengerRide) {
+    fareUi = { open: true, busy: true, walletBusy: true };
+    lastKey = '';
+    renderPassengerRide(passengerRide);
+    try {
+      await ctx.api.post(`/api/rides/${passengerRide.id}/pay-wallet`, {});
+      fareUi = {};
+      ctx.toast('Umelipa kwa salio la NAYA');
+    } catch (err) {
+      if (ctx.handleError(err)) return;
+      fareUi = { open: true, error: err.message };
+    }
+    lastKey = '';
+    return refreshPassenger();
   }
   if (action === 'fare-pay' && passengerRide) {
     const phone = farepay.phoneValue('fp-phone');

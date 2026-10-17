@@ -18,6 +18,7 @@ export function init(context) {
 const ICON = {
   check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
   phone: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg>',
+  wallet: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3"/><rect x="4" y="8" width="16" height="11" rx="2.5"/><circle cx="15.5" cy="13.5" r="1.4"/></svg>',
   cash: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/></svg>',
 };
 
@@ -37,14 +38,30 @@ const waitingHtml = (phone, total) => `<div class="fp-wait" role="status">
     <p><strong>Angalia simu ${esc(formatPhone(phone))}</strong><br>Weka PIN kukubali kulipa ${formatTsh(total)}. Tunasubiri uthibitisho wa mtandao…</p>
   </div>`;
 
+/** 0.23.0 Kitufe cha "Lipa kwa salio" (abiria mwenye salio la NAYA linalotosha) */
+function walletBtn(f, ui) {
+  if (!f.wallet) return '';
+  if (!f.wallet.canPay) {
+    return f.wallet.balance > 0 && f.settlement === null
+      ? `<p class="fp-wallet-low">Salio la NAYA: ${formatTsh(f.wallet.balance)} — halitoshi. <a href="#/akaunti/salio">Weka pesa</a></p>`
+      : '';
+  }
+  return `<button class="btn btn-gold btn-block btn-big fp-wallet" type="button" data-ride="fare-wallet"${ui.busy ? ' disabled' : ''}>${ICON.wallet}<span>${
+    ui.walletBusy ? 'Inalipa…' : `Lipa ${formatTsh(f.due)} kwa salio`
+  }</span><small>Salio: ${formatTsh(f.wallet.balance)} · bila ada</small></button>`;
+}
+
+const paidCard = (f, mini = false) =>
+  `<section class="card fp-card is-ok${mini ? ' fp-mini' : ''}" id="fare-pay" role="status"><span class="fp-ico">${ICON.check}</span>
+    <div><h2>${f.settlement === 'WALLET' ? 'Umelipa kwa salio la NAYA' : mini ? 'Umelipa nauli kwa simu' : 'Umelipa kwa simu'}</h2><p class="muted">${formatTsh(f.due)} — ${
+      mini ? 'usimpe dereva pesa nyingine.' : 'imemfikia dereva kupitia NAYA. Asante!'
+    }</p></div></section>`;
+
 /** Abiria — kadi ya malipo kwenye skrini ya "Umefika". `ui` = { busy, error } */
 export function passengerCardHtml(ride, ui = {}) {
   const f = ride.farePay;
   if (!f) return '';
-  if (f.settlement === 'MOBILE') {
-    return `<section class="card fp-card is-ok" id="fare-pay" role="status"><span class="fp-ico">${ICON.check}</span>
-      <div><h2>Umelipa kwa simu</h2><p class="muted">${formatTsh(f.due)} imemfikia dereva kupitia NAYA. Asante!</p></div></section>`;
-  }
+  if (f.settlement === 'MOBILE' || f.settlement === 'WALLET') return paidCard(f);
   if (f.settlement === 'CASH') {
     return `<section class="card fp-card is-muted" id="fare-pay"><span class="fp-ico">${ICON.cash}</span>
       <div><h2>Umelipa taslimu</h2><p class="muted">Dereva amethibitisha amepokea ${formatTsh(f.due)}.</p></div></section>`;
@@ -54,17 +71,23 @@ export function passengerCardHtml(ride, ui = {}) {
       ? ''
       : `<section class="card fp-card is-bad" id="fare-pay" role="alert"><div><h2>Una deni la ${formatTsh(f.due)}</h2>
           <p>Dereva ameandika kwamba hukulipa nauli. Lipa deni ili uweze kuagiza safari tena.</p>
-          <a class="btn btn-primary btn-block" href="#/akaunti/deni">Lipa deni kwa simu</a></div></section>`;
+          <a class="btn btn-primary btn-block" href="#/akaunti/deni">Lipa deni</a></div></section>`;
   }
-  if (!f.enabled) return '';
   if (f.pending) return `<section class="card fp-card" id="fare-pay">${waitingHtml(f.pending.phone, f.total)}</section>`;
-  if (!f.canPay) {
-    return f.numbersLeft === 0
+  const wallet = walletBtn(f, ui);
+  if (!f.enabled || !f.canPay) {
+    if (wallet) {
+      return `<section class="card fp-card" id="fare-pay"><h2 id="fp-title">Lipa nauli</h2>${wallet}
+        <p class="alert alert-danger" id="fp-error" role="alert"${ui.error ? '' : ' hidden'}>${esc(ui.error ?? '')}</p>
+        <p class="fp-or">au mpe dereva <strong>${formatTsh(f.due)}</strong> taslimu</p></section>`;
+    }
+    return f.enabled && f.numbersLeft === 0
       ? `<section class="card fp-card is-muted" id="fare-pay"><div><h2>Lipa taslimu</h2><p class="muted">Umejaribu namba ${f.numbersUsed.length} bila mafanikio. Mpe dereva ${formatTsh(f.due)} taslimu.</p></div></section>`
       : '';
   }
   return `<section class="card fp-card" id="fare-pay" aria-labelledby="fp-title">
       <h2 id="fp-title">Lipa nauli</h2>
+      ${wallet ? `${wallet}<p class="fp-or fp-or-top">au kwa simu</p>` : ''}
       ${payForm(f, ui)}
       <p class="fp-or">au mpe dereva <strong>${formatTsh(f.due)}</strong> taslimu</p>
     </section>`;
@@ -95,25 +118,31 @@ function payForm(f, ui, { later = false } = {}) {
  */
 export function passengerLiveHtml(ride, ui = {}) {
   const f = ride.farePay;
-  if (!f || (!f.enabled && f.settlement !== 'MOBILE')) return '';
-  if (f.settlement === 'MOBILE') {
-    return `<section class="card fp-card is-ok fp-mini" id="fare-pay" role="status"><span class="fp-ico">${ICON.check}</span>
-      <div><h2>Umelipa nauli kwa simu</h2><p class="muted">${formatTsh(f.due)} — usimpe dereva pesa nyingine.</p></div></section>`;
-  }
+  if (!f) return '';
+  if (f.settlement === 'MOBILE' || f.settlement === 'WALLET') return paidCard(f, true);
+  if (!f.enabled && !f.wallet) return '';
   if (f.pending) return `<section class="card fp-card" id="fare-pay">${waitingHtml(f.pending.phone, f.total)}</section>`;
-  if (!f.canPay) return '';
+  const wallet = walletBtn(f, ui);
+  if (!f.canPay && !wallet) return '';
   if (ui.open || f.last?.status === 'FAILED') {
-    return `<section class="card fp-card" id="fare-pay" aria-labelledby="fp-title"><h2 id="fp-title">Lipa nauli kwa simu</h2>${payForm(f, ui, { later: true })}</section>`;
+    return `<section class="card fp-card" id="fare-pay" aria-labelledby="fp-title"><h2 id="fp-title">Lipa nauli sasa</h2>
+      ${wallet ? `${wallet}${f.canPay ? '<p class="fp-or fp-or-top">au kwa simu</p>' : ''}` : ''}
+      ${f.canPay ? payForm(f, ui, { later: true }) : `<p class="alert alert-danger" id="fp-error" role="alert"${ui.error ? '' : ' hidden'}>${esc(ui.error ?? '')}</p><button class="btn btn-ghost btn-block btn-plain" type="button" data-ride="fare-close">Baadaye</button>`}
+    </section>`;
   }
+  const label = f.wallet?.canPay ? `${formatTsh(f.due)} kwa salio${f.canPay ? ' au simu' : ''}` : `${formatTsh(f.total)} · au taslimu ukifika`;
   return `<section class="card fp-card fp-mini" id="fare-pay">
-      <button class="fp-open" type="button" data-ride="fare-open">${ICON.phone}<span><strong>Lipa nauli kwa simu</strong><small>${formatTsh(f.total)} · au taslimu ukifika</small></span><span class="fp-go" aria-hidden="true">›</span></button>
+      <button class="fp-open" type="button" data-ride="fare-open">${f.wallet?.canPay ? ICON.wallet : ICON.phone}<span><strong>Lipa nauli sasa</strong><small>${label}</small></span><span class="fp-go" aria-hidden="true">›</span></button>
     </section>`;
 }
 
 /** Abiria — safari imeghairiwa / haikupata dereva baada ya kulipa */
 export function passengerRefundHtml(ride) {
   const f = ride.farePay;
-  if (!f || f.settlement !== 'MOBILE' || !f.refund) return '';
+  if (!f || !f.refund || !['MOBILE', 'WALLET'].includes(f.settlement)) return '';
+  if (f.settlement === 'WALLET') {
+    return `<section class="card fp-card is-ok" role="status"><span class="fp-ico">${ICON.check}</span><div><h2>Pesa imerudi kwenye salio lako</h2><p class="muted">${formatTsh(f.due)} — <a href="#/akaunti/salio">Salio la NAYA</a></p></div></section>`;
+  }
   return f.refund === 'DONE'
     ? `<section class="card fp-card is-ok" role="status"><span class="fp-ico">${ICON.check}</span><div><h2>Pesa yako imerudishwa</h2><p class="muted">Ofisi ya NAYA imekurudishia ${formatTsh(f.total)}.</p></div></section>`
     : `<section class="card fp-card is-muted" role="status"><span class="fp-ico">${ICON.cash}</span><div><h2>Pesa yako itarudishwa</h2><p class="muted">Ulilipa ${formatTsh(f.total)} kwa simu lakini safari haikufanyika. Ofisi ya NAYA itakurudishia.</p></div></section>`;
@@ -124,8 +153,11 @@ export function passengerHeadline(ride) {
   const f = ride.farePay;
   const pays = ride.passengerPays ?? ride.fare;
   const promo = ride.promo ? ` Ofa ya NAYA imelipa ${formatTsh(ride.promo.discount)}.` : '';
+  if (f?.settlement === 'WALLET') return `Umelipa ${formatTsh(pays)} kwa salio la NAYA.${promo}`;
+  if (f?.settlement === 'MOBILE') return `Umelipa ${formatTsh(pays)} kwa simu.${promo}`;
+  if (f?.settlement === 'DEBT') return `Hukulipa ${formatTsh(pays)} — limekuwa deni.`;
+  if (f?.wallet?.canPay && !f.settlement) return `Lipa ${formatTsh(pays)} kwa salio au simu hapa chini, au taslimu kwa dereva.${promo}`;
   if (!f || !f.enabled || f.settlement === 'CASH') return `Lipa dereva ${formatTsh(pays)} taslimu.${promo}`;
-  if (f.settlement === 'MOBILE') return `Umelipa ${formatTsh(pays)} kwa simu.${promo}`;
   if (f.settlement === 'DEBT') return `Hukulipa ${formatTsh(pays)} — limekuwa deni.`;
   return `Lipa ${formatTsh(pays)} kwa simu hapa chini, au taslimu kwa dereva.${promo}`;
 }
@@ -134,9 +166,9 @@ export function passengerHeadline(ride) {
 export function driverSectionHtml(ride, ui = {}) {
   const f = ride.farePay;
   if (!f) return '';
-  if (f.settlement === 'MOBILE') {
+  if (f.settlement === 'MOBILE' || f.settlement === 'WALLET') {
     return `<section class="card fp-card is-ok" role="status"><span class="fp-ico">${ICON.check}</span>
-      <div><h2>Abiria amelipa kwa simu</h2><p class="muted">${formatTsh(f.due)} imeingia kwenye wallet yako. <a href="#/akaunti/wallet">Fungua wallet</a></p></div></section>`;
+      <div><h2>Abiria amelipa ${f.settlement === 'WALLET' ? 'kwa salio la NAYA' : 'kwa simu'}</h2><p class="muted">${formatTsh(f.due)} imeingia kwenye wallet yako. <a href="#/akaunti/wallet">Fungua wallet</a></p></div></section>`;
   }
   if (f.settlement === 'CASH') return `<p class="fp-note">${ICON.check} Umeandika: umepokea ${formatTsh(f.due)} taslimu.</p>`;
   if (f.settlement === 'DEBT') {
@@ -167,12 +199,12 @@ export function driverSectionHtml(ride, ui = {}) {
 /** Dereva — wakati wa safari: abiria ameshalipa kwa simu */
 export function driverLiveNote(ride) {
   const f = ride.farePay;
-  if (f?.settlement === 'MOBILE') return `<p class="fp-note">${ICON.check} Abiria amelipa nauli kwa simu — usimdai. Pesa itaingia kwenye wallet yako ukimaliza safari.</p>`;
+  if (f?.settlement === 'MOBILE' || f?.settlement === 'WALLET') return `<p class="fp-note">${ICON.check} Abiria amelipa nauli ${f.settlement === 'WALLET' ? 'kwa salio la NAYA' : 'kwa simu'} — usimdai. Pesa itaingia kwenye wallet yako ukimaliza safari.</p>`;
   if (f?.pending) return `<p class="fp-note fp-note-wait"><span class="fp-spin fp-spin-sm" aria-hidden="true"></span> Abiria analipa nauli kwa simu…</p>`;
   return '';
 }
 
-export const fareKey = (f) => (f ? [f.settlement, f.debtCleared, f.pending?.id, f.last?.id, f.numbersLeft, f.canPay, f.canSettle, f.refund].join(',') : '');
+export const fareKey = (f) => (f ? [f.settlement, f.debtCleared, f.pending?.id, f.last?.id, f.numbersLeft, f.canPay, f.canSettle, f.refund, f.wallet?.balance, f.wallet?.canPay].join(',') : '');
 
 /** Namba iliyoandikwa → 2557XXXXXXXX (server inakagua pia). */
 export function phoneValue(id) {
@@ -213,8 +245,16 @@ async function loadDebt(error = '') {
       )
       .join('')}</ul>
     ${
+      d.wallet?.canPay
+        ? `<button class="btn btn-gold btn-block btn-big fp-wallet" type="button" data-debt="wallet">${ICON.wallet}<span>Lipa ${formatTsh(d.due)} kwa salio</span><small>Salio: ${formatTsh(d.wallet.balance)} · bila ada</small></button>
+           <p class="alert alert-danger" id="debt-wallet-error" role="alert" hidden></p>${d.enabled && !d.pending ? '<p class="fp-or fp-or-top">au kwa simu</p>' : ''}`
+        : d.wallet && d.wallet.balance > 0
+          ? `<p class="fp-wallet-low">Salio la NAYA: ${formatTsh(d.wallet.balance)} — halitoshi deni lote. <a href="#/akaunti/salio">Weka pesa</a></p>`
+          : ''
+    }
+    ${
       !d.enabled
-        ? '<p class="alert alert-warn">Malipo kwa simu yamezimwa kwa sasa. Wasiliana na ofisi ya NAYA.</p>'
+        ? d.wallet?.canPay ? '' : '<p class="alert alert-warn">Malipo kwa simu yamezimwa kwa sasa. Wasiliana na ofisi ya NAYA.</p>'
         : d.pending
           ? `<section class="card fp-card">${waitingHtml(d.pending.phone, d.total)}</section>`
           : `<section class="card fp-card">
@@ -241,6 +281,19 @@ async function watchDebt(paymentId) {
 }
 
 async function onDebtClick(event) {
+  const wb = event.target.closest('[data-debt="wallet"]');
+  if (wb && $('debt')) {
+    wb.disabled = true;
+    try {
+      await ctx.api.post('/api/passenger/debt/pay-wallet', {});
+      ctx.toast('Deni limelipwa kwa salio — asante!');
+      loadDebt();
+    } catch (err) {
+      wb.disabled = false;
+      ctx.handleError(err, 'debt-wallet-error');
+    }
+    return;
+  }
   const b = event.target.closest('[data-debt="pay"]');
   if (!b || !$('debt')) return;
   const phone = phoneValue('debt-phone');

@@ -115,6 +115,20 @@ Alama za kutiliwa shaka (`rides.flags`), zinaonekana kwa ofisi kwenye safari, Ri
 DRIVER, PASSENGER, AUTO au ADMIN. Migration `021_safari_rahisi.sql` inaongeza safu tu (haifuti data); safari zinazoendelea zisizo
 za ofa zinaondolewa PIN ili zisikwame.
 
+## Salio la NAYA — wallet ya abiria (0.23.0)
+
+Abiria anaweka pesa kwenye **Salio la NAYA** kwa simu (M-Pesa, Mixx, Airtel, HaloPesa) na kulipia safari au deni kwa bonyezo moja — bila ombi la PIN kila safari na bila ada.
+
+- **Kuwasha:** Ofisi → Fedha → Malipo → **Nauli kwa simu** → sehemu ya "Salio la abiria". Imezimwa kwa chaguo-msingi. **Kikomo cha salio ni TSh 15,000** kwa kila abiria (kinabadilika kwenye mipangilio); kiwango cha chini cha kuweka TSh 500.
+- **Kuweka pesa:** Akaunti → **Salio la NAYA** → Weka pesa → kiasi (anaona ada ya simu juu, ileile ya nauli kwa simu) → PIN kwenye simu. Salio linaongezeka tu mtandao ukithibitisha.
+- **Kulipa:** dereva akishakubali safari (hadi saa 24 baada ya kukamilika) → "Lipa nauli sasa" → **Lipa kwa salio**. Dereva anapata nauli kwenye wallet yake safari ikikamilika. Deni pia linalipwa kwa salio (Deni langu).
+- **Safari ikighairiwa** (abiria, ofisi, au hakuna dereva) baada ya kulipa kwa salio → pesa inarudi kwenye salio **papo hapo**.
+- **Malipo ya simu yaliyozidi** (mfano simu ilithibitisha baada ya safari kulipwa kwa salio / taslimu) → pesa ya abiria inawekwa kwenye salio lake moja kwa moja.
+- **Kurudishiwa salio:** abiria anaomba → ofisi inamtumia kwa Abliner (Send) kisha inaandika **kiasi ilichotuma** + kumbukumbu ("Nimerudisha"). Ombi likiwa wazi, abiria hawezi kuweka pesa wala kulipa kwa salio.
+- Salio za abiria zinahesabiwa pamoja na wallet za madereva dhidi ya salio la Abliner (onyo kwenye ofisi likiwa halitoshi).
+- **Tahadhari:** kuhifadhi pesa za wateja kunaweza kuhitaji idhini ya Benki Kuu (BoT) — thibitisha kabla ya kuwasha kwa watu wengi.
+- Migration 033 inaongeza `naya.customer_wallets` na `naya.customer_wallet_entries` na kupanua CHECK mbili — haifuti data.
+
 ## Abiria kulipa nauli kwa simu (0.22.0 · 0.22.1)
 
 Kuanzia **dereva akubali safari** mpaka safari ikamilike, abiria anaona "Lipa nauli kwa simu" kwenye skrini ya safari — analipa wakati wowote anaotaka (au taslimu kwa dereva). Hachagui njia ya malipo wakati wa kuagiza.

@@ -11,9 +11,21 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { ADMIN_ROLES, requireRole } from '../middleware/auth.js';
 import { MOBILE_NETWORKS } from '../services/payments/provider.js';
-import { clearDebt, driverSettle, getRidePaySettings, listDebts, listRefunds, markRefunded, myDebt, payDebt, payRideFare, ridePaySummary, saveRidePaySettings } from '../services/ride-payments.js';
-import { ok } from '../utils/http.js';
+import {
+  adjustCustomerWallet,
+  cancelCashout,
+  customerWalletsSummary,
+  getCustomerWalletSettings,
+  markCashoutDone,
+  myCustomerWallet,
+  requestCashout,
+  saveCustomerWalletSettings,
+  topupQuote,
+} from '../services/customer-wallet.js';
+import { clearDebt, driverSettle, getRidePaySettings, listDebts, listRefunds, markRefunded, myDebt, payDebt, payDebtFromWallet, payRideFare, payRideFromWallet, ridePaySummary, saveRidePaySettings, startCustomerTopup, topupFee } from '../services/ride-payments.js';
+import { conflict, ok } from '../utils/http.js';
 import { normalizeTzPhone } from '../utils/phone.js';
+import { db, one } from '../db/pool.js';
 
 const idParam = z.object({ id: z.uuid({ error: 'Haikupatikana' }) });
 const payBody = z.object({
@@ -46,6 +58,60 @@ export async function ridePaymentRoutes(app: FastifyInstance): Promise<void> {
   app.post('/api/driver/rides/:id/settle', { ...user, config: { rateLimit: { max: 30, timeWindow: '10 minutes' } } }, async (request) => {
     const { how } = z.object({ how: z.enum(['CASH', 'DEBT'], { error: 'Chagua: cash au deni' }) }).parse(request.body);
     return ok(await driverSettle(uid(request), idParam.parse(request.params).id, how));
+  });
+
+  // ---- 0.23.0 Salio la abiria (NAYA Wallet)
+  app.get('/api/passenger/wallet', user, async (request) => {
+    return ok(await myCustomerWallet(uid(request)));
+  });
+  app.get('/api/passenger/wallet/quote', { ...user, config: { rateLimit: { max: 60, timeWindow: '10 minutes' } } }, async (request) => {
+    const { amount } = z.object({ amount: z.coerce.number({ error: 'Weka kiasi' }).int('Kiasi kiwe namba kamili').positive('Weka kiasi') }).parse(request.query);
+    const s = await getCustomerWalletSettings();
+    if (!s.enabled) throw conflict('Wallet ya NAYA haijawashwa kwa sasa.');
+    const w = await one<{ balance: number }>(db, 'SELECT balance FROM naya.customer_wallets WHERE user_id = $1', [uid(request)]);
+    const fee = await topupFee(amount);
+    return ok(topupQuote(s, w?.balance ?? 0, amount, () => fee));
+  });
+  app.post('/api/passenger/wallet/topup', { ...user, config: { rateLimit: { max: 8, timeWindow: '10 minutes' } } }, async (request) => {
+    const input = payBody.extend({ amount: z.coerce.number({ error: 'Weka kiasi' }).int('Kiasi kiwe namba kamili').positive('Weka kiasi') }).parse(request.body);
+    return ok(await startCustomerTopup(uid(request), input));
+  });
+  app.post('/api/passenger/wallet/cashout', { ...user, config: { rateLimit: { max: 5, timeWindow: '1 hour' } } }, async (request) => {
+    const { phone } = payBody.pick({ phone: true }).parse(request.body);
+    return ok(await requestCashout(uid(request), phone));
+  });
+  app.post('/api/passenger/wallet/cashout/cancel', user, async (request) => ok(await cancelCashout(uid(request))));
+  app.post('/api/rides/:id/pay-wallet', { ...user, config: { rateLimit: { max: 10, timeWindow: '10 minutes' } } }, async (request) =>
+    ok(await payRideFromWallet(uid(request), idParam.parse(request.params).id)),
+  );
+  app.post('/api/passenger/debt/pay-wallet', { ...user, config: { rateLimit: { max: 8, timeWindow: '10 minutes' } } }, async (request) => ok(await payDebtFromWallet(uid(request))));
+
+  app.get('/api/admin/customer-wallets/summary', adminOnly, async () => ok(await customerWalletsSummary()));
+  app.post('/api/admin/customer-wallets/:id/cashout-done', adminOnly, async (request) => {
+    const { amount, note } = z
+      .object({
+        amount: z.coerce.number({ error: 'Weka kiasi ulichotuma' }).int('Kiasi kiwe namba kamili').positive('Weka kiasi ulichotuma'),
+        note: z.string({ error: 'Andika kumbukumbu ya kutuma' }).trim().min(3, 'Andika kumbukumbu ya kutuma').max(200),
+      })
+      .parse(request.body);
+    return ok(await markCashoutDone(uid(request), idParam.parse(request.params).id, amount, note));
+  });
+  app.post('/api/admin/customer-wallets/:id/adjust', adminOnly, async (request) => {
+    const input = z
+      .object({ amount: z.coerce.number({ error: 'Weka kiasi' }).int('Kiasi kiwe namba kamili'), reason: z.string({ error: 'Andika sababu' }).trim().min(5, 'Andika sababu').max(250) })
+      .parse(request.body);
+    return ok(await adjustCustomerWallet(uid(request), idParam.parse(request.params).id, input));
+  });
+  app.get('/api/admin/settings/customer-wallet', adminOnly, async () => ok(await getCustomerWalletSettings()));
+  app.put('/api/admin/settings/customer-wallet', adminOnly, async (request) => {
+    const input = z
+      .object({
+        enabled: z.boolean().optional(),
+        maxBalance: z.coerce.number().int().min(1000, 'Kikomo kisiwe chini ya TSh 1,000').max(1_000_000).optional(),
+        minTopup: z.coerce.number().int().min(100).max(100_000).optional(),
+      })
+      .parse(request.body);
+    return ok(await saveCustomerWalletSettings(uid(request), input));
   });
 
   app.get('/api/admin/ride-payments/summary', adminOnly, async () => ok(await ridePaySummary()));

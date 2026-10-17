@@ -433,11 +433,14 @@ export async function walletsSummary() {
   ]);
   const ablinerBalance = wallet && 'balance' in wallet && typeof wallet.balance === 'number' ? wallet.balance : null;
   const settings = await getDriverWalletSettings();
+  const cust = await one<{ total: number }>(db, 'SELECT coalesce(sum(balance), 0)::bigint::float8 AS total FROM naya.customer_wallets');
   return {
     ...t!,
     ablinerBalance,
     /** Salio la Abliner halitoshi kulipa wallet zote za madereva? (zinazotumwa sasa zimeshakatwa pande zote mbili) */
-    short: ablinerBalance !== null && ablinerBalance < (t?.owed ?? 0),
+    // 0.23.0 Salio za abiria (NAYA Wallet) nazo ni deni la NAYA — zinahesabiwa pamoja
+    customerOwed: cust?.total ?? 0,
+    short: ablinerBalance !== null && ablinerBalance < (t?.owed ?? 0) + (cust?.total ?? 0),
     settings,
     defaults: WALLET_DEFAULTS,
   };
