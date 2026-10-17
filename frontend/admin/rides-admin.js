@@ -13,6 +13,8 @@ function fareLine(r) {
   const f = r.farePay;
   if (!f) return r.status === 'COMPLETED' ? ' · taslimu' : '';
   if (f.settlement === 'DEBT') return ` · ${f.debtCleared ? 'deni (limeondolewa)' : FARE.DEBT}`;
+  if (f.refund) return ` · imelipwa kwa simu — ${f.refund === 'DONE' ? 'imerudishwa' : 'INAHITAJI KURUDISHWA'}`;
+  if (f.settlement === 'MOBILE' && f.early) return ' · imelipwa kwa simu mapema (inaingia wallet safari ikikamilika)';
   if (f.settlement) return ` · ${FARE[f.settlement]}`;
   if (f.pending) return ' · abiria analipa kwa simu sasa';
   return ' · malipo bado hayajaandikwa';

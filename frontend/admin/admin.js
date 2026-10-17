@@ -369,6 +369,7 @@ async function loadOverview() {
   const financeP = loadFinanceBadge();
   const locationsP = loadLocationsBadge();
   const driverWalletsP = api.get('/api/admin/wallets/summary').catch(() => null);
+  const farePayP = api.get('/api/admin/ride-payments/summary').catch(() => null);
   $('greeting').textContent = `${greetingFor(new Date())}, ${me.fullName.split(' ')[0]}`;
   $('today').textContent = new Date().toLocaleDateString('sw-TZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   try {
@@ -403,7 +404,7 @@ async function loadOverview() {
     $('stat-apk-users').textContent = n(data.app?.users ?? 0);
     safetyAdmin.setOpenCount(data.sosOpen);
     setNavCounts(data);
-    renderQueue(data, walletP, financeP, locationsP, driverWalletsP);
+    renderQueue(data, walletP, financeP, locationsP, driverWalletsP, farePayP);
     loadTrend();
     setDot('sys-sms', data.sms.enabled ? 'ok' : 'wait');
     $('sys-sms-text').textContent = data.sms.enabled ? 'SMS (Beem) zimewashwa' : 'SMS (Beem) hazijawashwa — weka BEEM_API_KEY na BEEM_SECRET_KEY';
@@ -463,7 +464,7 @@ function setNavCounts(data) {
 }
 
 /** "Kazi zinazokusubiri": mambo yanayohitaji mtu wa ofisi sasa hivi, ya hatari kwanza. */
-async function renderQueue(data, walletP = Promise.resolve(null), financeP = Promise.resolve(0), locationsP = Promise.resolve(0), driverWalletsP = Promise.resolve(null)) {
+async function renderQueue(data, walletP = Promise.resolve(null), financeP = Promise.resolve(0), locationsP = Promise.resolve(0), driverWalletsP = Promise.resolve(null), farePayP = Promise.resolve(null)) {
   let searching = 0;
   try {
     const live = await api.get('/api/admin/live');
@@ -471,12 +472,13 @@ async function renderQueue(data, walletP = Promise.resolve(null), financeP = Pro
   } catch {
     // si muhimu
   }
-  const [wallet, payoutsWaiting, locationsWaiting, dw] = await Promise.all([walletP.catch(() => null), financeP.catch(() => 0), locationsP.catch(() => 0), driverWalletsP.catch(() => null)]);
+  const [wallet, payoutsWaiting, locationsWaiting, dw, fp] = await Promise.all([walletP.catch(() => null), financeP.catch(() => 0), locationsP.catch(() => 0), driverWalletsP.catch(() => null), farePayP.catch(() => null)]);
   const items = [
     [data.sosOpen, 'bad', 'Dharura zilizo wazi', 'Mpigie mtu aliyeomba msaada sasa hivi', '#/dharura', 'Shughulikia'],
     [wallet?.low ? 1 : 0, 'bad', 'Salio la Abliner liko chini', `Chini ya TSh ${Number(wallet?.lowBalance ?? 0).toLocaleString('en-US')} — jaza salio ili malipo ya ofa yasishindwe`, '#/malipo', 'Fungua Malipo', '!'],
     [dw?.short ? 1 : 0, 'bad', 'Salio la Abliner halitoshi wallet za madereva', `Madereva wanadai TSh ${Number(dw?.owed ?? 0).toLocaleString('en-US')} kwenye wallet zao — jaza salio ili wasikwame wakitoa`, '#/malipo/wallet', 'Fungua wallet', '!'],
     [(dw?.stuck ?? 0) + (dw?.lateSuccess ?? 0), 'bad', 'Kutoa wallet kunahitaji ukaguzi wako', 'Kumekwama au kumefika baada ya pesa kurudishwa — kagua kwenye Abliner', '#/malipo/wallet', 'Kagua'],
+    [fp?.refunds?.n ?? 0, 'bad', 'Abiria wanasubiri kurudishiwa pesa', 'Walilipa kwa simu lakini safari haikufanyika', '#/malipo/nauli', 'Rudisha'],
     [dw?.pinResets ?? 0, 'warn', 'Madereva wameomba PIN mpya ya wallet', 'Thibitisha ni wao kwa simu, kisha ruhusu', '#/malipo/wallet', 'Shughulikia'],
     [payoutsWaiting, 'warn', 'Malipo ya ofa yanasubiri uamuzi wako', 'Yaliyoshikiliwa kwa ukaguzi au yaliyoshindwa kutumwa', '#/malipo', 'Amua'],
     [searching, 'bad', 'Wateja wanasubiri dereva', 'Mpe dereva maalum kutoka ramani au ukurasa wa safari', '#/ramani', 'Fungua ramani'],

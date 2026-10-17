@@ -1404,3 +1404,15 @@ input, select, textarea { font-size: 17px; padding: 13px 14px; border-radius: va
 .fp-debts li:last-child { border-bottom: 0; }
 .fp-debts li > span { display: flex; flex-direction: column; gap: 2px; }
 .fp-debts li > strong { white-space: nowrap; }
+.fp-mini { padding: 0; overflow: hidden; }
+.fp-mini.is-ok { padding: 14px 16px; }
+.fp-mini.is-ok h2 { font-size: 16px; margin-bottom: 2px; }
+.fp-mini.is-ok p { margin: 0; }
+.fp-open { display: flex; align-items: center; gap: 14px; width: 100%; padding: 15px 16px; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.fp-open > svg { flex: none; width: 40px; height: 40px; padding: 9px; border-radius: 50%; background: var(--g100); color: var(--g700); fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.fp-open > span:nth-child(2) { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.fp-open small { color: #5C6A62; font-size: 14px; }
+.fp-go { font-size: 26px; color: var(--g700); line-height: 1; }
+.fp-open:focus-visible { outline: 3px solid var(--g500); outline-offset: -3px; }
+.fp-note-wait { color: #3E4F47; font-weight: 600; }
+.fp-spin-sm { width: 18px; height: 18px; border-width: 2.5px; }

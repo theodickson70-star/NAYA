@@ -68,7 +68,11 @@ interface FareRide {
   fare_settlement: string | null;
   fare_settled_at: Date | null;
   debt_cleared_at: Date | null;
+  fare_refund?: string | null;
 }
+
+/** Hali ambazo abiria anaweza kulipa kwa simu: dereva amekubali → mpaka safari ikamilike (0.22.1). */
+export const PAY_EARLY: string[] = ['ACCEPTED', 'ARRIVED', 'IN_PROGRESS'];
 
 async function ridePayments(client: Db, ride: Pick<FareRide, 'id' | 'passenger_id'>) {
   return many<PaymentRow>(
@@ -81,11 +85,13 @@ async function ridePayments(client: Db, ride: Pick<FareRide, 'id' | 'passenger_i
 const withinWindow = (r: Pick<FareRide, 'completed_at'>) => !!r.completed_at && Date.now() - new Date(r.completed_at).getTime() < SETTLE_HOURS * 3600_000;
 
 /**
- * Hali ya malipo ya nauli kwa skrini ya safari iliyokamilika (abiria na dereva). null = haihusiki
- * (safari haijakamilika, au malipo ya simu yamezimwa na hakuna kilichoandikwa).
+ * Hali ya malipo ya nauli (abiria, dereva, ofisi): kuanzia dereva akubali mpaka safari ikamilike. null = haihusiki
+ * (hakuna dereva bado, au malipo ya simu yamezimwa na hakuna kilichoandikwa).
  */
 export async function fareState(client: Db, r: FareRide, settings?: RidePaySettings) {
-  if (r.status !== 'COMPLETED') return null;
+  const early = PAY_EARLY.includes(r.status);
+  const ended = ['CANCELLED', 'NO_DRIVER'].includes(r.status) || (r.status === 'SEARCHING' && r.fare_settlement === 'MOBILE');
+  if (r.status !== 'COMPLETED' && !early && !(ended && r.fare_settlement === 'MOBILE')) return null;
   const s = settings ?? (await getRidePaySettings(client));
   if (!s.enabled && !r.fare_settlement) return null;
   const due = Math.max(0, r.fare - r.promo_discount);
@@ -94,7 +100,8 @@ export async function fareState(client: Db, r: FareRide, settings?: RidePaySetti
   const pending = pays.find(isPending) ?? null;
   const numbers = [...new Set(pays.filter((p) => p.meta?.purpose === 'RIDE').map((p) => p.phone))];
   const last = pays[0] ?? null;
-  const open = r.fare_settlement === null && withinWindow(r);
+  const open = r.fare_settlement === null && (early || (r.status === 'COMPLETED' && withinWindow(r)));
+  const done = r.status === 'COMPLETED';
   return {
     enabled: s.enabled,
     settlement: r.fare_settlement as 'CASH' | 'MOBILE' | 'DEBT' | null,
@@ -107,11 +114,15 @@ export async function fareState(client: Db, r: FareRide, settings?: RidePaySetti
     last: last && !isPending(last) ? { id: last.id, status: last.status, phone: last.phone, failureReason: last.failure_reason } : null,
     numbersUsed: numbers,
     numbersLeft: Math.max(0, MAX_NUMBERS - numbers.length),
+    /** Safari bado inaendelea (malipo ya mapema): pesa inaingia wallet ya dereva safari ikikamilika */
+    early,
+    /** Safari ilighairiwa baada ya kulipa → ofisi inamrudishia abiria */
+    refund: (r.fare_refund as 'NEEDED' | 'DONE' | null | undefined) ?? null,
     /** Abiria anaweza kubonyeza "Lipa kwa simu" sasa */
     canPay: s.enabled && open && !pending && due > 0,
-    /** Dereva anaweza kuandika cash / deni sasa */
-    canSettle: open && !pending && due > 0,
-    canDebt: s.enabled && open && !pending && due > 0,
+    /** Dereva anaweza kuandika cash / deni sasa (safari ikishakamilika tu) */
+    canSettle: done && open && !pending && due > 0,
+    canDebt: done && s.enabled && open && !pending && due > 0,
   };
 }
 
@@ -144,11 +155,13 @@ export async function payRideFare(passengerId: string, rideId: string, input: { 
   const payment = await transaction(async (client) => {
     const r = await one<FareRide>(client, 'SELECT * FROM naya.rides WHERE id = $1 FOR UPDATE', [rideId]);
     if (!r || r.passenger_id !== passengerId) throw notFound('Safari haikupatikana');
-    if (r.status !== 'COMPLETED') throw conflict('Unalipa ukishafika — safari bado haijakamilika.');
+    if (r.status !== 'COMPLETED' && !PAY_EARLY.includes(r.status)) {
+      throw conflict(r.status === 'SEARCHING' ? 'Utaweza kulipa dereva akishakubali safari.' : 'Safari hii haipo tena.');
+    }
     if (r.fare_settlement === 'CASH') throw conflict('Dereva ameandika kwamba umelipa taslimu.');
     if (r.fare_settlement === 'MOBILE') throw conflict('Safari hii imeshalipwa kwa simu.');
     if (r.fare_settlement === 'DEBT') throw conflict('Safari hii imekuwa deni — lipa kupitia "Deni langu".');
-    if (!withinWindow(r)) throw conflict('Muda wa kulipa safari hii umepita.');
+    if (r.status === 'COMPLETED' && !withinWindow(r)) throw conflict('Muda wa kulipa safari hii umepita.');
     const due = Math.max(0, r.fare - r.promo_discount);
     if (due <= 0) throw conflict('Safari hii haina cha kulipa.');
     const pays = await ridePayments(client, r);
@@ -335,7 +348,12 @@ export async function ridePaySummary() {
           AND completed_at >= (date_trunc('day', now() AT TIME ZONE 'Africa/Dar_es_Salaam') AT TIME ZONE 'Africa/Dar_es_Salaam')`,
     ),
   ]);
-  return { settings: s, providerReady: !!getProvider(), debts: debts!, today: today!, maxNumbers: MAX_NUMBERS };
+  const refunds = await one<{ n: number; total: number }>(
+    db,
+    `SELECT count(*)::int AS n, coalesce(sum(p.amount), 0)::int AS total FROM naya.rides r JOIN naya.payments p ON p.id = r.fare_payment_id
+      WHERE r.fare_refund = 'NEEDED'`,
+  );
+  return { settings: s, providerReady: !!getProvider(), debts: debts!, today: today!, refunds: refunds!, maxNumbers: MAX_NUMBERS };
 }
 
 /** Ofisi: deni limeondolewa — CASH = abiria alimlipa dereva taslimu baadaye · FORGIVEN = limesamehewa. Wallet haiguswi. */
@@ -366,4 +384,45 @@ export async function clearDebt(adminId: string, rideId: string, how: 'CASH' | '
     body: `Ofisi ya NAYA imeondoa deni la safari yako (${how === 'CASH' ? 'umelipa taslimu' : 'limesamehewa'}). Unaweza kuagiza safari.`,
   });
   return listDebts(true);
+}
+
+// ------------------------------------------------------------------ marejesho (0.22.1)
+
+/** Ofisi: safari zilizolipwa kwa simu kisha zikaghairiwa / hazikupata dereva → abiria arudishiwe pesa. */
+export async function listRefunds(open: boolean) {
+  return many(
+    db,
+    `SELECT r.id, r.status, r.cancelled_at AS "cancelledAt", r.requested_at AS "requestedAt", r.pickup_name AS "from", r.dest_name AS "to",
+            r.cancelled_by AS "cancelledBy", p.amount, p.phone, p.network, p.reference, p.provider_ref AS "providerRef",
+            u.id AS "passengerId", u.full_name AS "passengerName", u.phone AS "passengerPhone",
+            r.fare_refund AS state, r.fare_refund_at AS "doneAt", r.fare_refund_note AS note, c.full_name AS "doneBy"
+       FROM naya.rides r JOIN naya.payments p ON p.id = r.fare_payment_id JOIN naya.users u ON u.id = r.passenger_id
+       LEFT JOIN naya.users c ON c.id = r.fare_refund_by
+      WHERE r.fare_refund IS NOT NULL AND ($1::boolean IS FALSE OR r.fare_refund = 'NEEDED')
+      ORDER BY (r.fare_refund = 'NEEDED') DESC, coalesce(r.cancelled_at, r.requested_at) DESC LIMIT 300`,
+    [open],
+  );
+}
+
+/** Ofisi: imemrudishia abiria pesa (kwa Abliner → Send) — inaandika kumbukumbu. */
+export async function markRefunded(adminId: string, rideId: string, note: string) {
+  const r = await transaction(async (client) => {
+    const r = await one<{ passenger_id: string; fare_refund: string | null }>(client, 'SELECT passenger_id, fare_refund FROM naya.rides WHERE id = $1 FOR UPDATE', [rideId]);
+    if (!r || !r.fare_refund) throw notFound('Marejesho hayakupatikana');
+    if (r.fare_refund === 'DONE') throw conflict('Pesa hii imeshaandikwa kurudishwa.');
+    await client.query(
+      `UPDATE naya.rides SET fare_refund = 'DONE', fare_refund_at = now(), fare_refund_by = $2, fare_refund_note = $3, updated_at = now() WHERE id = $1`,
+      [rideId, adminId, note.slice(0, 200)],
+    );
+    await writeAudit(client, { actorId: adminId, action: 'ride_fare.refunded', targetType: 'ride', targetId: rideId, details: { note } });
+    return r;
+  });
+  await notify({
+    userId: r.passenger_id,
+    event: 'account',
+    kind: 'ride_fare_refunded',
+    title: 'Pesa yako imerudishwa',
+    body: 'Ofisi ya NAYA imekurudishia pesa uliyolipa kwa safari ambayo haikufanyika.',
+  });
+  return listRefunds(true);
 }

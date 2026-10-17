@@ -188,7 +188,7 @@ export async function book(body) {
 
 function passengerKey(r) {
   // Umbali/dakika hazimo hapa: zinasasishwa papo hapo bila kuchora skrini upya (ramani isianze upya).
-  return [r.status, r.redispatched, r.driver?.name, r.pin, r.sosOpen, r.shared, cancelOpen, sosSheet, shareUrl, farepay.fareKey(r.farePay), fareUi.busy, fareUi.error].join('|');
+  return [r.status, r.redispatched, r.driver?.name, r.pin, r.sosOpen, r.shared, cancelOpen, sosSheet, shareUrl, farepay.fareKey(r.farePay), fareUi.busy, fareUi.error, fareUi.open].join('|');
 }
 
 export function renderPassengerRide(ride) {
@@ -239,6 +239,7 @@ export function renderPassengerRide(ride) {
     ${live ? '<div class="ride-map" id="ride-map" role="img" aria-label="Ramani: mahali pa kuchukuliwa, unakoenda, na dereva"></div>' : ''}
     ${ride.pin ? pinCardHtml(ride.pin) : ''}
     ${d ? driverCardHtml(ride) : ''}
+    ${live ? farepay.passengerLiveHtml(ride, fareUi) : ''}
     ${live ? safetyHtml({ share: true, sosOpen: ride.sosOpen }) : ''}
     <section class="card">${routeSummary(ride)}</section>
     ${
@@ -256,7 +257,7 @@ export function renderPassengerRide(ride) {
     }
     ${
       ride.status === 'NO_DRIVER' || ride.status === 'CANCELLED'
-        ? `<button class="btn btn-primary btn-block" type="button" data-ride="close">Sawa</button>
+        ? `${farepay.passengerRefundHtml(ride)}<button class="btn btn-primary btn-block" type="button" data-ride="close">Sawa</button>
            ${ride.status === 'NO_DRIVER' || ride.cancelledBy !== 'PASSENGER' ? feedbackLink(ride, { problem: true }) : ''}`
         : ''
     }
@@ -278,6 +279,7 @@ export function renderPassengerRide(ride) {
         ? cancelOpen
           ? `<div class="card confirm">
               <p><strong>Ghairi safari hii?</strong></p>
+              ${ride.farePay?.settlement === 'MOBILE' ? `<p class="muted">Umeshalipa ${formatTsh(ride.farePay.total)} kwa simu. Ukighairi, ofisi ya NAYA itakurudishia pesa.</p>` : ''}
               <p class="alert alert-danger" id="cancel-error" role="alert" hidden></p>
               <div class="actions"><button class="btn btn-danger" type="button" data-ride="cancel-confirm">Ndiyo, ghairi</button>
               <button class="btn btn-ghost" type="button" data-ride="cancel-keep">Hapana</button></div>
@@ -782,8 +784,9 @@ function driverRideHtml(ride) {
     <section class="card">
       <div class="driver-top">
         <span class="driver-photo pax-photo" id="pax-photo">${paxInitials(p?.name)}</span>
-        <span class="driver-who"><strong>${esc(p?.name ?? 'Abiria')}</strong><span class="muted">${esc(paxMeta(p))}</span><span class="muted">Abiria · nauli ${formatTsh(ride.passengerPays ?? ride.fare)}</span></span>
+        <span class="driver-who"><strong>${esc(p?.name ?? 'Abiria')}</strong><span class="muted">${esc(paxMeta(p))}</span><span class="muted">Abiria · nauli ${formatTsh(ride.passengerPays ?? ride.fare)}${ride.farePay?.settlement === 'MOBILE' ? ' · imelipwa kwa simu ✓' : ''}</span></span>
       </div>
+      ${farepay.driverLiveNote(ride)}
       <div class="actions two">
         ${p ? `<a class="btn btn-ghost call" href="${tel(p.phone)}">${ICON.phone} Piga simu</a>` : ''}
         ${step.target ? `<a class="btn btn-ghost call" href="${mapsLink(step.target)}" target="_blank" rel="noopener">${ICON.map} Ramani</a>` : ''}
@@ -918,14 +921,21 @@ async function onClick(event) {
   const id = el.dataset.id;
 
   // Nauli kwa simu (abiria / dereva)
+  if ((action === 'fare-open' || action === 'fare-close') && passengerRide) {
+    fareUi = { open: action === 'fare-open' };
+    lastKey = '';
+    renderPassengerRide(passengerRide);
+    if (action === 'fare-open') $('fp-phone')?.focus();
+    return;
+  }
   if (action === 'fare-pay' && passengerRide) {
     const phone = farepay.phoneValue('fp-phone');
     if (phone.replace(/\D/g, '').length < 9) {
-      fareUi = { error: 'Weka namba ya simu ya kulipia.' };
+      fareUi = { open: true, error: 'Weka namba ya simu ya kulipia.' };
       lastKey = '';
       return renderPassengerRide(passengerRide);
     }
-    fareUi = { busy: true };
+    fareUi = { open: true, busy: true };
     lastKey = '';
     renderPassengerRide(passengerRide);
     try {
@@ -933,7 +943,7 @@ async function onClick(event) {
       fareUi = {};
     } catch (err) {
       if (ctx.handleError(err)) return;
-      fareUi = { error: err.message };
+      fareUi = { open: true, error: err.message };
     }
     lastKey = '';
     return refreshPassenger();

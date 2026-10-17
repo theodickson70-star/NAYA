@@ -29,20 +29,29 @@ export function open() {
 async function load() {
   const v = view;
   try {
-    const [s, debts] = await Promise.all([ctx.api.get('/api/admin/ride-payments/summary'), ctx.api.get(`/api/admin/ride-debts?open=${showAll ? 0 : 1}`)]);
-    if (v === view) render(s, debts);
+    const [s, debts, refunds] = await Promise.all([
+      ctx.api.get('/api/admin/ride-payments/summary'),
+      ctx.api.get(`/api/admin/ride-debts?open=${showAll ? 0 : 1}`),
+      ctx.api.get(`/api/admin/ride-refunds?open=${showAll ? 0 : 1}`),
+    ]);
+    if (v === view) render(s, debts, refunds);
   } catch (err) {
     if (v !== view || ctx.onAuthError(err)) return;
     host.insertAdjacentHTML('beforeend', `<p class="alert alert-danger" role="alert">${esc(err.message)}</p>`);
   }
 }
 
-function render(s, debts) {
+function render(s, debts, refunds) {
   const st = s.settings;
   const example = 3000;
   const fee = Math.max(Math.round(st.feeMin), Math.ceil((example * st.feePercent) / 100));
   host.innerHTML = `${ctx.tabs()}<div data-nauli>
-    <p class="rp-lead">Abiria akifika analipa nauli kwa simu kwenye app (namba yoyote, hadi namba ${n(s.maxNumbers)}) au taslimu. Ada ya kupokea pesa inaongezwa juu ya nauli; dereva anapata nauli kamili kwenye wallet yake. Asiyelipa → deni, na hawezi kuagiza safari mpaka alipe.</p>
+    ${
+      s.refunds.n
+        ? `<p class="alert alert-danger" role="alert"><strong>Abiria ${n(s.refunds.n)} wanasubiri kurudishiwa ${formatTsh(s.refunds.total)}</strong> — walilipa kwa simu lakini safari haikufanyika. Watumie pesa kwa Abliner (Send), kisha bonyeza "Nimerudisha" hapa chini.</p>`
+        : ''
+    }
+    <p class="rp-lead">Dereva akishakubali safari, abiria anaweza kulipa nauli kwa simu kwenye app (hadi safari ikamilike) (namba yoyote, hadi namba ${n(s.maxNumbers)}) au taslimu. Ada ya kupokea pesa inaongezwa juu ya nauli; dereva anapata nauli kamili kwenye wallet yake. Asiyelipa → deni, na hawezi kuagiza safari mpaka alipe.</p>
     ${!s.providerReady ? '<p class="alert alert-danger" role="alert">Kampuni ya malipo haijaunganishwa — malipo ya simu hayawezi kuwashwa.</p>' : ''}
     <section class="rp-stats">
       <div class="rp-stat rp-stat-hero"><span>Hali</span><strong>${st.enabled ? 'Imewashwa' : 'Imezimwa'}</strong><small>${st.enabled ? 'Abiria wanaona "Lipa kwa simu"' : 'Abiria wanalipa taslimu tu'}</small></div>
@@ -62,6 +71,28 @@ function render(s, debts) {
       <p class="alert alert-danger" id="fa-settings-error" role="alert" hidden></p>
       <div class="actions"><button class="btn btn-primary btn-small" type="submit">Hifadhi</button></div>
     </form>
+    ${
+      refunds.length
+        ? `<div class="fa-head"><h3>Marejesho kwa abiria</h3></div>
+      <div class="rp-scroll"><table class="rp-table"><thead><tr><th>Safari</th><th>Abiria</th><th>Alilipa kwa</th><th class="num">Kiasi</th><th>Hali</th></tr></thead><tbody>${refunds
+        .map(
+          (r) => `<tr>
+            <td class="rp-nowrap">${esc(formatDate(r.cancelledAt ?? r.requestedAt, true))}<span class="rp-sub"><a href="#/safari/${esc(r.id)}">${esc(r.from)} → ${esc(r.to)}</a> · ${
+              r.status === 'NO_DRIVER' ? 'hakuna dereva' : r.cancelledBy === 'PASSENGER' ? 'abiria ameghairi' : r.cancelledBy === 'ADMIN' ? 'ofisi imeghairi' : 'imeghairiwa'
+            }</span></td>
+            <td><a href="#/wateja/${esc(r.passengerId)}">${esc(r.passengerName)}</a><span class="rp-sub">${esc(formatPhone(r.passengerPhone))}</span></td>
+            <td>${esc(formatPhone(r.phone))}<span class="rp-sub">${esc(r.providerRef ?? r.reference)}</span></td>
+            <td class="num"><strong>${formatTsh(r.amount)}</strong></td>
+            <td>${
+              r.state === 'DONE'
+                ? `<span class="badge badge-ok">Imerudishwa</span><span class="rp-sub">${esc(formatDate(r.doneAt, true))}${r.doneBy ? ` · ${esc(r.doneBy)}` : ''}${r.note ? ` · ${esc(r.note)}` : ''}</span>`
+                : `<span class="badge badge-bad">Irudishwe</span><span class="fa-act"><button class="link-btn" type="button" data-refund="${esc(r.id)}" data-amount="${esc(r.amount)}" data-phone="${esc(formatPhone(r.phone))}">Nimerudisha</button></span>`
+            }</td>
+          </tr>`,
+        )
+        .join('')}</tbody></table></div>`
+        : ''
+    }
     <div class="fa-head"><h3>Madeni ya abiria</h3>
       <div class="filters rp-chips" role="group" aria-label="Madeni"><button type="button" class="chip" data-fa="open" aria-pressed="${!showAll}">Yasiyolipwa</button><button type="button" class="chip" data-fa="all" aria-pressed="${showAll}">Yote</button></div></div>
     <p class="alert alert-danger" id="fa-error" role="alert" hidden></p>
@@ -93,6 +124,25 @@ async function onClick(event) {
     showAll = chip.dataset.fa === 'all';
     view += 1;
     return load();
+  }
+  const rf = event.target.closest('[data-refund]');
+  if (rf) {
+    const note = prompt(`Umemrudishia ${formatTsh(Number(rf.dataset.amount))} kwenye ${rf.dataset.phone} kupitia Abliner? Andika kumbukumbu ya muamala (mf. namba ya Send):`);
+    if (!note || note.trim().length < 3) return;
+    rf.disabled = true;
+    try {
+      await ctx.api.post(`/api/admin/ride-refunds/${rf.dataset.refund}/done`, { note: note.trim() });
+      toast('Imeandikwa: pesa imerudishwa');
+      view += 1;
+      load();
+    } catch (err) {
+      rf.disabled = false;
+      if (ctx.onAuthError(err)) return;
+      const box = document.getElementById('fa-error');
+      box.textContent = err.message;
+      box.hidden = false;
+    }
+    return;
   }
   const b = event.target.closest('[data-clear]');
   if (!b) return;

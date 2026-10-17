@@ -5,12 +5,13 @@
 //   Dereva: POST /api/driver/rides/:id/settle { how: CASH | DEBT }
 //   Ofisi:  GET  /api/admin/ride-payments/summary · GET /api/admin/ride-debts?open=1
 //           POST /api/admin/ride-debts/:id/clear { how: CASH | FORGIVEN, note }
+//           GET  /api/admin/ride-refunds?open=1 · POST /api/admin/ride-refunds/:id/done { note }
 //           GET/PUT /api/admin/settings/ride-payments
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { ADMIN_ROLES, requireRole } from '../middleware/auth.js';
 import { MOBILE_NETWORKS } from '../services/payments/provider.js';
-import { clearDebt, driverSettle, getRidePaySettings, listDebts, myDebt, payDebt, payRideFare, ridePaySummary, saveRidePaySettings } from '../services/ride-payments.js';
+import { clearDebt, driverSettle, getRidePaySettings, listDebts, listRefunds, markRefunded, myDebt, payDebt, payRideFare, ridePaySummary, saveRidePaySettings } from '../services/ride-payments.js';
 import { ok } from '../utils/http.js';
 import { normalizeTzPhone } from '../utils/phone.js';
 
@@ -57,6 +58,14 @@ export async function ridePaymentRoutes(app: FastifyInstance): Promise<void> {
       .object({ how: z.enum(['CASH', 'FORGIVEN'], { error: 'Chagua: amelipa cash au samehe' }), note: z.string({ error: 'Andika sababu' }).trim().min(3, 'Andika sababu').max(200) })
       .parse(request.body);
     return ok(await clearDebt(uid(request), idParam.parse(request.params).id, input.how, input.note));
+  });
+  app.get('/api/admin/ride-refunds', adminOnly, async (request) => {
+    const { open } = z.object({ open: z.enum(['0', '1']).default('1') }).parse(request.query);
+    return ok(await listRefunds(open === '1'));
+  });
+  app.post('/api/admin/ride-refunds/:id/done', adminOnly, async (request) => {
+    const { note } = z.object({ note: z.string({ error: 'Andika kumbukumbu ya kurudisha' }).trim().min(3, 'Andika kumbukumbu ya kurudisha').max(200) }).parse(request.body);
+    return ok(await markRefunded(uid(request), idParam.parse(request.params).id, note));
   });
   app.get('/api/admin/settings/ride-payments', adminOnly, async () => ok(await getRidePaySettings()));
   app.put('/api/admin/settings/ride-payments', adminOnly, async (request) => {

@@ -336,6 +336,65 @@ describe('Nauli kwa simu — imewashwa', () => {
     await closeRide(id, 'p2');
   });
 
+  it('0.22.1 malipo ya mapema: dereva akishakubali abiria analipa; wallet inaongezwa safari ikikamilika tu', async () => {
+    assert.equal((await call('POST', '/api/driver/online', { online: true, lat: A.lat - 0.0005, lng: A.lng }, 'd2')).status, 200);
+    const res = await call('POST', '/api/rides', { pickup: { locationId: locationIds[0] }, destination: { locationId: locationIds[1] }, vehicleType: 'BODABODA' }, 'p2');
+    assert.equal(res.status, 201, res.json.message);
+    const id = res.json.data.id;
+    assert.equal((await call('POST', `/api/rides/${id}/pay`, { phone: `0742${s}` }, 'p2')).status, 409, 'bado inatafuta dereva');
+    const offer = (await call('GET', '/api/driver/state', undefined, 'd2')).json.data.offer;
+    assert.equal((await call('POST', `/api/driver/offers/${offer.id}/accept`, {}, 'd2')).status, 200);
+    const cur = (await call('GET', '/api/rides/current', undefined, 'p2')).json.data;
+    assert.equal(cur.farePay.canPay, true, 'dereva amekubali → anaweza kulipa');
+    assert.equal(cur.farePay.early, true);
+    const r = await call('POST', `/api/rides/${id}/pay`, { phone: `0742${s}` }, 'p2');
+    assert.equal(r.status, 200, r.json.message);
+    const bal0 = Number((await db.query('SELECT coalesce(balance, 0) AS b FROM naya.wallets WHERE driver_id = $1', [ids.d2])).rows[0]?.b ?? 0);
+    await confirm((await lastPay('p2')).reference);
+    assert.equal((await db.query('SELECT fare_settlement FROM naya.rides WHERE id = $1', [id])).rows[0].fare_settlement, 'MOBILE');
+    assert.equal(Number((await db.query('SELECT coalesce(balance, 0) AS b FROM naya.wallets WHERE driver_id = $1', [ids.d2])).rows[0]?.b ?? 0), bal0, 'bado haijaingia — safari inaendelea');
+    const drv = (await call('GET', '/api/driver/state', undefined, 'd2')).json.data.ride;
+    assert.equal(drv.farePay.settlement, 'MOBILE');
+    await call('POST', `/api/driver/rides/${id}/arrive`, {}, 'd2');
+    assert.equal((await call('POST', `/api/driver/rides/${id}/start`, {}, 'd2')).status, 200);
+    await db.query(`UPDATE naya.rides SET started_at = now() - interval '6 minutes' WHERE id = $1`, [id]);
+    await call('POST', '/api/driver/location', NEAR_B, 'd2');
+    assert.equal((await call('POST', `/api/driver/rides/${id}/complete`, {}, 'd2')).status, 200);
+    assert.equal(Number((await db.query('SELECT balance FROM naya.wallets WHERE driver_id = $1', [ids.d2])).rows[0].balance), bal0 + 3000, 'safari imekamilika → +3000');
+    assert.equal((await call('POST', `/api/driver/rides/${id}/settle`, { how: 'CASH' }, 'd2')).status, 409, 'imeshalipwa');
+    const { checkPendingPayments } = await import('../src/services/payments/index.js');
+    await checkPendingPayments();
+    assert.equal(Number((await db.query('SELECT balance FROM naya.wallets WHERE driver_id = $1', [ids.d2])).rows[0].balance), bal0 + 3000, 'worker haiongezi mara mbili');
+    await call('POST', `/api/driver/rides/${id}/close`, {}, 'd2');
+    await call('POST', '/api/driver/online', { online: false }, 'd2');
+    await closeRide(id, 'p2');
+  });
+
+  it('0.22.1 abiria akilipa kisha kughairi → "itarudishwa"; ofisi inaandika "Nimerudisha"; dereva hapati', async () => {
+    assert.equal((await call('POST', '/api/driver/online', { online: true, lat: A.lat - 0.0005, lng: A.lng }, 'd2')).status, 200);
+    const res = await call('POST', '/api/rides', { pickup: { locationId: locationIds[0] }, destination: { locationId: locationIds[1] }, vehicleType: 'BODABODA' }, 'p2');
+    assert.equal(res.status, 201, res.json.message);
+    const id = res.json.data.id;
+    const offer = (await call('GET', '/api/driver/state', undefined, 'd2')).json.data.offer;
+    assert.equal((await call('POST', `/api/driver/offers/${offer.id}/accept`, {}, 'd2')).status, 200);
+    assert.equal((await call('POST', `/api/rides/${id}/pay`, { phone: `0742${s}` }, 'p2')).status, 200);
+    await confirm((await lastPay('p2')).reference);
+    const bal = Number((await db.query('SELECT coalesce(balance, 0) AS b FROM naya.wallets WHERE driver_id = $1', [ids.d2])).rows[0]?.b ?? 0);
+    assert.equal((await call('POST', `/api/rides/${id}/cancel`, { reason: 'Nimebadilisha mpango' }, 'p2')).status, 200);
+    const row = (await db.query('SELECT fare_refund FROM naya.rides WHERE id = $1', [id])).rows[0];
+    assert.equal(row.fare_refund, 'NEEDED');
+    const sum = (await call('GET', '/api/admin/ride-payments/summary', undefined, 'admin')).json.data;
+    assert.ok(sum.refunds.n >= 1);
+    const list = (await call('GET', '/api/admin/ride-refunds?open=1', undefined, 'admin')).json.data;
+    assert.ok(list.some((x: any) => x.id === id && x.amount === 3100));
+    assert.equal((await call('POST', `/api/admin/ride-refunds/${id}/done`, { note: 'Send ABL123' }, 'admin')).status, 200);
+    assert.equal((await call('POST', `/api/admin/ride-refunds/${id}/done`, { note: 'tena' }, 'admin')).status, 409);
+    assert.equal((await db.query('SELECT fare_refund FROM naya.rides WHERE id = $1', [id])).rows[0].fare_refund, 'DONE');
+    assert.equal(Number((await db.query('SELECT coalesce(balance, 0) AS b FROM naya.wallets WHERE driver_id = $1', [ids.d2])).rows[0]?.b ?? 0), bal, 'dereva hapati');
+    await call('POST', '/api/driver/online', { online: false }, 'd2');
+    await closeRide(id, 'p2');
+  });
+
   it('ledger: salio la wallet = jumla ya miamala (madereva wote wa majaribio)', async () => {
     for (const k of ['d1', 'd2']) {
       const w = await db.query('SELECT balance FROM naya.wallets WHERE driver_id = $1', [ids[k]]);

@@ -14,7 +14,7 @@ import { badRequest, conflict, forbidden, isUniqueViolation, notFound } from '..
 import { writeAudit } from './audit.js';
 import { readDocument } from './drivers.js';
 import { passengerCard } from './profile.js';
-import { onPromoRideCompleted } from './payments/index.js';
+import { creditPrepaidFare, onPromoRideCompleted } from './payments/index.js';
 import { straightLineKm } from './fare-engine.js';
 import { notify, notifyAdmins } from './notify.js';
 import { estimateTrip, findLocation, nearestServicePoint, SERVICE_RADIUS_KM } from './places.js';
@@ -126,6 +126,7 @@ interface RideRow {
   fare_settlement: 'CASH' | 'MOBILE' | 'DEBT' | null;
   fare_settled_at: Date | null;
   debt_cleared_at: Date | null;
+  fare_refund: 'NEEDED' | 'DONE' | null;
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
@@ -294,7 +295,10 @@ export async function dispatchRide(rideId: string): Promise<void> {
     let candidates = await findCandidates(client, { ...base, exclude: ride.promotion_id ? await driversOverPromoLimit(client, ride.promotion_id) : [] });
     if (ride.promotion_id && !candidates.some((c) => c.km <= MAX_PICKUP_KM)) {
       const everyone = await findCandidates(client, { ...base, exclude: [] });
-      if (everyone.some((c) => c.km <= MAX_PICKUP_KM)) {
+      if (everyone.some((c) => c.km <= MAX_PICKUP_KM) && ride.fare_settlement === 'MOBILE') {
+        // Abiria ameshalipa kwa simu (bei ya ofa): ofa haiondolewi — NAYA inaiheshimu hata kwa dereva aliyefikia kikomo.
+        candidates = everyone;
+      } else if (everyone.some((c) => c.km <= MAX_PICKUP_KM)) {
         // Hakuna dereva mwenye nafasi ya ofa karibu: safari inaendelea bila ofa (abiria anaambiwa, anaweza kughairi bure).
         await client.query(`UPDATE naya.rides SET promotion_id = NULL, promo_discount = 0, promo_title = NULL, start_pin = NULL, updated_at = now() WHERE id = $1`, [rideId]);
         await history(client, rideId, 'SEARCHING', 'SEARCHING', null, `Ofa imeondolewa: madereva waliopo wamefikia kikomo cha ofa (${ride.promo_title ?? ''})`);
@@ -327,7 +331,7 @@ export async function dispatchRide(rideId: string): Promise<void> {
     if (offeredTo.length) return { offeredTo, seconds, ride };
 
     if (ride.search_age_s > SEARCH_TIMEOUT_SECONDS) {
-      await client.query(`UPDATE naya.rides SET status = 'NO_DRIVER', updated_at = now() WHERE id = $1`, [rideId]);
+      await client.query(`UPDATE naya.rides SET status = 'NO_DRIVER', fare_refund = CASE WHEN fare_settlement = 'MOBILE' AND fare_refund IS NULL THEN 'NEEDED' ELSE fare_refund END, updated_at = now() WHERE id = $1`, [rideId]);
       await history(client, rideId, 'SEARCHING', 'NO_DRIVER', null, 'Hakuna dereva aliyepatikana');
       return { noDriver: true, passengerId: ride.passenger_id };
     }
@@ -638,7 +642,7 @@ export async function cancelByPassenger(passengerId: string, rideId: string, rea
     if (!['SEARCHING', 'ACCEPTED', 'ARRIVED'].includes(ride.status)) throw conflict('Safari hii imeshaisha.');
     await client.query(
       `UPDATE naya.rides SET status = 'CANCELLED', cancelled_by = 'PASSENGER', cancel_reason = $2, cancelled_at = now(),
-              passenger_closed = true, updated_at = now() WHERE id = $1`,
+              passenger_closed = true, fare_refund = CASE WHEN fare_settlement = 'MOBILE' AND fare_refund IS NULL THEN 'NEEDED' ELSE fare_refund END, updated_at = now() WHERE id = $1`,
       [rideId, reason],
     );
     const offers = await many<{ driver_id: string }>(
@@ -1078,14 +1082,19 @@ export async function advanceRide(driverId: string, rideId: string, step: keyof 
     // Bila kusubiri (kampuni ya malipo inaweza kuchelewa sekunde kadhaa) — dereva haoni kuchelewa kwa "Maliza safari".
     void onPromoRideCompleted(rideId).catch((error) => console.error(`[payments] ofa ${rideId}: ${(error as Error).message}`));
   }
+  // 0.22.1 Abiria alilipa kwa simu mapema → nauli inaingia kwenye wallet ya dereva sasa
+  if (step === 'complete' && ride.fare_settlement === 'MOBILE') {
+    await creditPrepaidFare(rideId).catch((error) => console.error(`[nauli] prepaid ${rideId}: ${(error as Error).message}`));
+  }
   const pays = tsh(ride.fare - ride.promo_discount);
+  const prepaid = ride.fare_settlement === 'MOBILE';
   const phonePay = step === 'complete' && (await getRidePaySettings()).enabled;
   const messages = {
     arrive: { title: 'Dereva amefika!', body: `Anakusubiri ${ride.pickup_name}.`, urgent: true },
     start: null,
     complete: {
       title: `Umefika ${ride.dest_name}`,
-      body: `Lipa dereva ${pays}${phonePay ? ' kwa simu kwenye app au taslimu' : ' taslimu'}.${ride.promo_discount > 0 ? ` Ofa ya NAYA imelipa ${tsh(ride.promo_discount)}.` : ''} Asante kwa kusafiri na NAYA.`,
+      body: `${prepaid ? `Umeshalipa ${pays} kwa simu` : `Lipa dereva ${pays}${phonePay ? ' kwa simu kwenye app au taslimu' : ' taslimu'}`}.${ride.promo_discount > 0 ? ` Ofa ya NAYA imelipa ${tsh(ride.promo_discount)}.` : ''} Asante kwa kusafiri na NAYA.`,
       urgent: false,
     },
   } as const;
@@ -1338,7 +1347,8 @@ export async function cancelByAdmin(adminId: string, rideId: string, reason: str
     if (!ride) throw notFound('Safari haikupatikana');
     if (!ACTIVE.includes(ride.status)) throw conflict('Safari hii imeshaisha.');
     await client.query(
-      `UPDATE naya.rides SET status = 'CANCELLED', cancelled_by = 'ADMIN', cancel_reason = $2, cancelled_at = now(), updated_at = now() WHERE id = $1`,
+      `UPDATE naya.rides SET status = 'CANCELLED', cancelled_by = 'ADMIN', cancel_reason = $2, cancelled_at = now(),
+              fare_refund = CASE WHEN fare_settlement = 'MOBILE' AND fare_refund IS NULL THEN 'NEEDED' ELSE fare_refund END, updated_at = now() WHERE id = $1`,
       [rideId, reason],
     );
     const offers = await many<{ driver_id: string }>(
@@ -1528,6 +1538,7 @@ export async function completeByAdmin(adminId: string, rideId: string, note: str
   await notify({ userId: ride.passenger_id, event: 'ride', rideId, kind: 'ride_complete', title: `Umefika ${ride.dest_name}`, body: 'Safari imekamilishwa na ofisi ya NAYA.' });
   if (ride.driver_id) await notify({ userId: ride.driver_id, event: 'ride', rideId });
   await onPromoRideCompleted(rideId).catch((error) => console.error(`[payments] ofa ${rideId}: ${(error as Error).message}`));
+  await creditPrepaidFare(rideId).catch((error) => console.error(`[nauli] prepaid ${rideId}: ${(error as Error).message}`));
   await notifyAdmins(rideId);
   return rideForAdmin(rideId);
 }

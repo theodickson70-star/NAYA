@@ -115,9 +115,12 @@ Alama za kutiliwa shaka (`rides.flags`), zinaonekana kwa ofisi kwenye safari, Ri
 DRIVER, PASSENGER, AUTO au ADMIN. Migration `021_safari_rahisi.sql` inaongeza safu tu (haifuti data); safari zinazoendelea zisizo
 za ofa zinaondolewa PIN ili zisikwame.
 
-## Abiria kulipa nauli kwa simu (0.22.0)
+## Abiria kulipa nauli kwa simu (0.22.0 · 0.22.1)
 
-Abiria akifika (safari imekamilika) anaweza kulipa nauli kwa simu ndani ya app, au taslimu kwa dereva kama kawaida.
+Kuanzia **dereva akubali safari** mpaka safari ikamilike, abiria anaona "Lipa nauli kwa simu" kwenye skrini ya safari — analipa wakati wowote anaotaka (au taslimu kwa dereva). Hachagui njia ya malipo wakati wa kuagiza.
+
+- **Malipo ya mapema (0.22.1):** pesa inashikiliwa mpaka safari ikamilike, kisha inaingia kwenye wallet ya dereva aliyemaliza safari. Dereva anaona "Abiria amelipa nauli kwa simu — usimdai".
+- **Safari ikighairiwa baada ya kulipa** (abiria, ofisi, au hakuna dereva): abiria anaambiwa "Pesa yako itarudishwa"; ofisi inaona **Marejesho kwa abiria** (Nauli kwa simu) na muhtasari — inamtumia pesa kwa Abliner (Send), kisha inabonyeza "Nimerudisha" na kumbukumbu. Migration 032 inaongeza safu tu.
 
 - **Kuwasha:** Ofisi → Fedha → Malipo → **Nauli kwa simu**. Imezimwa kwa chaguo-msingi. Weka ada juu ya nauli (% na kiwango cha chini) iwe sawa na ada ya Abliner ya kupokea pesa.
 - **Abiria:** skrini ya "Umefika" inaonyesha nauli + ada ya simu = jumla. Anaweza kutumia namba yoyote (M-Pesa, Mixx, Airtel, HaloPesa), hadi namba 3 kwa safari moja. Anaweka PIN kwenye simu; "Umelipa" inaonekana tu baada ya mtandao kuthibitisha.
