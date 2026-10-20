@@ -1051,10 +1051,3 @@ a.kpi:hover, .queue-item:hover, .settings-tile:hover { transform: translateY(-2p
 .rf-to legend { font-weight: 700; margin-bottom: 4px; }
 .um-money-h3 { margin: 16px 0 6px; font-size: 15px; }
 #rf-ride { width: 100%; }
-
-/* 0.25.1: SMS ya majaribio */
-.sms-test { margin: 14px 0; }
-.sms-test label { display: block; font-weight: 700; margin-bottom: 6px; }
-.sms-test-row { display: flex; gap: 8px; flex-wrap: wrap; }
-.sms-test-row input { flex: 1 1 220px; min-width: 0; }
-.sms-test .alert { margin: 10px 0 0; }

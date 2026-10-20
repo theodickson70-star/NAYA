@@ -411,8 +411,6 @@ SMS zikiwa zimewashwa:
 - **SMS za taarifa muhimu** (zinalipiwa, kwa hiyo chache tu): dereva amethibitishwa, ombi la udereva linahitaji marekebisho,
   ada inakaribia kuisha, ada imeisha.
 - Ofisi → Muhtasari → **SMS**: salio la Beem, SMS za leo na mwezi huu, na zilizoshindwa.
-- **SMS ya majaribio (0.25.1):** Ofisi → Muhtasari → SMS → andika namba yako → **Tuma**. Ikishindwa, ofisi inaona jibu la Beem (funguo, Sender ID au salio).
-- **Kuwasha mara ya kwanza (0.25.1):** server ikiwaka na funguo za Beem kwa mara ya kwanza, watumiaji WALIOPO (waliojisajili SMS zikiwa zimezimwa) wanahesabiwa wamethibitishwa — madereva na wateja wa sasa hawazuiwi ghafla. Wapya wanathibitisha kwa SMS. Inafanyika mara moja tu (`settings.sms_activation`) na inaandikwa kwenye kumbukumbu.
 
 Bila funguo za Beem, SMS zimezimwa: hakuna anayeombwa kuthibitisha namba, na "Umesahau password?" inamwambia mtu awasiliane na ofisi.
 
