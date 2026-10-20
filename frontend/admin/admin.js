@@ -441,6 +441,23 @@ const SMS_KINDS = {
   rider_driver_found: 'Safari ya mtu mwingine — dereva',
   rider_cancelled: 'Safari ya mtu mwingine — imeghairiwa',
   campaign: 'Kituo cha SMS',
+  account_suspended: 'Akaunti imesimamishwa',
+  account_reactivated: 'Akaunti imefunguliwa',
+  password_changed: 'Password imebadilishwa',
+  wallet_status: 'Wallet imesimamishwa / kufunguliwa',
+  wallet_adjust: 'Marekebisho ya wallet',
+  wallet_withdrawal: 'Pesa imetumwa (wallet)',
+  wallet_withdrawal_failed: 'Kutoa pesa kumeshindwa',
+  wallet_pin: 'PIN mpya ya wallet',
+  wallet_hold: 'Namba ya malipo imebadilishwa',
+  payout_name_changed: 'Jina la namba ya malipo limebadilika',
+  promo_payout: 'Malipo ya ofa',
+  subscription_paid: 'Ada imepokelewa',
+  ride_fare_debt: 'Deni la nauli',
+  customer_refund: 'Umerudishiwa pesa',
+  customer_cashout: 'Salio limerudishwa',
+  ride_fare_refunded: 'Nauli imerudishwa',
+  support_reply: 'Ofisi imejibu (msaada)',
 };
 
 // 0.25.1: SMS ya majaribio (kuthibitisha funguo za Beem na Sender ID)

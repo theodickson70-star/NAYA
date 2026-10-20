@@ -12,6 +12,13 @@ import { hashPassword } from './auth.js';
 import { getDriverProfile, REQUIRED_DOCUMENTS } from './drivers.js';
 import { removeAllFcmTokens } from './fcm.js';
 import { notifyAdmins } from './notify.js';
+import { sendSms, smsEnabled } from './sms.js';
+
+/** 0.26.1: password ya muda inatumwa kwa SMS pia (mtu asitegemee kukumbuka aliyoambiwa kwa mdomo). */
+async function smsTempPassword(phone: string, what: string, password: string): Promise<boolean> {
+  if (!smsEnabled()) return false;
+  return sendSms(phone, `NAYA: ${what}. Password ya muda: ${password}. Ingia kwenye app ya NAYA kwa namba yako, kisha uibadilishe.`, 'temp_password').catch(() => false);
+}
 import type { LocationInput } from '../validators/places.js';
 
 // Herufi zisizochanganya (hakuna 0/O, 1/l/I)
@@ -115,7 +122,8 @@ export async function createStaff(adminId: string, input: { fullName: string; ph
       await writeAudit(client, { actorId: adminId, action: 'staff.created', targetType: 'user', targetId: row!.id, details: { fullName: input.fullName } });
       return row!;
     });
-    return { id: user.id, fullName: input.fullName, phone: input.phone, linked: false as const, tempPassword: password };
+    const smsSent = await smsTempPassword(input.phone, 'Akaunti yako ya NAYA Staff imefunguliwa', password);
+    return { id: user.id, fullName: input.fullName, phone: input.phone, linked: false as const, tempPassword: password, smsSent };
   } catch (error) {
     if (isUniqueViolation(error)) throw conflict('Namba hii imesajiliwa sasa hivi na mtu mwingine. Jaribu tena.');
     throw error;
@@ -176,7 +184,8 @@ export async function resetStaffPassword(adminId: string, id: string) {
     return s;
   });
   await removeAllFcmTokens(id).catch(() => {});
-  return { id, fullName: row.full_name, phone: row.phone, tempPassword: password };
+  const smsSent = await smsTempPassword(row.phone, 'Password yako ya NAYA Staff imebadilishwa na ofisi', password);
+  return { id, fullName: row.full_name, phone: row.phone, tempPassword: password, smsSent };
 }
 
 // ------------------------------------------------------------------ staff mwenyewe
@@ -237,7 +246,8 @@ export async function registerDriver(
       await writeAudit(client, { actorId: staffId, action: 'staff.driver_registered', targetType: 'driver', targetId: user!.id, details: { plate: v.plateNumber } });
       return user!.id;
     });
-    return { id, fullName: input.fullName, phone: input.phone, tempPassword: password };
+    const smsSent = await smsTempPassword(input.phone, 'Akaunti yako ya dereva imefunguliwa', password);
+    return { id, fullName: input.fullName, phone: input.phone, tempPassword: password, smsSent };
   } catch (error) {
     if (isUniqueViolation(error)) throw conflict('Namba hii ya plate tayari imesajiliwa na dereva mwingine.');
     throw error;

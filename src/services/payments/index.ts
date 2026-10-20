@@ -492,6 +492,7 @@ export async function applyResult(reference: string, result: ProviderResult) {
       kind: 'wallet_withdrawal_failed',
       title: 'Kutoa pesa kumeshindwa',
       body: `Kutoa ${tsh(p.amount)} hakukufanikiwa: ${result.message ?? 'kampuni ya malipo imekataa.'} Pesa yote imerudi kwenye wallet yako.`,
+      sms: `NAYA: Kutoa ${tsh(p.amount)} hakukufanikiwa. Pesa yote imerudi kwenye wallet yako ya NAYA. Jaribu tena kwenye app.`,
     });
     await notifyAdmins();
   }
@@ -890,6 +891,8 @@ export async function payoutNameProblem(payment: PaymentRow): Promise<string | n
     return null;
   }
   const now = r.found ? `sasa ni "${r.name}"` : 'mtandao haujathibitisha namba hii';
+  // SMS mara moja tu kwa kila badiliko (malipo mengine yakijaribiwa, dereva asipate SMS nyingi)
+  const firstTime = !(await one(db, 'SELECT 1 FROM naya.driver_payout_accounts WHERE id = $1 AND name_changed_at IS NOT NULL', [account.id]));
   await db.query('UPDATE naya.driver_payout_accounts SET name_changed_to = $2, name_changed_at = now() WHERE id = $1', [account.id, r.found ? r.name : null]);
   await notify({
     userId: payment.user_id,
@@ -897,6 +900,9 @@ export async function payoutNameProblem(payment: PaymentRow): Promise<string | n
     kind: 'payout_name_changed',
     title: 'Thibitisha namba yako ya malipo',
     body: `Namba yako ya malipo ${phoneText(payment.phone)}: ${now}. NAYA haijatuma pesa. Fungua Akaunti → Malipo ya ofa na uthibitishe namba yako upya.`,
+    ...(firstTime
+      ? { sms: 'NAYA: Jina la namba yako ya malipo halilingani tena, kwa hiyo NAYA haijakutumia pesa. Fungua app: Akaunti > Malipo ya ofa, thibitisha namba yako.' }
+      : {}),
   }).catch(() => {});
   return `${NAME_CHANGED_PREFIX}: ${now} (ilikuwa "${expected}"). Pesa haikutumwa — dereva athibitishe namba yake upya kwenye app.`;
 }

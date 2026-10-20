@@ -277,6 +277,7 @@ export async function markCashoutDone(adminId: string, userId: string, amount: n
     kind: 'customer_cashout',
     title: 'Salio limerudishwa',
     body: `Ofisi ya NAYA imekutumia ${tsh(amount)} kutoka salio lako. Salio sasa: ${tsh(out)}.`,
+    sms: `NAYA: Tumekutumia ${tsh(amount)} kutoka Salio lako la NAYA kwenda kwenye simu yako. Salio sasa: ${tsh(out)}.`,
   });
   return customerWalletsSummary();
 }

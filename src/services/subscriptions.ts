@@ -214,6 +214,7 @@ export async function recordPayment(
     kind: 'subscription_paid',
     title: 'Ada imepokelewa — asante!',
     body: subscriptionPaidMessage(amount, paidUntil),
+    sms: `NAYA: ${subscriptionPaidMessage(amount, paidUntil)}`,
   });
   await notifyAdmins();
   return subscriptionForAdmin(driverId);

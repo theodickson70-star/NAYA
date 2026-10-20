@@ -167,6 +167,7 @@ export async function refundCustomer(
       kind: 'customer_refund',
       title: 'Umerudishiwa pesa',
       body: `NAYA imekurudishia ${tsh(input.amount)} kwenye Salio lako la NAYA (${label}). Salio sasa: ${tsh(balance)}. Samahani kwa usumbufu.`,
+      sms: `NAYA: Umerudishiwa ${tsh(input.amount)} kwenye Salio lako la NAYA. Salio sasa: ${tsh(balance)}. Litumie kulipia safari ijayo.`,
     });
     return customerMoney(userId);
   }

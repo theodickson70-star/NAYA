@@ -209,6 +209,13 @@ export async function replyAsStaff(adminId: string, ticketId: string, input: { b
     return t;
   });
   if (text) {
+    // 0.26.1: SMS fupi ya "umejibiwa" — mara moja tu kila saa 6 kwa mtu mmoja (mazungumzo marefu yasilete SMS nyingi)
+    const recent = await one(
+      db,
+      `SELECT 1 FROM naya.sms_log l JOIN naya.users u ON u.phone = l.phone
+        WHERE u.id = $1 AND l.kind = 'support_reply' AND l.created_at > now() - interval '6 hours'`,
+      [ticket.user_id],
+    );
     await notify({
       userId: ticket.user_id,
       event: 'support',
@@ -216,6 +223,7 @@ export async function replyAsStaff(adminId: string, ticketId: string, input: { b
       title: 'Ofisi ya NAYA imekujibu',
       body: text.slice(0, 280),
       urgent: true,
+      ...(recent ? {} : { sms: 'NAYA: Ofisi ya NAYA imejibu ombi lako la msaada. Fungua app ya NAYA: Msaada, uone jibu.' }),
     });
   } else {
     await publish({ type: 'support', userId: ticket.user_id });

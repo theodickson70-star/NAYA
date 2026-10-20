@@ -157,7 +157,7 @@ function showSecret(r, title) {
       <h3>${esc(title)}</h3>
       <p>Mpe <strong>${esc(r.fullName)}</strong> taarifa hizi. Ataingia kwenye <strong>app ya NAYA</strong> (si ofisi) kwa namba <strong>${esc(formatPhone(r.phone))}</strong>, kisha atabadilisha password.</p>
       <p class="staff-password">${esc(r.tempPassword)}</p>
-      <p class="small muted">Password hii inaonyeshwa <strong>mara moja tu</strong>. Iandike sasa.</p>
+      <p class="small muted">${r.smsSent ? 'Pia imetumwa kwa SMS kwenye namba yake. ' : ''}Password hii inaonyeshwa <strong>mara moja tu</strong>. Iandike sasa.</p>
     </div>
     <button class="btn btn-ghost btn-small" type="button" data-secret-close>Nimeiandika</button>`;
   box.hidden = false;

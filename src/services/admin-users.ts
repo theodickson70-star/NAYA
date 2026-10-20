@@ -6,7 +6,7 @@ import { badRequest, conflict, notFound } from '../utils/http.js';
 import { writeAudit } from './audit.js';
 import { hashPassword } from './auth.js';
 import { notify, notifyAdmins } from './notify.js';
-import { sendSms, smsEnabled } from './sms.js';
+import { NAYA_OFFICE_PHONE, sendSms, smsEnabled } from './sms.js';
 
 export const USER_FILTERS = ['ALL', 'PASSENGERS', 'DRIVERS', 'SUSPENDED', 'UNVERIFIED', 'NEW'] as const;
 export type UserFilter = (typeof USER_FILTERS)[number];
@@ -171,6 +171,15 @@ export async function suspendUser(adminId: string, id: string, reason: string) {
   });
   await publish({ type: 'account', userId: id });
   await notifyAdmins();
+  // 0.26.1: ametolewa kwenye app papo hapo — SMS ndiyo njia pekee ya kumjulisha
+  await notify({
+    userId: id,
+    event: 'account',
+    kind: 'account_suspended',
+    title: 'Akaunti imesimamishwa',
+    body: `Ofisi ya NAYA imesimamisha akaunti yako: ${reason.trim().slice(0, 120)}`,
+    sms: `NAYA: Akaunti yako imesimamishwa: ${reason.trim().slice(0, 90)}. Kwa maelezo piga ofisi ya NAYA ${NAYA_OFFICE_PHONE}.`,
+  });
   return userDetail(id);
 }
 
@@ -182,6 +191,14 @@ export async function reactivateUser(adminId: string, id: string) {
     await writeAudit(client, { actorId: adminId, action: 'user.reactivated', targetType: 'user', targetId: id });
   });
   await notifyAdmins();
+  await notify({
+    userId: id,
+    event: 'account',
+    kind: 'account_reactivated',
+    title: 'Akaunti imefunguliwa',
+    body: 'Ofisi ya NAYA imefungua akaunti yako tena. Karibu tena!',
+    sms: 'NAYA: Akaunti yako imefunguliwa tena. Unaweza kuingia kwenye app ya NAYA sasa. Karibu tena!',
+  });
   return userDetail(id);
 }
 

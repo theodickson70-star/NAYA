@@ -9,6 +9,8 @@ import { conflict } from '../utils/http.js';
 import { writeAudit } from './audit.js';
 
 const SEND_URL = `${env.beemBaseUrl}/v1/send`;
+/** Namba ya ofisi ya NAYA kwenye SMS (mtu asiyeweza kuingia kwenye app ajue wa kumpigia). */
+export const NAYA_OFFICE_PHONE = '0628 986 770';
 const BALANCE_URL = `${env.beemBaseUrl}/public/v1/vendors/balance`;
 const TIMEOUT_MS = 10_000;
 

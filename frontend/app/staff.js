@@ -228,7 +228,7 @@ async function renderDriver(id) {
             <h2>Akaunti ya ${esc(fresh.fullName)} imetengenezwa</h2>
             <p>Mpe dereva password hii ya muda. Ataingia kwenye app ya NAYA kwa namba <strong>${esc(formatPhone(fresh.phone))}</strong> na kuibadilisha.</p>
             <p class="sf-password" aria-label="Password ya muda">${esc(fresh.tempPassword)}</p>
-            <p class="small">Inaonyeshwa <strong>mara moja tu</strong>. Iandike sasa.</p>
+            <p class="small">${fresh.smsSent ? 'Pia imetumwa kwa SMS kwenye namba ya dereva. ' : ''}Inaonyeshwa <strong>mara moja tu</strong>. Iandike sasa.</p>
           </section>`
         : ''
     }

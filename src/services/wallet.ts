@@ -11,6 +11,7 @@ import { type Db, db, many, one, transaction } from '../db/pool.js';
 import { AppError, badRequest, conflict, forbidden, notFound } from '../utils/http.js';
 import { writeAudit } from './audit.js';
 import { notify, notifyAdmins } from './notify.js';
+import { NAYA_OFFICE_PHONE } from './sms.js';
 import { STUCK_MINUTES, getAutoPayout, insertPayment, sendWithdrawal, walletOverview } from './payments/index.js';
 import { getProvider, MOBILE_NETWORKS, type MobileNetwork } from './payments/provider.js';
 import { NETWORK_LABEL, type Network } from './promotions.js';
@@ -520,6 +521,9 @@ export async function setWalletActive(adminId: string, driverId: string, active:
     kind: 'wallet_status',
     title: active ? 'Wallet imefunguliwa' : 'Wallet imesimamishwa',
     body: active ? 'Ofisi ya NAYA imefungua wallet yako tena.' : `Ofisi ya NAYA imesimamisha wallet yako${reason ? `: ${reason}` : '.'} Salio lako liko salama.`,
+    sms: active
+      ? 'NAYA: Wallet yako imefunguliwa tena. Unaweza kutoa pesa kama kawaida.'
+      : `NAYA: Wallet yako imesimamishwa kwa muda${reason ? `: ${reason.slice(0, 80)}` : ''}. Salio lako liko salama. Piga ofisi ${NAYA_OFFICE_PHONE}.`,
   }).catch(() => {});
   return walletForAdmin(driverId);
 }
@@ -571,6 +575,7 @@ export async function adjustWallet(adminId: string, driverId: string, input: { a
     kind: 'wallet_adjust',
     title: 'Marekebisho ya wallet',
     body: `Ofisi ya NAYA ${input.amount > 0 ? 'imeongeza' : 'imepunguza'} ${tsh(Math.abs(input.amount))} kwenye wallet yako: ${input.reason}`,
+    sms: `NAYA: Ofisi ${input.amount > 0 ? 'imeongeza' : 'imepunguza'} ${tsh(Math.abs(input.amount))} kwenye wallet yako: ${input.reason.slice(0, 70)}.`,
   }).catch(() => {});
   return walletForAdmin(driverId);
 }

@@ -434,6 +434,7 @@ export async function markRefunded(adminId: string, rideId: string, note: string
     kind: 'ride_fare_refunded',
     title: 'Pesa yako imerudishwa',
     body: 'Ofisi ya NAYA imekurudishia pesa uliyolipa kwa safari ambayo haikufanyika.',
+    sms: 'NAYA: Tumekurudishia pesa uliyolipa kwa safari ambayo haikufanyika. Angalia simu yako. Samahani kwa usumbufu.',
   });
   return listRefunds(true);
 }

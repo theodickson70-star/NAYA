@@ -5,7 +5,8 @@ import { db, one, transaction } from '../db/pool.js';
 import { AppError, conflict, forbidden, isUniqueViolation, unauthorized } from '../utils/http.js';
 import { removeAllFcmTokens } from './fcm.js';
 import { consumeOtp, issueOtp, OTP_RESEND_SECONDS } from './otp.js';
-import { smsEnabled } from './sms.js';
+import { NAYA_OFFICE_PHONE, smsEnabled } from './sms.js';
+import { notify } from './notify.js';
 import {
   bumpTokenVersion,
   findUserByPhone,
@@ -121,5 +122,14 @@ export async function changePassword(userId: string, currentPassword: string, ne
     [userId, await hashPassword(newPassword)],
   );
   await removeAllFcmTokens(userId);
+  // 0.26.1: tahadhari ya usalama — kama si yeye aliyebadilisha, ajue mapema
+  await notify({
+    userId,
+    event: 'account',
+    kind: 'password_changed',
+    title: 'Password imebadilishwa',
+    body: 'Password ya akaunti yako ya NAYA imebadilishwa.',
+    sms: `NAYA: Password ya akaunti yako imebadilishwa. Kama si wewe, piga ofisi ya NAYA ${NAYA_OFFICE_PHONE} sasa hivi.`,
+  });
   return updated!;
 }

@@ -115,6 +115,20 @@ Alama za kutiliwa shaka (`rides.flags`), zinaonekana kwa ofisi kwenye safari, Ri
 DRIVER, PASSENGER, AUTO au ADMIN. Migration `021_safari_rahisi.sql` inaongeza safu tu (haifuti data); safari zinazoendelea zisizo
 za ofa zinaondolewa PIN ili zisikwame.
 
+## SMS kwenye matukio muhimu (0.26.1)
+
+Matukio haya yalikuwa na arifa ya app tu; sasa yanatuma pia SMS fupi (SMS 1, bila siri yoyote):
+
+- **Akaunti imesimamishwa** (pamoja na sababu na namba ya ofisi — mtu anatolewa kwenye app, kwa hiyo SMS ndiyo njia pekee ya kumjulisha) na **imefunguliwa**.
+- **Password imebadilishwa** — "kama si wewe, piga ofisi".
+- **Wallet ya dereva:** imesimamishwa / imefunguliwa, marekebisho ya ofisi, **kutoa pesa kumeshindwa** (pesa imerudi kwenye wallet), na **jina la namba ya malipo limebadilika** (mara moja tu kwa kila badiliko).
+- **Ada iliyorekodiwa na ofisi kwa mkono** (taslimu) — kama ada iliyolipwa kwa simu.
+- **Pesa za mteja:** kurudishiwa kwenye Salio la NAYA, salio kurudishwa kwenye simu, marejesho ya nauli ya mkono.
+- **Ofisi imejibu ombi la msaada** — SMS fupi ("fungua app uone jibu"), mara moja tu kila saa 6 kwa mtu mmoja; maandishi ya jibu hayatumwi kwa SMS.
+- **Password ya muda** ya dereva aliyesajiliwa na NAYA Staff, ya NAYA Staff mpya, na ya Staff aliyebadilishiwa password — inatumwa pia kwa SMS (bado inaonyeshwa mara moja kwenye skrini).
+
+Matukio ya safari (dereva anakuja, amefika, hakuna dereva…) yanabaki na arifa ya simu tu — ni mengi mno kwa SMS.
+
 ## Kituo cha SMS (0.26.0)
 
 Ofisi → Mawasiliano → **Kituo cha SMS** (`#/sms`): kutuma SMS kwa wateja na madereva kwa templates.
