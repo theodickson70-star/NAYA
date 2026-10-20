@@ -29,6 +29,7 @@ import { staffRoutes } from './routes/staff.js';
 import { walletRoutes } from './routes/wallet.js';
 import { ridePaymentRoutes } from './routes/ride-payments.js';
 import { safetyRoutes } from './routes/safety.js';
+import { smsCenterRoutes } from './routes/sms-center.js';
 import { subscriptionRoutes } from './routes/subscriptions.js';
 import { streamRoutes } from './routes/stream.js';
 
@@ -92,6 +93,7 @@ export async function buildApp(options: { logger?: boolean } = {}): Promise<Fast
   await app.register(healthRoutes);
   await app.register(authRoutes);
   await app.register(adminRoutes);
+  await app.register(smsCenterRoutes);
   await app.register(adminDriverRoutes);
   await app.register(accountRoutes);
   await app.register(profileRoutes);

@@ -115,6 +115,17 @@ Alama za kutiliwa shaka (`rides.flags`), zinaonekana kwa ofisi kwenye safari, Ri
 DRIVER, PASSENGER, AUTO au ADMIN. Migration `021_safari_rahisi.sql` inaongeza safu tu (haifuti data); safari zinazoendelea zisizo
 za ofa zinaondolewa PIN ili zisikwame.
 
+## Kituo cha SMS (0.26.0)
+
+Ofisi → Mawasiliano → **Kituo cha SMS** (`#/sms`): kutuma SMS kwa wateja na madereva kwa templates.
+
+- **Wapokeaji:** wateja wote · wateja wapya (wiki hii) · wateja wa zamani (hawajasafiri siku 30) · madereva wote · madereva online · ada inaisha (siku 3 au imeisha) · madereva wanaosubiri uthibitisho · wote · **namba maalum** (andika namba, hata zisizo za NAYA).
+- **Templates:** 9 za mwanzo (wateja, madereva, wote), kila moja ni SMS 1. Ofisi inaongeza, inahariri na kuondoa. Maneno yanayojazwa kwa kila mtu: `{jina}` `{jina_kamili}` `{plate}` `{ada_hadi}` `{link}` `{link_pakua}`. Maneno ndani ya `[ ]` (mf. `[andika ofa hapa]`) lazima yabadilishwe kabla ya kutuma.
+- **Hakiki kwanza:** idadi ya watu, SMS ngapi (herufi 160 = SMS 1), salio la Beem, na mfano wa SMS tatu zilizojazwa majina. "Tuma" inafanya kazi baada ya hakiki tu, na idadi lazima ilingane (kundi likibadilika katikati, ofisi inaambiwa).
+- **Kinga:** watu 2,000 kwa mara moja; ujumbe usizidi SMS 3; salio la Beem lisipotosha → haitumwi; ujumbe uleule kwa watu walewale ndani ya dakika 2 → unazuiwa.
+- **Historia:** maendeleo (zimefika Beem / zimeshindwa), kitufe cha **Simamisha**, na orodha ya namba zilizoshindwa pamoja na sababu ya Beem. Server ikianza upya katikati, kutuma kunaandikwa "Imesimamishwa" (hakurudiwi).
+- Migration 036: majedwali `sms_templates` na `sms_campaigns`, safu `sms_log.campaign_id` (NULL kwa SMS za zamani) na templates za mwanzo — haifuti data.
+
 ## Safari ya mtu mwingine (0.25.0)
 
 Abiria anaweza kumwagizia mtu mwingine safari (mzazi, mtoto, mgeni).
@@ -411,6 +422,8 @@ SMS zikiwa zimewashwa:
 - **SMS za taarifa muhimu** (zinalipiwa, kwa hiyo chache tu): dereva amethibitishwa, ombi la udereva linahitaji marekebisho,
   ada inakaribia kuisha, ada imeisha.
 - Ofisi → Muhtasari → **SMS**: salio la Beem, SMS za leo na mwezi huu, na zilizoshindwa.
+- **SMS ya majaribio (0.25.1):** Ofisi → Muhtasari → SMS → andika namba yako → **Tuma**. Ikishindwa, ofisi inaona jibu la Beem (funguo, Sender ID au salio).
+- **Kuwasha mara ya kwanza (0.25.1):** server ikiwaka na funguo za Beem kwa mara ya kwanza, watumiaji WALIOPO (waliojisajili SMS zikiwa zimezimwa) wanahesabiwa wamethibitishwa — madereva na wateja wa sasa hawazuiwi ghafla. Wapya wanathibitisha kwa SMS. Inafanyika mara moja tu (`settings.sms_activation`) na inaandikwa kwenye kumbukumbu.
 
 Bila funguo za Beem, SMS zimezimwa: hakuna anayeombwa kuthibitisha namba, na "Umesahau password?" inamwambia mtu awasiliane na ofisi.
 

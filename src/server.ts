@@ -3,6 +3,8 @@ import { buildApp } from './app.js';
 import { env } from './config/env.js';
 import { db } from './db/pool.js';
 import { runMigrations } from './db/migrate.js';
+import { activateSmsOnce } from './services/sms.js';
+import { markInterruptedCampaigns } from './services/sms-center.js';
 import { startListener, stopListener } from './realtime/hub.js';
 import { dispatchPending } from './services/rides.js';
 import { runSubscriptionChecks } from './services/subscriptions.js';
@@ -18,6 +20,13 @@ try {
   app.log.error((error as Error).message);
   process.exit(1);
 }
+
+// SMS zikiwashwa kwa mara ya kwanza: watumiaji waliopo wasizuiwe ghafla (wanahesabiwa wamethibitishwa).
+await activateSmsOnce((m) => app.log.info(m)).catch((error) => app.log.warn(`[sms] ${(error as Error).message}`));
+// Kituo cha SMS: kutuma kulikokatizwa na kuanza upya kwa server kunaandikwa "kumesimama" (hakutumwi mara mbili).
+await markInterruptedCampaigns()
+  .then((n) => n && app.log.warn(`[sms-center] kutuma ${n} kulikatizwa na kuanza upya kwa server`))
+  .catch(() => {});
 
 await app.listen({ port: env.port, host: '0.0.0.0' });
 // Taarifa za papo hapo kutoka servers nyingine (Postgres LISTEN/NOTIFY).

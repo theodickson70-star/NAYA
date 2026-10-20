@@ -3,6 +3,7 @@
 import { createApi, escapeHtml as esc, fetchHealth } from '/shared/api.js';
 import { connectRealtime } from '/shared/realtime.js';
 import * as broadcastAdmin from './broadcast-admin.js';
+import * as smsCenter from './sms-center-admin.js';
 import { barChart, shortDay } from './charts.js';
 import * as feedbackAdmin from './feedback-admin.js';
 import * as liveAdmin from './live-admin.js';
@@ -35,14 +36,14 @@ const views = ['view-loading', 'view-login', 'view-offline', 'view-app'];
 const pages = [
   'page-overview', 'page-drivers', 'page-driver', 'page-locations', 'page-fares', 'page-rides', 'page-ride', 'page-subscriptions', 'page-sos',
   'page-live', 'page-users', 'page-user', 'page-support', 'page-ticket', 'page-reports', 'page-broadcast', 'page-feedback', 'page-offers',
-  'page-settings', 'page-staff',
+  'page-settings', 'page-staff', 'page-sms',
 ];
 
 /** Kichwa cha juu (breadcrumb): kundi la menyu → ukurasa. */
 const TITLES = {
   overview: ['', 'Muhtasari'], live: ['Operesheni', 'Ramani live'], rides: ['Operesheni', 'Safari'], sos: ['Operesheni', 'Dharura'],
   drivers: ['Watu', 'Madereva'], users: ['Watu', 'Wateja'], finance: ['Fedha', 'Malipo'], subscriptions: ['Fedha', 'Ada ya mwezi'],
-  offers: ['Fedha', 'Ofa'], broadcast: ['Mawasiliano', 'Matangazo'], support: ['Mawasiliano', 'Msaada'], feedback: ['Mawasiliano', 'Maoni'],
+  offers: ['Fedha', 'Ofa'], broadcast: ['Mawasiliano', 'Matangazo'], sms: ['Mawasiliano', 'Kituo cha SMS'], support: ['Mawasiliano', 'Msaada'], feedback: ['Mawasiliano', 'Maoni'],
   reports: ['', 'Ripoti'], settings: ['Mipangilio', 'Mipangilio ya mfumo'], staff: ['Mipangilio', 'NAYA Staff'], fares: ['Mipangilio', 'Bei na nauli'], locations: ['Mipangilio', 'Maeneo'],
 };
 const DETAIL_TITLE = { 'page-driver': 'Dereva', 'page-ride': 'Safari moja', 'page-user': 'Mtumiaji', 'page-ticket': 'Ombi la msaada' };
@@ -175,6 +176,7 @@ function route() {
   else if (parts[0] === 'mipangilio') page = 'page-settings';
   else if (parts[0] === 'staff') page = 'page-staff';
   else if (parts[0] === 'matangazo') page = 'page-broadcast';
+  else if (parts[0] === 'sms') page = 'page-sms';
   else if (parts[0] === 'maoni') page = 'page-feedback';
   closeMenu();
   ridesAdmin.stop();
@@ -191,7 +193,7 @@ function route() {
   const navFor = {
     'page-overview': 'overview', 'page-drivers': 'drivers', 'page-driver': 'drivers', 'page-locations': 'locations', 'page-fares': 'fares',
     'page-rides': 'rides', 'page-ride': 'rides', 'page-subscriptions': 'subscriptions', 'page-sos': 'sos', 'page-live': 'live',
-    'page-users': 'users', 'page-user': 'users', 'page-support': 'support', 'page-ticket': 'support', 'page-reports': 'reports', 'page-broadcast': 'broadcast', 'page-feedback': 'feedback',
+    'page-users': 'users', 'page-user': 'users', 'page-support': 'support', 'page-ticket': 'support', 'page-reports': 'reports', 'page-broadcast': 'broadcast', 'page-sms': 'sms', 'page-feedback': 'feedback',
     'page-offers': parts[0] === 'malipo' ? 'finance' : 'offers', 'page-settings': 'settings', 'page-staff': 'staff',
   };
   const navKey = navFor[page];
@@ -226,6 +228,8 @@ function route() {
   if (page === 'page-staff') staffAdmin.loadPage();
   if (page === 'page-locations') staffAdmin.loadPendingLocations();
   if (page === 'page-broadcast') broadcastAdmin.load();
+  if (page === 'page-sms') smsCenter.load();
+  else smsCenter.stop();
   if (page === 'page-feedback') feedbackAdmin.load();
 }
 
@@ -430,7 +434,40 @@ const SMS_KINDS = {
   driver_rejected: 'Ombi la dereva — marekebisho',
   subscription_due: 'Ada inakaribia kuisha',
   subscription_expired: 'Ada imeisha',
+  admin_test: 'SMS ya majaribio',
+  broadcast: 'Tangazo',
+  office_message: 'Ujumbe wa ofisi',
+  temp_password: 'Password ya muda',
+  rider_driver_found: 'Safari ya mtu mwingine — dereva',
+  rider_cancelled: 'Safari ya mtu mwingine — imeghairiwa',
+  campaign: 'Kituo cha SMS',
 };
+
+// 0.25.1: SMS ya majaribio (kuthibitisha funguo za Beem na Sender ID)
+$('sms-test-form')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = form.querySelector('button');
+  const box = $('sms-test-result');
+  button.disabled = true;
+  button.textContent = 'Inatuma…';
+  box.hidden = true;
+  try {
+    const r = await api.post('/api/admin/sms/test', { phone: $('sms-test-phone').value });
+    box.className = `alert ${r.ok ? 'alert-ok' : 'alert-danger'}`;
+    box.textContent = r.ok
+      ? `Beem imepokea SMS (Sender ID: ${r.senderId}). Angalia simu yako — ikifika, SMS za NAYA ziko tayari.`
+      : `Haikutumwa: ${r.error}. Kagua BEEM_API_KEY, BEEM_SECRET_KEY, BEEM_SENDER_ID (${r.senderId}) na salio la Beem.`;
+    loadSms();
+  } catch (err) {
+    if (handleAuthError(err)) return;
+    box.className = 'alert alert-danger';
+    box.textContent = err.message;
+  }
+  box.hidden = false;
+  button.disabled = false;
+  button.textContent = 'Tuma';
+});
 
 async function loadSms() {
   try {
@@ -438,6 +475,8 @@ async function loadSms() {
     $('sms-panel').hidden = false;
     const n = (v) => Number(v).toLocaleString('sw-TZ');
     $('sms-balance').textContent = sms.balance == null ? '?' : n(sms.balance);
+    $('sms-sender').textContent = `· Sender ID: ${sms.senderId}`;
+    $('sms-center-link').hidden = false;
     $('sms-today').textContent = n(sms.sentToday);
     $('sms-month').textContent = n(sms.sentThisMonth);
     $('sms-failed').hidden = !sms.failedToday;
@@ -928,5 +967,6 @@ ofaAdmin.setup({ api, onAuthError: handleAuthError });
 settingsAdmin.setup({ api, onAuthError: handleAuthError, toast });
 staffAdmin.setup({ api, onAuthError: handleAuthError, onPendingChange: setLocationsBadge, onApproved: () => places.loadLocations($('location-q').value) });
 broadcastAdmin.setup({ api, onAuthError: handleAuthError });
+smsCenter.setup({ api, onAuthError: handleAuthError });
 feedbackAdmin.setup({ api, onAuthError: handleAuthError });
 start();
