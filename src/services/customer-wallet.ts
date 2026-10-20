@@ -11,7 +11,7 @@ import { writeAudit } from './audit.js';
 import { notify, notifyAdmins } from './notify.js';
 import { getProvider, guessNetwork, type MobileNetwork } from './payments/provider.js';
 
-export type CwKind = 'TOPUP' | 'RIDE_PAYMENT' | 'RIDE_REFUND' | 'DEBT_PAYMENT' | 'CASHOUT' | 'ADJUSTMENT';
+export type CwKind = 'TOPUP' | 'RIDE_PAYMENT' | 'RIDE_REFUND' | 'DEBT_PAYMENT' | 'CASHOUT' | 'ADJUSTMENT' | 'REFUND';
 
 export interface CustomerWalletSettings {
   enabled: boolean;
@@ -83,6 +83,7 @@ const LABEL: Record<CwKind, string> = {
   DEBT_PAYMENT: 'Deni la nauli',
   CASHOUT: 'Umerudishiwa salio',
   ADJUSTMENT: 'Marekebisho ya ofisi',
+  REFUND: 'Umerudishiwa na NAYA',
 };
 
 /** Kwa skrini ya safari: wallet ya abiria imewashwa na salio lake. */

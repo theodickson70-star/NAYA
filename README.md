@@ -115,6 +115,18 @@ Alama za kutiliwa shaka (`rides.flags`), zinaonekana kwa ofisi kwenye safari, Ri
 DRIVER, PASSENGER, AUTO au ADMIN. Migration `021_safari_rahisi.sql` inaongeza safu tu (haifuti data); safari zinazoendelea zisizo
 za ofa zinaondolewa PIN ili zisikwame.
 
+## Kurudishia mteja pesa (0.24.0)
+
+Mteja akilalamika (amekatwa mara mbili, safari haikufanyika, huduma mbaya, amezidishiwa nauli, fidia), ofisi inamrudishia pesa yenyewe.
+
+- **Wapi:** Ofisi → Wateja → mteja → paneli **"Pesa za mteja"** (salio, alicholipa, marejesho ya zamani) → **Mrudishie pesa**.
+- **Njia mbili:** **Salio la NAYA** — inaingia papo hapo bila ada; au **Namba ya simu** — inatumwa kwa Abliner, ada ya kutuma inabebwa na NAYA, mteja anapokea kiasi kamili.
+- Unachagua safari (si lazima), kiasi, sababu na maelezo. Kwa safari moja huwezi kurudisha zaidi ya alicholipa ukitoa alichokwisharudishiwa.
+- **Mipaka:** TSh 50,000 kwa refund moja; TSh 200,000 kwa siku kwa simu (yote yanabadilishwa `PUT /api/admin/settings/refunds`).
+- **Marejesho kwa abiria** (Fedha → Nauli kwa simu): kitufe "Rudisha kwa simu au salio" kinafungua mteja na safari tayari imechaguliwa; refund ikifanikiwa safari inawekwa DONE.
+- Kila refund inaandikwa kwenye kumbukumbu (audit) na mteja anapata arifa + SMS. Malipo ya simu yakishindikana ofisi inaarifiwa.
+- Migration 034 inapanua CHECK mbili (`CUSTOMER_REFUND`, `REFUND`) na kuongeza index — haifuti data.
+
 ## Salio la NAYA — wallet ya abiria (0.23.0)
 
 Abiria anaweka pesa kwenye **Salio la NAYA** kwa simu (M-Pesa, Mixx, Airtel, HaloPesa) na kulipia safari au deni kwa bonyezo moja — bila ombi la PIN kila safari na bila ada.

@@ -33,7 +33,7 @@ const MAX_OPEN_CONTROL = 3;
 const isControl = (p: { meta?: { channel?: string } | null }) => p.meta?.channel === 'CONTROL_NUMBER';
 const NAME_CHANGED_PREFIX = 'Jina la namba ya malipo limebadilika';
 
-export type Kind = 'SUBSCRIPTION' | 'PROMO_PAYOUT' | 'WALLET_WITHDRAWAL' | 'RIDE_FARE' | 'CUSTOMER_TOPUP';
+export type Kind = 'SUBSCRIPTION' | 'PROMO_PAYOUT' | 'WALLET_WITHDRAWAL' | 'RIDE_FARE' | 'CUSTOMER_TOPUP' | 'CUSTOMER_REFUND';
 type Status = 'PENDING' | 'SUCCESS' | 'FAILED';
 
 export interface PaymentRow {
@@ -66,8 +66,13 @@ export interface PaymentRow {
     fare?: number;
     /** Kuweka pesa kwenye salio la abiria: kiasi kinachoingia kwenye salio (bila ada) */
     credit?: number;
+    /** Kumrudishia mteja pesa (0.24.0): sababu, maelezo, safari husika, nani wa ofisi */
+    reason?: string;
+    note?: string;
+    rideId?: string | null;
   };
   attempt: number;
+  created_by?: string | null;
   created_at: Date;
   completed_at: Date | null;
 }
@@ -75,7 +80,7 @@ export interface PaymentRow {
 const METHOD: Record<string, PaymentMethod> = { MPESA: 'MPESA', MIXX: 'TIGO', AIRTEL: 'AIRTEL', HALOPESA: 'HALOPESA', CONTROL: 'CONTROL' };
 const phoneText = (p: string) => (p.length === 12 && p.startsWith('255') ? `0${p.slice(3, 6)} ${p.slice(6, 9)} ${p.slice(9)}` : p);
 const tsh = (v: number) => `TSh ${Math.round(v).toLocaleString('en-US')}`;
-const newReference = (kind: Kind) => `NY${kind === 'SUBSCRIPTION' ? 'A' : kind === 'WALLET_WITHDRAWAL' ? 'W' : kind === 'RIDE_FARE' ? 'N' : kind === 'CUSTOMER_TOPUP' ? 'S' : 'O'}${Date.now().toString(36).toUpperCase()}${randomBytes(3).toString('hex').toUpperCase()}`;
+const newReference = (kind: Kind) => `NY${kind === 'SUBSCRIPTION' ? 'A' : kind === 'WALLET_WITHDRAWAL' ? 'W' : kind === 'RIDE_FARE' ? 'N' : kind === 'CUSTOMER_TOPUP' ? 'S' : kind === 'CUSTOMER_REFUND' ? 'R' : 'O'}${Date.now().toString(36).toUpperCase()}${randomBytes(3).toString('hex').toUpperCase()}`;
 
 function view(p: PaymentRow) {
   return {
@@ -334,6 +339,8 @@ export async function applyResult(reference: string, result: ProviderResult) {
     | { kind: 'fare_failed'; p: PaymentRow }
     | { kind: 'topup_ok'; p: PaymentRow; credit: number; balance: number }
     | { kind: 'topup_failed'; p: PaymentRow }
+    | { kind: 'refund_ok'; p: PaymentRow }
+    | { kind: 'refund_failed'; p: PaymentRow }
     | null;
   let after: After = null;
   try {
@@ -376,6 +383,18 @@ export async function applyResult(reference: string, result: ProviderResult) {
           paymentId: p.id,
         });
         return { kind: 'sub', driverId: p.user_id, amount: r.amount, paidUntil: r.paidUntil };
+      }
+      if (p.kind === 'CUSTOMER_REFUND') {
+        if (result.status !== 'SUCCESS') return { kind: 'refund_failed', p };
+        // Safari ilikuwa inasubiri kurudishiwa (Marejesho) → imeshughulikiwa
+        if (p.meta.rideId) {
+          await client.query(
+            `UPDATE naya.rides SET fare_refund = 'DONE', fare_refund_at = now(), fare_refund_by = $2,
+                    fare_refund_note = $3, updated_at = now() WHERE id = $1 AND fare_refund = 'NEEDED'`,
+            [p.meta.rideId, p.created_by, `Imetumwa kwa simu: ${(result.providerRef ?? p.reference).slice(0, 60)}`],
+          );
+        }
+        return { kind: 'refund_ok', p };
       }
       if (p.kind === 'CUSTOMER_TOPUP') {
         if (result.status !== 'SUCCESS') return { kind: 'topup_failed', p };
@@ -442,6 +461,16 @@ export async function applyResult(reference: string, result: ProviderResult) {
     await notify({ userId: p.user_id, event: 'driver', kind: 'wallet_withdrawal', title: 'Pesa imetumwa', body, sms: body });
   } else if (after?.kind === 'fare_ok') {
     await afterRideFare(after.p, after.credited, result.providerRef ?? after.p.provider_ref);
+  } else if (after?.kind === 'refund_ok') {
+    const p = after.p;
+    const body = `NAYA imekurudishia ${tsh(p.amount)} kwenye ${NETWORK_LABEL[p.network as Network] ?? p.network} ${phoneText(p.phone)}.${
+      result.providerRef ? ` Kumbukumbu: ${result.providerRef}.` : ''
+    } Samahani kwa usumbufu.`;
+    await notify({ userId: p.user_id, event: 'account', kind: 'customer_refund', title: 'Umerudishiwa pesa', body, sms: `NAYA: ${body}` });
+    await notifyAdmins();
+  } else if (after?.kind === 'refund_failed') {
+    console.error(`[rudisha] ${after.p.reference} imeshindwa: ${result.message ?? ''}`);
+    await notifyAdmins();
   } else if (after?.kind === 'topup_ok') {
     await afterTopup(after.p.user_id, after.credit, after.balance);
   } else if (after?.kind === 'topup_failed') {
@@ -906,6 +935,38 @@ async function sendPayout(payment: PaymentRow) {
   } catch (error) {
     // Hatujui kama pesa imetoka — usiandike "imeshindwa"; worker itauliza hali yake.
     console.error(`[payments] disburse ${payment.reference}: ${(error as Error).message}`);
+    return;
+  }
+  await applyResult(payment.reference, result);
+}
+
+/**
+ * 0.24.0 Kumrudishia mteja pesa kwa simu: mteja apokee `payment.amount` kamili (NAYA inabeba ada ya kutuma, kama malipo
+ * ya ofa). Jibu likipotea → PENDING; worker inauliza hali — hakuna kutuma mara ya pili.
+ */
+export async function sendRefund(paymentId: string) {
+  const provider = getProvider();
+  const payment = await one<PaymentRow>(db, `SELECT * FROM naya.payments WHERE id = $1 AND kind = 'CUSTOMER_REFUND'`, [paymentId]);
+  if (!payment || payment.status !== 'PENDING') return;
+  if (!provider || provider.name !== payment.provider || !provider.canDisburse) {
+    await applyResult(payment.reference, { status: 'FAILED', message: 'Kampuni ya malipo haiwezi kutuma pesa kwa sasa.' });
+    return;
+  }
+  let send = payment.amount;
+  if (provider.quoteDisbursement) {
+    const { feeMode } = await getAutoPayout();
+    const q = await provider.quoteDisbursement(payment.amount, feeMode);
+    send = q.send;
+    await db.query(`UPDATE naya.payments SET meta = meta || $2::jsonb, updated_at = now() WHERE id = $1`, [
+      payment.id,
+      JSON.stringify({ sendAmount: q.send, fee: q.fee, feeSource: q.source, feeMode }),
+    ]);
+  }
+  let result: ProviderResult;
+  try {
+    result = await provider.disburse({ reference: payment.reference, amount: send, phone: payment.phone, network: payment.network, description: 'NAYA kurudishia mteja pesa' });
+  } catch (error) {
+    console.error(`[rudisha] disburse ${payment.reference}: ${(error as Error).message}`);
     return;
   }
   await applyResult(payment.reference, result);
@@ -1381,7 +1442,7 @@ export async function listPayments(opts: { kind?: Kind; status?: Status; q?: str
 }
 
 export function paymentsCsv(rows: Awaited<ReturnType<typeof listPayments>>) {
-  const KIND = { SUBSCRIPTION: 'Ada ya mwezi', PROMO_PAYOUT: 'Malipo ya ofa', WALLET_WITHDRAWAL: 'Kutoa wallet', RIDE_FARE: 'Nauli kwa simu', CUSTOMER_TOPUP: 'Salio la abiria' };
+  const KIND = { SUBSCRIPTION: 'Ada ya mwezi', PROMO_PAYOUT: 'Malipo ya ofa', WALLET_WITHDRAWAL: 'Kutoa wallet', RIDE_FARE: 'Nauli kwa simu', CUSTOMER_TOPUP: 'Salio la abiria', CUSTOMER_REFUND: 'Kurudishia mteja' };
   const STATUS = { PENDING: 'Inasubiri', SUCCESS: 'Imefaulu', FAILED: 'Imeshindwa' };
   const cell = (v: unknown) => {
     const t = v === null || v === undefined ? '' : String(v);

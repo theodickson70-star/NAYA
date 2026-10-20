@@ -87,7 +87,7 @@ function render(s, debts, refunds, cw) {
             <td>${
               r.state === 'DONE'
                 ? `<span class="badge badge-ok">Imerudishwa</span><span class="rp-sub">${esc(formatDate(r.doneAt, true))}${r.doneBy ? ` · ${esc(r.doneBy)}` : ''}${r.note ? ` · ${esc(r.note)}` : ''}</span>`
-                : `<span class="badge badge-bad">Irudishwe</span><span class="fa-act"><button class="link-btn" type="button" data-refund="${esc(r.id)}" data-amount="${esc(r.amount)}" data-phone="${esc(formatPhone(r.phone))}">Nimerudisha</button></span>`
+                : `<span class="badge badge-bad">Irudishwe</span><span class="fa-act"><a class="link-btn" href="#/wateja/${esc(r.passengerId)}?rudisha=${esc(r.id)}">Rudisha kwa simu au salio</a><button class="link-btn" type="button" data-refund="${esc(r.id)}" data-amount="${esc(r.amount)}" data-phone="${esc(formatPhone(r.phone))}">Nimeshatuma kwa mkono</button></span>`
             }</td>
           </tr>`,
         )

@@ -24,6 +24,7 @@ import {
 } from '../services/customer-wallet.js';
 import { clearDebt, driverSettle, getRidePaySettings, listDebts, listRefunds, markRefunded, myDebt, payDebt, payDebtFromWallet, payRideFare, payRideFromWallet, ridePaySummary, saveRidePaySettings, startCustomerTopup, topupFee } from '../services/ride-payments.js';
 import { conflict, ok } from '../utils/http.js';
+import { customerMoney, getRefundSettings, refundCustomer, REFUND_REASONS, saveRefundSettings } from '../services/refunds.js';
 import { normalizeTzPhone } from '../utils/phone.js';
 import { db, one } from '../db/pool.js';
 
@@ -85,6 +86,33 @@ export async function ridePaymentRoutes(app: FastifyInstance): Promise<void> {
     ok(await payRideFromWallet(uid(request), idParam.parse(request.params).id)),
   );
   app.post('/api/passenger/debt/pay-wallet', { ...user, config: { rateLimit: { max: 8, timeWindow: '10 minutes' } } }, async (request) => ok(await payDebtFromWallet(uid(request))));
+
+  // ---- 0.24.0 Ofisi kumrudishia mteja pesa (Wateja → mteja → Pesa za mteja)
+  app.get('/api/admin/users/:id/money', adminOnly, async (request) => ok(await customerMoney(idParam.parse(request.params).id)));
+  app.post('/api/admin/users/:id/refund', { ...adminOnly, config: { rateLimit: { max: 30, timeWindow: '10 minutes' } } }, async (request) => {
+    const input = z
+      .object({
+        amount: z.coerce.number({ error: 'Weka kiasi' }).int('Kiasi kiwe namba kamili').positive('Weka kiasi'),
+        to: z.enum(['SALIO', 'PHONE'], { error: 'Chagua: salio au simu' }),
+        phone: payBody.shape.phone.optional().nullable(),
+        network: z.enum(MOBILE_NETWORKS as [string, ...string[]]).optional().nullable(),
+        reason: z.enum(REFUND_REASONS, { error: 'Chagua sababu' }),
+        note: z.string({ error: 'Andika maelezo' }).trim().min(5, 'Andika maelezo (angalau herufi 5)').max(250),
+        rideId: z.uuid().optional().nullable(),
+      })
+      .parse(request.body);
+    return ok(await refundCustomer(uid(request), idParam.parse(request.params).id, input));
+  });
+  app.get('/api/admin/settings/refunds', adminOnly, async () => ok(await getRefundSettings()));
+  app.put('/api/admin/settings/refunds', adminOnly, async (request) => {
+    const input = z
+      .object({
+        maxPerRefund: z.coerce.number().int().min(1000).max(1_000_000).optional(),
+        dailyPhoneCap: z.coerce.number().int().min(1000).max(10_000_000).optional(),
+      })
+      .parse(request.body);
+    return ok(await saveRefundSettings(uid(request), input));
+  });
 
   app.get('/api/admin/customer-wallets/summary', adminOnly, async () => ok(await customerWalletsSummary()));
   app.post('/api/admin/customer-wallets/:id/cashout-done', adminOnly, async (request) => {

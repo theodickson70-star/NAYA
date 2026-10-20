@@ -21,7 +21,7 @@ const ICON = {
   pen: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>',
   bike: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="16.5" r="3"/><circle cx="18.5" cy="16.5" r="3"/><path d="M5.5 16.5l4-7h5l4 7M9.5 9.5L8 6H5.5M14.5 9.5L16 6h2"/></svg>',
 };
-const KIND_ICON = { TOPUP: 'in', RIDE_PAYMENT: 'bike', RIDE_REFUND: 'undo', DEBT_PAYMENT: 'bike', CASHOUT: 'out', ADJUSTMENT: 'pen' };
+const KIND_ICON = { TOPUP: 'in', RIDE_PAYMENT: 'bike', RIDE_REFUND: 'undo', DEBT_PAYMENT: 'bike', CASHOUT: 'out', ADJUSTMENT: 'pen', REFUND: 'undo' };
 
 export function init(context) {
   ctx = context;

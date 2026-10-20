@@ -1041,3 +1041,13 @@ a.kpi:hover, .queue-item:hover, .settings-tile:hover { transform: translateY(-2p
 .fa-act { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
 .fa-act .link-btn { font: inherit; font-size: 13px; font-weight: 700; color: var(--naya-green); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .fa-act .link-danger { color: var(--danger); }
+
+/* Pesa za mteja — kurudishia pesa (0.24.0) */
+.um-money-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.um-refund { margin-top: 12px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; }
+.um-refund summary { cursor: pointer; padding: 4px 0; }
+.um-refund[open] summary { margin-bottom: 8px; }
+.rf-to { border: 0; padding: 0; margin: 10px 0 4px; }
+.rf-to legend { font-weight: 700; margin-bottom: 4px; }
+.um-money-h3 { margin: 16px 0 6px; font-size: 15px; }
+#rf-ride { width: 100%; }
