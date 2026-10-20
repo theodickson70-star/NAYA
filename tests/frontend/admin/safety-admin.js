@@ -8,7 +8,7 @@ let scope = 'open';
 let knownOpen = null; // idadi ya dharura zilizo wazi tulizoona mara ya mwisho (kwa kengele)
 let audio = null;
 
-const ROLE = { PASSENGER: 'Abiria', DRIVER: 'Dereva' };
+const ROLE = { PASSENGER: 'Abiria', DRIVER: 'Dereva', RIDER: 'Anayesafiri (ameagizwa)' };
 
 export function setup(context) {
   ctx = context;
@@ -106,8 +106,8 @@ function alertHtml(a) {
     </div>
     <div class="sos-actions">
       <a class="btn btn-primary" href="tel:+${esc(a.phone)}">Mpigie ${esc(a.name.split(' ')[0])} · ${esc(formatPhone(a.phone))}</a>
-      ${a.otherPhone ? `<a class="btn btn-ghost" href="tel:+${esc(a.otherPhone)}">${a.role === 'PASSENGER' ? 'Dereva' : 'Abiria'}: ${esc(a.otherName)} · ${esc(formatPhone(a.otherPhone))}</a>` : ''}
-      ${a.emergencyPhone ? `<a class="btn btn-ghost" href="tel:+${esc(a.emergencyPhone)}">Mtu wa dharura: ${esc(a.emergencyName || '–')} · ${esc(formatPhone(a.emergencyPhone))}</a>` : ''}
+      ${a.otherPhone ? `<a class="btn btn-ghost" href="tel:+${esc(a.otherPhone)}">${a.role === 'DRIVER' ? 'Abiria' : 'Dereva'}: ${esc(a.otherName)} · ${esc(formatPhone(a.otherPhone))}</a>` : ''}
+      ${a.emergencyPhone ? `<a class="btn btn-ghost" href="tel:+${esc(a.emergencyPhone)}">${a.role === 'RIDER' ? esc(a.emergencyName) : `Mtu wa dharura: ${esc(a.emergencyName || '–')}`} · ${esc(formatPhone(a.emergencyPhone))}</a>` : ''}
     </div>
     <p class="small">${where}${a.plateNumber ? ` · Plate <span class="plate">${esc(a.plateNumber)}</span>` : ''} · <a href="#/safari/${esc(a.rideId)}">Fungua safari</a></p>
     ${

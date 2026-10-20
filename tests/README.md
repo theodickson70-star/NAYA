@@ -115,6 +115,58 @@ Alama za kutiliwa shaka (`rides.flags`), zinaonekana kwa ofisi kwenye safari, Ri
 DRIVER, PASSENGER, AUTO au ADMIN. Migration `021_safari_rahisi.sql` inaongeza safu tu (haifuti data); safari zinazoendelea zisizo
 za ofa zinaondolewa PIN ili zisikwame.
 
+## Safari ya mtu mwingine (0.25.0)
+
+Abiria anaweza kumwagizia mtu mwingine safari (mzazi, mtoto, mgeni).
+
+- **Kuagiza:** baada ya kuchagua chombo → "Safari hii ni ya nani?" → **Mtu mwingine** → jina + namba ya anayesafiri → **Mwagizie safari**. "Kutoka" iwe mahali alipo anayesafiri (onyo linaonekana kama ni GPS ya aliyeagiza).
+- **Aliyeagiza** ndiye analipa nauli (simu, salio au taslimu ya anayesafiri) na kubeba deni kama nauli haikulipwa. Anaona kadi ya "Safari ya …" yenye kitufe cha kumpigia, link ya kufuatilia na "Mtumie link" (WhatsApp).
+- **Dereva** anaona jina la anayesafiri + "Ameagizwa na …", na anampigia **anayesafiri**. Picha na namba ya aliyeagiza hazionyeshwi.
+- **Anayesafiri** (bila app wala akaunti): dereva akikubali anapata SMS — jina la dereva, plate, simu na link `/safari/#…`. Link inaonyesha ramani, simu ya dereva, PIN ya ofa, kama nauli imelipwa, na kitufe cha **Dharura** (inafika ofisini kama "Anayesafiri (ameagizwa)"). Safari ikighairiwa, anapata SMS "imeghairiwa".
+- SMS zinahitaji funguo za Beem; bila hizo, aliyeagiza anamtumia link kwa WhatsApp. `PUBLIC_URL` (si lazima) = anwani ya link kwenye SMS.
+- Ofisi: safari inaonyesha "Aliyeagiza (analipa)" na "Anayesafiri" pamoja na kama SMS ilimfikia.
+- Migration 035 inaongeza safu 4 kwenye `naya.rides` (NULL kwa safari za zamani) na kupanua CHECK ya dharura (RIDER) — haifuti data.
+
+## Kurudishia mteja pesa (0.24.0)
+
+Mteja akilalamika (amekatwa mara mbili, safari haikufanyika, huduma mbaya, amezidishiwa nauli, fidia), ofisi inamrudishia pesa yenyewe.
+
+- **Wapi:** Ofisi → Wateja → mteja → paneli **"Pesa za mteja"** (salio, alicholipa, marejesho ya zamani) → **Mrudishie pesa**.
+- **Njia mbili:** **Salio la NAYA** — inaingia papo hapo bila ada; au **Namba ya simu** — inatumwa kwa Abliner, ada ya kutuma inabebwa na NAYA, mteja anapokea kiasi kamili.
+- Unachagua safari (si lazima), kiasi, sababu na maelezo. Kwa safari moja huwezi kurudisha zaidi ya alicholipa ukitoa alichokwisharudishiwa.
+- **Mipaka:** TSh 50,000 kwa refund moja; TSh 200,000 kwa siku kwa simu (yote yanabadilishwa `PUT /api/admin/settings/refunds`).
+- **Marejesho kwa abiria** (Fedha → Nauli kwa simu): kitufe "Rudisha kwa simu au salio" kinafungua mteja na safari tayari imechaguliwa; refund ikifanikiwa safari inawekwa DONE.
+- Kila refund inaandikwa kwenye kumbukumbu (audit) na mteja anapata arifa + SMS. Malipo ya simu yakishindikana ofisi inaarifiwa.
+- Migration 034 inapanua CHECK mbili (`CUSTOMER_REFUND`, `REFUND`) na kuongeza index — haifuti data.
+
+## Salio la NAYA — wallet ya abiria (0.23.0)
+
+Abiria anaweka pesa kwenye **Salio la NAYA** kwa simu (M-Pesa, Mixx, Airtel, HaloPesa) na kulipia safari au deni kwa bonyezo moja — bila ombi la PIN kila safari na bila ada.
+
+- **Kuwasha:** Ofisi → Fedha → Malipo → **Nauli kwa simu** → sehemu ya "Salio la abiria". Imezimwa kwa chaguo-msingi. **Kikomo cha salio ni TSh 15,000** kwa kila abiria (kinabadilika kwenye mipangilio); kiwango cha chini cha kuweka TSh 500.
+- **Kuweka pesa:** Akaunti → **Salio la NAYA** → Weka pesa → kiasi (anaona ada ya simu juu, ileile ya nauli kwa simu) → PIN kwenye simu. Salio linaongezeka tu mtandao ukithibitisha.
+- **Kulipa:** dereva akishakubali safari (hadi saa 24 baada ya kukamilika) → "Lipa nauli sasa" → **Lipa kwa salio**. Dereva anapata nauli kwenye wallet yake safari ikikamilika. Deni pia linalipwa kwa salio (Deni langu).
+- **Safari ikighairiwa** (abiria, ofisi, au hakuna dereva) baada ya kulipa kwa salio → pesa inarudi kwenye salio **papo hapo**.
+- **Malipo ya simu yaliyozidi** (mfano simu ilithibitisha baada ya safari kulipwa kwa salio / taslimu) → pesa ya abiria inawekwa kwenye salio lake moja kwa moja.
+- **Kurudishiwa salio:** abiria anaomba → ofisi inamtumia kwa Abliner (Send) kisha inaandika **kiasi ilichotuma** + kumbukumbu ("Nimerudisha"). Ombi likiwa wazi, abiria hawezi kuweka pesa wala kulipa kwa salio.
+- Salio za abiria zinahesabiwa pamoja na wallet za madereva dhidi ya salio la Abliner (onyo kwenye ofisi likiwa halitoshi).
+- **Tahadhari:** kuhifadhi pesa za wateja kunaweza kuhitaji idhini ya Benki Kuu (BoT) — thibitisha kabla ya kuwasha kwa watu wengi.
+- Migration 033 inaongeza `naya.customer_wallets` na `naya.customer_wallet_entries` na kupanua CHECK mbili — haifuti data.
+
+## Abiria kulipa nauli kwa simu (0.22.0 · 0.22.1)
+
+Kuanzia **dereva akubali safari** mpaka safari ikamilike, abiria anaona "Lipa nauli kwa simu" kwenye skrini ya safari — analipa wakati wowote anaotaka (au taslimu kwa dereva). Hachagui njia ya malipo wakati wa kuagiza.
+
+- **Malipo ya mapema (0.22.1):** pesa inashikiliwa mpaka safari ikamilike, kisha inaingia kwenye wallet ya dereva aliyemaliza safari. Dereva anaona "Abiria amelipa nauli kwa simu — usimdai".
+- **Safari ikighairiwa baada ya kulipa** (abiria, ofisi, au hakuna dereva): abiria anaambiwa "Pesa yako itarudishwa"; ofisi inaona **Marejesho kwa abiria** (Nauli kwa simu) na muhtasari — inamtumia pesa kwa Abliner (Send), kisha inabonyeza "Nimerudisha" na kumbukumbu. Migration 032 inaongeza safu tu.
+
+- **Kuwasha:** Ofisi → Fedha → Malipo → **Nauli kwa simu**. Imezimwa kwa chaguo-msingi. Weka ada juu ya nauli (% na kiwango cha chini) iwe sawa na ada ya Abliner ya kupokea pesa.
+- **Abiria:** skrini ya "Umefika" inaonyesha nauli + ada ya simu = jumla. Anaweza kutumia namba yoyote (M-Pesa, Mixx, Airtel, HaloPesa), hadi namba 3 kwa safari moja. Anaweka PIN kwenye simu; "Umelipa" inaonekana tu baada ya mtandao kuthibitisha.
+- **Dereva:** anapata **nauli kamili kwenye wallet yake** (ada inabebwa na abiria). Akipewa taslimu anabonyeza "Nimepokea … taslimu". Abiria asipolipa kabisa → "Abiria hajalipa" → deni.
+- **Deni:** abiria mwenye deni hawezi kuagiza safari mpya mpaka alipe (Akaunti → Deni langu, kwa simu); pesa inaenda kwenye wallet ya dereva aliyemdai. Ofisi inaweza kuondoa deni ("amemlipa dereva taslimu" au "samehe") kwa sababu.
+- **Usalama:** malipo yanakubaliwa mara moja tu kwa kila safari. Malipo yakithibitishwa baada ya dereva kuandika taslimu, wallet haiguswi tena na ofisi inajulishwa. Dereva haoni namba alizotumia mlipaji.
+- Malipo yote yanaonekana kwenye Miamala ya simu (kichujio "Nauli kwa simu"). Migration 031 inaongeza safu tu kwenye `naya.rides` na kupanua CHECK moja — haifuti data.
+
 ## Wallet ya dereva (0.21.0)
 
 Kila dereva aliyethibitishwa ana wallet yake ndani ya NAYA (inafunguliwa yenyewe). Pesa halisi iko kwenye akaunti ya NAYA kwa Abliner; wallet ni deni la NAYA kwa dereva, linalorekodiwa mstari kwa mstari (ledger).

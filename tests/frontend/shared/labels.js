@@ -26,6 +26,10 @@ export const DOCUMENT_STATUS = {
 export const VEHICLE_TYPES = { BODABODA: 'Bodaboda', BAJAJI: 'Bajaji' };
 
 export const AUDIT_ACTIONS = {
+  'customer.refund_salio': 'Amerudishiwa pesa (salio la NAYA)',
+  'customer.refund_phone': 'Amerudishiwa pesa (kwa simu)',
+  'customer_wallet.cashout_done': 'Amerudishiwa salio lake',
+  'customer_wallet.adjusted': 'Marekebisho ya salio',
   'location.created': 'Eneo limeongezwa',
   'location.approved': 'Eneo limeidhinishwa',
   'location.rejected': 'Eneo limekataliwa',

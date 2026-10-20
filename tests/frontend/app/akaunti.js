@@ -116,6 +116,7 @@ export function renderHub({ modeCardHtml, version }) {
     ${u.hasPhoto ? '' : `<a class="card acct-nudge" href="#/akaunti/wasifu"><span class="acct-ico">${ICON.camera}</span><span><strong>Weka picha yako</strong><span class="muted">Dereva anaiona akipokea ombi lako — anakutambua haraka mahali pa kukuchukua.</span></span></a>`}
     <nav class="card acct-menu" aria-label="Akaunti">
       ${row({ href: '#/akaunti/wasifu', icon: 'user', title: 'Wasifu', sub: 'Picha, jina na namba yako' })}
+      ${driverMode ? '' : `<span id="acct-salio-slot"></span>`}
       ${driverMode ? '' : row({ href: '#/akaunti/ofa', icon: 'gift', title: 'Ofa', sub: offerSub, badge: offers?.list?.length ? `<span class="acct-badge">−${offers.list[0].discountPercent}%</span>` : '', id: 'acct-ofa' })}
       ${row({ href: '#/akaunti/shughuli', icon: 'clock', title: 'Shughuli', sub: 'Safari zako na arifa' })}
     </nav>
@@ -142,6 +143,17 @@ export function renderHub({ modeCardHtml, version }) {
 }
 
 async function loadHubMeta() {
+  // 0.23.0 Salio la NAYA (abiria) — inaonekana ofisi ikishawasha
+  if ($('acct-salio-slot')) {
+    ctx.api
+      .get('/api/passenger/wallet')
+      .then((w) => {
+        const slot = $('acct-salio-slot');
+        if (!slot || (!w.enabled && !w.balance)) return;
+        slot.outerHTML = row({ href: '#/akaunti/salio', icon: 'wallet', title: 'Salio la NAYA', sub: `Salio: <strong>${formatTsh(w.balance)}</strong> · lipia safari kwa bonyezo moja`, id: 'acct-salio' });
+      })
+      .catch(() => {});
+  }
   if ($('acct-wallet')) {
     ctx.api
       .get('/api/driver/wallet')
@@ -364,7 +376,7 @@ export async function renderActivity() {
           .map(
             (r) => `<li>
               <span class="acct-trip-route"><strong>${esc(r.destination.name)}</strong><span class="muted">kutoka ${esc(r.pickup.name)}</span>
-                <span class="muted small">${esc(formatDate(r.requestedAt, true))} · ${esc(VEHICLE_TYPES[r.vehicleType] ?? '')}</span></span>
+                <span class="muted small">${esc(formatDate(r.requestedAt, true))} · ${esc(VEHICLE_TYPES[r.vehicleType] ?? '')}${!drives && r.riderName ? ` · kwa ${esc(r.riderName)}` : ''}</span></span>
               <span class="trip-right">${
                 r.status === 'COMPLETED'
                   ? `<strong>${formatTsh(drives ? r.fare : r.passengerPays ?? r.fare)}</strong>${r.promo ? `<span class="acct-promo-tag">Ofa −${formatTsh(r.promo.discount)}</span>` : ''}`

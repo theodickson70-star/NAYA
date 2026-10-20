@@ -6,6 +6,8 @@
 //
 // Kila badiliko linafanyika ndani ya transaction kwa "UPDATE … WHERE status = <inayotarajiwa>" au row lock,
 // na database ina unique indexes zinazozuia dereva/abiria kuwa na safari mbili zinazoendelea.
+import { assertNoDebt, fareState, getRidePaySettings } from './ride-payments.js';
+import { refundRideToWallet } from './customer-wallet.js';
 import { randomInt } from 'node:crypto';
 import { type Db, db, many, one, transaction } from '../db/pool.js';
 import { publish } from '../realtime/hub.js';
@@ -13,11 +15,12 @@ import { badRequest, conflict, forbidden, isUniqueViolation, notFound } from '..
 import { writeAudit } from './audit.js';
 import { readDocument } from './drivers.js';
 import { passengerCard } from './profile.js';
-import { onPromoRideCompleted } from './payments/index.js';
+import { creditPrepaidFare, onPromoRideCompleted } from './payments/index.js';
 import { straightLineKm } from './fare-engine.js';
 import { notify, notifyAdmins } from './notify.js';
 import { estimateTrip, findLocation, nearestServicePoint, SERVICE_RADIUS_KM } from './places.js';
 import { openSosFor } from './safety.js';
+import { hashToken, riderLinkPath, riderToken, smsRiderCancelled, smsRiderDriverFound } from './rider.js';
 import { assertPhoneVerified } from './verification.js';
 import { bestPromotion, driverLimitMessage, driverPromoUsage, driversOverPromoLimit } from './promotions.js';
 import { assertSubscriptionOk, describeSubscription, feeWaived, getSettings, SUBSCRIPTION_OK_SQL } from './subscriptions.js';
@@ -121,6 +124,15 @@ interface RideRow {
   auto_arrived: boolean;
   auto_started: boolean;
   completed_by: 'DRIVER' | 'PASSENGER' | 'AUTO' | 'ADMIN' | null;
+  /** Migration 031: nauli kwa simu / cash / deni */
+  fare_settlement: 'CASH' | 'MOBILE' | 'DEBT' | 'WALLET' | null;
+  fare_settled_at: Date | null;
+  debt_cleared_at: Date | null;
+  fare_refund: 'NEEDED' | 'DONE' | null;
+  /** Migration 035: safari ya mtu mwingine (aliyeagiza = passenger_id; anayesafiri = rider_*) */
+  rider_name: string | null;
+  rider_phone: string | null;
+  rider_sms_at: Date | null;
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
@@ -289,7 +301,10 @@ export async function dispatchRide(rideId: string): Promise<void> {
     let candidates = await findCandidates(client, { ...base, exclude: ride.promotion_id ? await driversOverPromoLimit(client, ride.promotion_id) : [] });
     if (ride.promotion_id && !candidates.some((c) => c.km <= MAX_PICKUP_KM)) {
       const everyone = await findCandidates(client, { ...base, exclude: [] });
-      if (everyone.some((c) => c.km <= MAX_PICKUP_KM)) {
+      if (everyone.some((c) => c.km <= MAX_PICKUP_KM) && (ride.fare_settlement === 'MOBILE' || ride.fare_settlement === 'WALLET')) {
+        // Abiria ameshalipa kwa simu (bei ya ofa): ofa haiondolewi — NAYA inaiheshimu hata kwa dereva aliyefikia kikomo.
+        candidates = everyone;
+      } else if (everyone.some((c) => c.km <= MAX_PICKUP_KM)) {
         // Hakuna dereva mwenye nafasi ya ofa karibu: safari inaendelea bila ofa (abiria anaambiwa, anaweza kughairi bure).
         await client.query(`UPDATE naya.rides SET promotion_id = NULL, promo_discount = 0, promo_title = NULL, start_pin = NULL, updated_at = now() WHERE id = $1`, [rideId]);
         await history(client, rideId, 'SEARCHING', 'SEARCHING', null, `Ofa imeondolewa: madereva waliopo wamefikia kikomo cha ofa (${ride.promo_title ?? ''})`);
@@ -322,8 +337,9 @@ export async function dispatchRide(rideId: string): Promise<void> {
     if (offeredTo.length) return { offeredTo, seconds, ride };
 
     if (ride.search_age_s > SEARCH_TIMEOUT_SECONDS) {
-      await client.query(`UPDATE naya.rides SET status = 'NO_DRIVER', updated_at = now() WHERE id = $1`, [rideId]);
+      await client.query(`UPDATE naya.rides SET status = 'NO_DRIVER', fare_refund = CASE WHEN fare_settlement = 'MOBILE' AND fare_refund IS NULL THEN 'NEEDED' ELSE fare_refund END, updated_at = now() WHERE id = $1`, [rideId]);
       await history(client, rideId, 'SEARCHING', 'NO_DRIVER', null, 'Hakuna dereva aliyepatikana');
+      if (ride.fare_settlement === 'WALLET') await refundRideToWallet(client, rideId, ride.passenger_id);
       return { noDriver: true, passengerId: ride.passenger_id };
     }
     return {};
@@ -429,6 +445,7 @@ function baseView(r: RideRow) {
     nearDestination: !!r.near_dest_at,
     currency: 'TZS' as const,
     paymentMethod: r.payment_method,
+    forOther: r.rider_name !== null,
     cancelledBy: r.cancelled_by,
     cancelReason: r.cancel_reason,
     requestedAt: r.requested_at,
@@ -452,9 +469,19 @@ async function passengerView(client: Db, r: RideRow) {
     ...baseView(r),
     ratingForDriver: r.rating_for_driver,
     redispatched,
+    farePay: await fareState(client, r),
     // PIN ya kuanza safari: abiria anampa dereva akishapanda (inaonekana kwa abiria tu).
     pin: ['ACCEPTED', 'ARRIVED'].includes(r.status) ? r.start_pin : null,
     shared: live && r.share_token_hash !== null,
+    // Safari ya mtu mwingine: aliyeagiza anaona anayesafiri ni nani + link ya kumtumia (WhatsApp/SMS yake mwenyewe)
+    rider: r.rider_name
+      ? {
+          name: r.rider_name,
+          phone: r.rider_phone,
+          link: ['SEARCHING', ...WITH_DRIVER].includes(r.status) ? riderLinkPath(r.id) : null,
+          smsSent: r.rider_sms_at !== null,
+        }
+      : null,
     sosOpen: live ? await openSosFor(client, r.passenger_id, r.id) : false,
     driver: driver && {
       ...driver,
@@ -469,16 +496,29 @@ async function passengerView(client: Db, r: RideRow) {
 async function driverView(client: Db, r: RideRow) {
   const passenger = await one<{ full_name: string; phone: string }>(client, 'SELECT full_name, phone FROM naya.users WHERE id = $1', [r.passenger_id]);
   const card = passenger ? await passengerCard(r.passenger_id) : null;
+  // Safari ya mtu mwingine: dereva anaona (na kumpigia) anayesafiri; aliyeagiza ni jina la kwanza tu, bila picha wala namba.
+  const other = r.rider_name && r.rider_phone
+    ? { name: r.rider_name, phone: r.rider_phone, hasPhoto: false, rating: null, trips: 0, bookedBy: card?.firstName ?? null }
+    : null;
   return {
     ...baseView(r),
     ratingForPassenger: r.rating_for_passenger,
-    passenger: passenger && { name: passenger.full_name, phone: passenger.phone, hasPhoto: card?.hasPhoto ?? false, rating: card?.rating ?? null, trips: card?.trips ?? 0 },
+    // Dereva haoni namba alizotumia mlipaji (anaweza kuwa mtu mwingine) wala sababu za mtandao
+    farePay: await fareState(client, r).then((f) => f && { ...f, pending: f.pending ? { id: f.pending.id } : null, last: null, numbersUsed: [], wallet: null }),
+    passenger: other ?? (passenger && { name: passenger.full_name, phone: passenger.phone, hasPhoto: card?.hasPhoto ?? false, rating: card?.rating ?? null, trips: card?.trips ?? 0, bookedBy: null }),
     pinRequired: r.status === 'ARRIVED' && r.start_pin !== null,
     // Malipo ya ofa ya moja kwa moja: PENDING (inatumwa) · PAID · HELD (inasubiri ukaguzi) · FAILED · REJECTED · null (ya mkono)
     promoPayout: r.promo_discount > 0 ? { state: r.promo_payout_state ?? null, note: r.promo_payout_note ?? null } : null,
     pinAttemptsLeft: Math.max(0, PIN_MAX_ATTEMPTS - r.pin_attempts),
     sosOpen: r.driver_id && WITH_DRIVER.includes(r.status) ? await openSosFor(client, r.driver_id, r.id) : false,
   };
+}
+
+/** Ombi kwa dereva: abiria ni nani (jina la kwanza, picha, nyota). Safari ya mtu mwingine → jina la anayesafiri, bila picha. */
+async function offerPassenger(ride: RideRow) {
+  const card = await passengerCard(ride.passenger_id);
+  if (!ride.rider_name) return card && { ...card, bookedBy: null };
+  return { firstName: ride.rider_name.split(' ')[0] ?? ride.rider_name, hasPhoto: false, rating: null, trips: 0, bookedBy: card?.firstName ?? null };
 }
 
 const findRide = (client: Db, id: string, lock = false) =>
@@ -520,9 +560,21 @@ export async function nearbyDrivers(userId: string, point: { lat: number; lng: n
 
 export async function requestRide(
   passengerId: string,
-  input: { pickup: { locationId: string } | { lat: number; lng: number }; destination: { locationId: string }; vehicleType: VehicleType },
+  input: {
+    pickup: { locationId: string } | { lat: number; lng: number };
+    destination: { locationId: string };
+    vehicleType: VehicleType;
+    /** 0.25.0: safari ya mtu mwingine — jina + namba (iliyosafishwa 255…) ya anayesafiri */
+    rider?: { name: string; phone: string } | null;
+  },
 ) {
   await assertPhoneVerified(db, passengerId);
+  const rider = input.rider ?? null;
+  if (rider) {
+    const me = await one<{ phone: string }>(db, 'SELECT phone FROM naya.users WHERE id = $1', [passengerId]);
+    if (me?.phone === rider.phone) throw badRequest('Hiyo ni namba yako. Kwa safari yako mwenyewe chagua "Mimi".');
+  }
+  await assertNoDebt(db, passengerId); // 0.22.0: deni la nauli → 402, app inampeleka "Deni langu"
   const online = await one(db, 'SELECT 1 FROM naya.drivers WHERE user_id = $1 AND is_online', [passengerId]);
   if (online) throw conflict('Uko online kama dereva. Nenda offline kwanza ili kuagiza safari.');
 
@@ -557,8 +609,8 @@ export async function requestRide(
         client,
         `INSERT INTO naya.rides (passenger_id, vehicle_type, pickup_location_id, pickup_name, pickup_lat, pickup_lng,
                                  dest_location_id, dest_name, dest_lat, dest_lng, distance_km, fare, start_pin,
-                                 promotion_id, promo_discount, promo_title)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING id`,
+                                 promotion_id, promo_discount, promo_title, rider_name, rider_phone)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) RETURNING id`,
         [
           passengerId,
           input.vehicleType,
@@ -576,9 +628,14 @@ export async function requestRide(
           promo?.promotionId ?? null,
           promo?.discount ?? 0,
           promo?.title ?? null,
+          rider?.name ?? null,
+          rider?.phone ?? null,
         ],
       );
-      await history(client, row!.id, null, 'SEARCHING', passengerId);
+      if (rider) {
+        await client.query('UPDATE naya.rides SET rider_token_hash = $2 WHERE id = $1', [row!.id, hashToken(riderToken(row!.id))]);
+      }
+      await history(client, row!.id, null, 'SEARCHING', passengerId, rider ? `Safari ya mtu mwingine: ${rider.name}` : undefined);
       if (promoBlocked) await history(client, row!.id, 'SEARCHING', 'SEARCHING', null, `Ofa imeondolewa: madereva waliopo wamefikia kikomo cha ofa (${promoBlocked})`);
       return row!.id;
     });
@@ -629,7 +686,7 @@ export async function cancelByPassenger(passengerId: string, rideId: string, rea
     if (!['SEARCHING', 'ACCEPTED', 'ARRIVED'].includes(ride.status)) throw conflict('Safari hii imeshaisha.');
     await client.query(
       `UPDATE naya.rides SET status = 'CANCELLED', cancelled_by = 'PASSENGER', cancel_reason = $2, cancelled_at = now(),
-              passenger_closed = true, updated_at = now() WHERE id = $1`,
+              passenger_closed = true, fare_refund = CASE WHEN fare_settlement = 'MOBILE' AND fare_refund IS NULL THEN 'NEEDED' ELSE fare_refund END, updated_at = now() WHERE id = $1`,
       [rideId, reason],
     );
     const offers = await many<{ driver_id: string }>(
@@ -638,6 +695,7 @@ export async function cancelByPassenger(passengerId: string, rideId: string, rea
       [rideId],
     );
     await history(client, rideId, ride.status, 'CANCELLED', passengerId, reason ?? 'Abiria ameghairi');
+    if (ride.fare_settlement === 'WALLET') await refundRideToWallet(client, rideId, ride.passenger_id);
     return { driverId: ride.driver_id, offerDrivers: offers.map((o) => o.driver_id), pickup: ride.pickup_name };
   });
   if (affected.driverId) {
@@ -652,6 +710,7 @@ export async function cancelByPassenger(passengerId: string, rideId: string, rea
   }
   for (const d of affected.offerDrivers) await notify({ userId: d, event: 'offer', rideId });
   await notifyAdmins(rideId);
+  await smsRiderCancelled(rideId);
   return passengerView(db, (await findRide(db, rideId))!);
 }
 
@@ -685,7 +744,7 @@ export async function passengerHistory(passengerId: string) {
       ORDER BY requested_at DESC LIMIT 20`,
     [passengerId],
   );
-  return rides.map(baseView);
+  return rides.map((r) => ({ ...baseView(r), riderName: r.rider_name }));
 }
 
 /** Picha ya dereva kwa abiria wa safari yake tu. */
@@ -832,7 +891,7 @@ export async function driverState(driverId: string) {
       distanceToPickupKm: offerRow.distance_km,
       ride: { ...baseView(ride) },
       // Abiria ni nani: jina la kwanza, picha (kama ameweka) na nyota — namba ya simu inaonekana baada ya kukubali tu
-      passenger: await passengerCard(ride.passenger_id),
+      passenger: await offerPassenger(ride),
     };
   }
 
@@ -957,6 +1016,7 @@ export async function acceptOffer(driverId: string, offerId: string) {
       urgent: true,
     });
     await notifyAdmins(ride.id);
+    if (ride.rider_phone) await smsRiderDriverFound(ride.id);
   }
   return state;
 }
@@ -1069,13 +1129,19 @@ export async function advanceRide(driverId: string, rideId: string, step: keyof 
     // Bila kusubiri (kampuni ya malipo inaweza kuchelewa sekunde kadhaa) — dereva haoni kuchelewa kwa "Maliza safari".
     void onPromoRideCompleted(rideId).catch((error) => console.error(`[payments] ofa ${rideId}: ${(error as Error).message}`));
   }
+  // 0.22.1 Abiria alilipa kwa simu mapema → nauli inaingia kwenye wallet ya dereva sasa
+  if (step === 'complete' && (ride.fare_settlement === 'MOBILE' || ride.fare_settlement === 'WALLET')) {
+    await creditPrepaidFare(rideId).catch((error) => console.error(`[nauli] prepaid ${rideId}: ${(error as Error).message}`));
+  }
   const pays = tsh(ride.fare - ride.promo_discount);
+  const prepaid = ride.fare_settlement === 'MOBILE' || ride.fare_settlement === 'WALLET';
+  const phonePay = step === 'complete' && (await getRidePaySettings()).enabled;
   const messages = {
     arrive: { title: 'Dereva amefika!', body: `Anakusubiri ${ride.pickup_name}.`, urgent: true },
     start: null,
     complete: {
       title: `Umefika ${ride.dest_name}`,
-      body: `Lipa dereva ${pays} taslimu.${ride.promo_discount > 0 ? ` Ofa ya NAYA imelipa ${tsh(ride.promo_discount)}.` : ''} Asante kwa kusafiri na NAYA.`,
+      body: `${prepaid ? `Umeshalipa ${pays} ${ride.fare_settlement === 'WALLET' ? 'kwa salio' : 'kwa simu'}` : `Lipa dereva ${pays}${phonePay ? ' kwa simu kwenye app au taslimu' : ' taslimu'}`}.${ride.promo_discount > 0 ? ` Ofa ya NAYA imelipa ${tsh(ride.promo_discount)}.` : ''} Asante kwa kusafiri na NAYA.`,
       urgent: false,
     },
   } as const;
@@ -1091,7 +1157,9 @@ export async function advanceRide(driverId: string, rideId: string, step: keyof 
         : step === 'complete'
           ? {
               title: by === 'PASSENGER' ? 'Abiria amefika' : 'Safari imekamilika',
-              body: `${by === 'PASSENGER' ? 'Abiria amethibitisha amefika. ' : ''}Pokea ${pays} taslimu kutoka kwa abiria.`,
+              body: `${by === 'PASSENGER' ? 'Abiria amethibitisha amefika. ' : ''}${
+                prepaid ? `Abiria ameshalipa ${pays} kupitia NAYA — usimdai; pesa iko kwenye wallet yako.` : `Pokea ${pays} kutoka kwa abiria${phonePay ? ' (kwa simu kwenye app yake au taslimu)' : ' taslimu'}.`
+              }`,
             }
           : null;
     await notify({ userId: driverId, event: 'ride', rideId, ...(driverMsg ? { kind: `ride_auto_${step}`, ...driverMsg } : {}) });
@@ -1267,6 +1335,7 @@ export async function listRidesForAdmin(scope: 'active' | 'all') {
     `SELECT r.id, r.status, r.vehicle_type AS "vehicleType", r.pickup_name AS "pickupName", r.dest_name AS "destinationName",
             r.fare, r.distance_km AS "distanceKm", r.requested_at AS "requestedAt", r.completed_at AS "completedAt",
             p.full_name AS "passengerName", p.phone AS "passengerPhone",
+            r.rider_name AS "riderName", r.rider_phone AS "riderPhone",
             du.full_name AS "driverName", du.phone AS "driverPhone", d.plate_number AS "plateNumber"
        FROM naya.rides r
        JOIN naya.users p ON p.id = r.passenger_id
@@ -1301,12 +1370,15 @@ export async function rideForAdmin(rideId: string) {
   ]);
   const sos = await many(
     db,
-    `SELECT s.id, s.role, s.status, s.created_at AS "createdAt", s.resolved_at AS "resolvedAt", s.resolution_note AS "note", u.full_name AS "name"
-       FROM naya.sos_alerts s JOIN naya.users u ON u.id = s.user_id WHERE s.ride_id = $1 ORDER BY s.created_at`,
+    `SELECT s.id, s.role, s.status, s.created_at AS "createdAt", s.resolved_at AS "resolvedAt", s.resolution_note AS "note",
+            CASE WHEN s.role = 'RIDER' THEN r.rider_name ELSE u.full_name END AS "name"
+       FROM naya.sos_alerts s JOIN naya.users u ON u.id = s.user_id JOIN naya.rides r ON r.id = s.ride_id
+      WHERE s.ride_id = $1 ORDER BY s.created_at`,
     [rideId],
   );
   return {
     ...baseView(ride),
+    farePay: await fareState(db, ride),
     flags: ride.flags.filter((f) => f !== 'PIN_REMINDED'),
     autoArrived: ride.auto_arrived,
     ratingForDriver: ride.rating_for_driver,
@@ -1314,6 +1386,8 @@ export async function rideForAdmin(rideId: string) {
     pinAttempts: ride.pin_attempts,
     shared: ride.share_token_hash !== null,
     passenger: passenger && { id: ride.passenger_id, name: passenger.full_name, phone: passenger.phone },
+    // Safari ya mtu mwingine: anayesafiri (passenger hapo juu ni aliyeagiza na kulipa)
+    rider: ride.rider_name ? { name: ride.rider_name, phone: ride.rider_phone, smsAt: ride.rider_sms_at } : null,
     driver: driver && { ...driver, id: ride.driver_id },
     timeline,
     offers,
@@ -1327,7 +1401,8 @@ export async function cancelByAdmin(adminId: string, rideId: string, reason: str
     if (!ride) throw notFound('Safari haikupatikana');
     if (!ACTIVE.includes(ride.status)) throw conflict('Safari hii imeshaisha.');
     await client.query(
-      `UPDATE naya.rides SET status = 'CANCELLED', cancelled_by = 'ADMIN', cancel_reason = $2, cancelled_at = now(), updated_at = now() WHERE id = $1`,
+      `UPDATE naya.rides SET status = 'CANCELLED', cancelled_by = 'ADMIN', cancel_reason = $2, cancelled_at = now(),
+              fare_refund = CASE WHEN fare_settlement = 'MOBILE' AND fare_refund IS NULL THEN 'NEEDED' ELSE fare_refund END, updated_at = now() WHERE id = $1`,
       [rideId, reason],
     );
     const offers = await many<{ driver_id: string }>(
@@ -1336,6 +1411,7 @@ export async function cancelByAdmin(adminId: string, rideId: string, reason: str
       [rideId],
     );
     await history(client, rideId, ride.status, 'CANCELLED', adminId, reason);
+    if (ride.fare_settlement === 'WALLET') await refundRideToWallet(client, rideId, ride.passenger_id);
     await writeAudit(client, { actorId: adminId, action: 'ride.cancelled', targetType: 'ride', targetId: rideId, details: { reason } });
     return { passengerId: ride.passenger_id, driverId: ride.driver_id, offerDrivers: offers.map((o) => o.driver_id) };
   });
@@ -1344,6 +1420,7 @@ export async function cancelByAdmin(adminId: string, rideId: string, reason: str
   if (affected.driverId) await notify({ userId: affected.driverId, ...notice });
   for (const d of affected.offerDrivers) await notify({ userId: d, event: 'offer', rideId });
   await notifyAdmins(rideId);
+  await smsRiderCancelled(rideId);
   return rideForAdmin(rideId);
 }
 
@@ -1517,6 +1594,7 @@ export async function completeByAdmin(adminId: string, rideId: string, note: str
   await notify({ userId: ride.passenger_id, event: 'ride', rideId, kind: 'ride_complete', title: `Umefika ${ride.dest_name}`, body: 'Safari imekamilishwa na ofisi ya NAYA.' });
   if (ride.driver_id) await notify({ userId: ride.driver_id, event: 'ride', rideId });
   await onPromoRideCompleted(rideId).catch((error) => console.error(`[payments] ofa ${rideId}: ${(error as Error).message}`));
+  await creditPrepaidFare(rideId).catch((error) => console.error(`[nauli] prepaid ${rideId}: ${(error as Error).message}`));
   await notifyAdmins(rideId);
   return rideForAdmin(rideId);
 }

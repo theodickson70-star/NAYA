@@ -439,6 +439,18 @@ input, select, textarea { font-size: 17px; padding: 13px 14px; border-radius: va
 .choice input:focus-visible + span { outline: 3px solid var(--gold); outline-offset: 2px; }
 .optional { color: var(--muted); font-weight: 400; }
 
+/* 0.25.0: safari ya mtu mwingine */
+.for-whom { margin: 14px 0 12px; }
+.for-whom .choice span { padding: 11px 8px; }
+.for-other { margin-top: 12px; }
+.for-other .muted.small { margin: 8px 0 0; }
+.for-other .alert { margin: 10px 0 0; }
+.rider-card .rider-who { display: grid; gap: 2px; }
+.rider-card .actions { margin-top: 12px; }
+.rider-link { margin-top: 12px; }
+.rider-link input { width: 100%; margin-top: 6px; }
+.booked-by { display: inline-block; font-size: 13px; font-weight: 700; color: var(--g800); background: var(--g100); border-radius: 999px; padding: 2px 10px; margin-top: 4px; }
+
 /* Nyaraka */
 .docs { list-style: none; margin: 0; padding: 0; }
 .doc { display: grid; grid-template-columns: 64px 1fr; gap: 12px; padding: 14px 0; border-top: 1px solid var(--line); }
@@ -1371,3 +1383,62 @@ input, select, textarea { font-size: 17px; padding: 13px 14px; border-radius: va
 .mw-paylink .muted { color: #CFE9DA; font-size: 13.5px; }
 .mw-paylink > span:last-child { font-size: 24px; color: var(--gold-2); }
 .mw-result .btn { text-decoration: none; }
+
+/* Nauli kwa simu (0.22.0) */
+.fp-card h2 { margin: 0 0 8px; font-size: 18px; }
+.fp-card.is-ok, .fp-card.is-muted, .fp-card.is-bad { display: flex; gap: 14px; align-items: flex-start; }
+.fp-card.is-ok { background: linear-gradient(180deg, #E9F6EF, #fff); }
+.fp-card.is-bad { background: #FBECE9; }
+.fp-card.is-bad h2 { color: var(--danger, #C2412D); }
+.fp-card.is-bad > div { flex: 1; }
+.fp-card.is-bad .btn { margin-top: 10px; }
+.fp-ico { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: var(--g700); color: #fff; }
+.fp-card.is-muted .fp-ico { background: #E6ECE9; color: #3E4F47; }
+.fp-ico svg, .fp-card .btn svg, .fp-note svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.fp-card .btn svg { margin-right: 8px; vertical-align: -5px; }
+.fp-sum { margin: 4px 0 14px; padding: 4px 14px; border-radius: 14px; background: #F3F6F4; }
+.fp-sum div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 7px 0; }
+.fp-sum dt { color: #5C6A62; font-size: 15px; }
+.fp-sum dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fp-sum .is-total { border-top: 1.5px dashed #CBD8D0; margin-top: 2px; padding-top: 9px; }
+.fp-sum .is-total dt { color: var(--ink); font-weight: 700; }
+.fp-sum .is-total dd { font-size: 20px; font-weight: 800; }
+.fp-phone { font-size: 20px; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+.fp-or { margin: 12px 0 0; text-align: center; color: #5C6A62; font-size: 14.5px; }
+.fp-note { display: flex; align-items: center; gap: 8px; margin: 10px 0; color: var(--g700); font-weight: 700; }
+.fp-wait { display: flex; gap: 14px; align-items: center; }
+.fp-wait p { margin: 0; line-height: 1.45; }
+.fp-spin { flex: none; width: 34px; height: 34px; border-radius: 50%; border: 3.5px solid #DCE7E1; border-top-color: var(--g700); animation: fp-spin 0.9s linear infinite; }
+@keyframes fp-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .fp-spin { animation-duration: 2.5s; } }
+.fp-debts { list-style: none; padding: 6px 16px; }
+.fp-debts li { display: flex; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid #E6ECE9; }
+.fp-debts li:last-child { border-bottom: 0; }
+.fp-debts li > span { display: flex; flex-direction: column; gap: 2px; }
+.fp-debts li > strong { white-space: nowrap; }
+.fp-mini { padding: 0; overflow: hidden; }
+.fp-mini.is-ok { padding: 14px 16px; }
+.fp-mini.is-ok h2 { font-size: 16px; margin-bottom: 2px; }
+.fp-mini.is-ok p { margin: 0; }
+.fp-open { display: flex; align-items: center; gap: 14px; width: 100%; padding: 15px 16px; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.fp-open > svg { flex: none; width: 40px; height: 40px; padding: 9px; border-radius: 50%; background: var(--g100); color: var(--g700); fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.fp-open > span:nth-child(2) { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.fp-open small { color: #5C6A62; font-size: 14px; }
+.fp-go { font-size: 26px; color: var(--g700); line-height: 1; }
+.fp-open:focus-visible { outline: 3px solid var(--g500); outline-offset: -3px; }
+.fp-note-wait { color: #3E4F47; font-weight: 600; }
+.fp-spin-sm { width: 18px; height: 18px; border-width: 2.5px; }
+
+/* Salio la NAYA — abiria (0.23.0) */
+.fp-wallet { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 10px; align-items: center; text-align: left; padding: 12px 18px; }
+.fp-wallet > svg { grid-row: 1 / 3; width: 26px; height: 26px; margin: 0 !important; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.fp-wallet > span { font-size: 18px; }
+.fp-wallet > small { font-weight: 600; font-size: 13px; opacity: 0.8; }
+.fp-or-top { margin: 10px 0 12px; }
+.fp-wallet-low { margin: 0 0 12px; padding: 10px 12px; border-radius: 12px; background: #FFF4CF; font-size: 14.5px; }
+.fp-wallet-low a { color: var(--g700); font-weight: 700; }
+.sl-hero .mw-hero-sub { line-height: 1.45; }
+.sl-empty { margin: 4px 0; }
+.sl-cash h2 { margin-top: 0; }
+.sl-cash-link { margin-top: 4px; }
+.mw-tx-ico svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }

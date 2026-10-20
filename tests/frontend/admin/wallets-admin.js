@@ -57,11 +57,11 @@ async function loadList() {
     const st = s.settings;
     host.innerHTML = `${ctx.tabs()}<div data-wallets>
       <p class="rp-lead">Kila dereva ana wallet yake: malipo ya ofa yanaingia hapa, naye anatoa kwenda namba yake ya malipo iliyothibitishwa kwa PIN yake mwenyewe (ofisi haiioni). Pesa halisi iko kwenye akaunti ya NAYA kwa Abliner.</p>
-      ${s.short ? `<p class="alert alert-danger" role="alert"><strong>Salio la Abliner (${formatTsh(s.ablinerBalance)}) halitoshi kulipa wallet zote za madereva (${formatTsh(s.owed)}).</strong> Jaza salio la Abliner ili madereva wasikwame wakitoa pesa.</p>` : ''}
+      ${s.short ? `<p class="alert alert-danger" role="alert"><strong>Salio la Abliner (${formatTsh(s.ablinerBalance)}) halitoshi kulipa wallet zote za madereva (${formatTsh(s.owed)})${s.customerOwed ? ` na salio za abiria (${formatTsh(s.customerOwed)})` : ''}.</strong> Jaza salio la Abliner ili madereva wasikwame wakitoa pesa.</p>` : ''}
       ${s.stuck ? `<p class="alert alert-danger" role="alert"><strong>Kutoa ${n(s.stuck)} kumekwama zaidi ya dakika 30.</strong> Fungua wallet ya dereva, kagua muamala kwenye dashibodi ya Abliner, kisha thibitisha kama pesa ilifika au la.</p>` : ''}
       ${s.lateSuccess ? `<p class="alert alert-danger" role="alert"><strong>Kutoa ${n(s.lateSuccess)} kumefika BAADA ya pesa kurudishwa kwenye wallet</strong> — dereva amepata mara mbili. Kagua na ufanye marekebisho.</p>` : ''}
       <section class="rp-stats">
-        <div class="rp-stat rp-stat-hero"><span>Deni la wallet zote</span><strong>${formatTsh(s.owed)}</strong><small>Madereva ${n(s.withBalance)} wana salio</small></div>
+        <div class="rp-stat rp-stat-hero"><span>Deni la wallet zote</span><strong>${formatTsh(s.owed)}</strong><small>Madereva ${n(s.withBalance)} wana salio${s.customerOwed ? ` · + abiria ${formatTsh(s.customerOwed)}` : ''}</small></div>
         <div class="rp-stat${s.short ? ' rp-stat-bad' : ''}"><span>Salio la Abliner</span><strong>${s.ablinerBalance === null ? '–' : formatTsh(s.ablinerBalance)}</strong><small>${
           s.ablinerBalance === null ? 'Halisomeki sasa' : s.short ? 'Halitoshi deni' : 'Linatosha deni la wallet'
         }</small></div>

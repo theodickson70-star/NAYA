@@ -6,6 +6,7 @@ import { t } from '/shared/i18n.js';
 import { escapeHtml as esc } from '/shared/api.js';
 import { formatDate, formatPhone, formatTsh, VEHICLE_TYPES } from '/shared/labels.js';
 import { rideMap } from '/shared/map.js';
+import * as farepay from './farepay.js';
 
 let ctx = null; // { api, toast, handleError, isPassengerHome, isDriverHome, onPassengerRideClosed, firstName }
 const $ = (id) => document.getElementById(id);
@@ -33,6 +34,9 @@ let shareUrl = ''; // link ya kushiriki (kama simu haina "Share")
 let mapView = null; // { rideId, map }
 const photos = new Map();
 const LIVE = ['ACCEPTED', 'ARRIVED', 'IN_PROGRESS'];
+let fareUi = {}; // nauli kwa simu: { busy, error, debtConfirm }
+let farePollAt = 0;
+let fareRideId = null; // dereva: safari ambayo fareUi ni yake
 
 export function init(context) {
   ctx = context;
@@ -119,7 +123,7 @@ function etaText(ride, eta, km) {
 function updateLive(data) {
   if (data.lat != null && data.lng != null) mapView?.map?.setDriver({ lat: data.lat, lng: data.lng });
   const el = $('ride-eta');
-  if (el && passengerRide) el.textContent = etaText(passengerRide, data.etaMinutes, data.distanceKm);
+  if (el && passengerRide && LIVE.includes(passengerRide.status)) el.textContent = etaText(passengerRide, data.etaMinutes, data.distanceKm);
 }
 
 const tel = (phone) => `tel:+${esc(phone)}`;
@@ -184,7 +188,7 @@ export async function book(body) {
 
 function passengerKey(r) {
   // Umbali/dakika hazimo hapa: zinasasishwa papo hapo bila kuchora skrini upya (ramani isianze upya).
-  return [r.status, r.redispatched, r.driver?.name, r.pin, r.sosOpen, r.shared, cancelOpen, sosSheet, shareUrl].join('|');
+  return [r.status, r.redispatched, r.driver?.name, r.pin, r.sosOpen, r.shared, r.rider?.smsSent, cancelOpen, sosSheet, shareUrl, farepay.fareKey(r.farePay), fareUi.busy, fareUi.error, fareUi.open].join('|');
 }
 
 export function renderPassengerRide(ride) {
@@ -192,6 +196,7 @@ export function renderPassengerRide(ride) {
     shareUrl = '';
     sosSheet = false;
   }
+  if (passengerRide?.id !== ride.id) fareUi = {};
   passengerRide = ride;
   const key = passengerKey(ride);
   // Usichore upya kama hakuna kilichobadilika (mf. abiria anaandika maoni au anachagua nyota).
@@ -206,7 +211,7 @@ export function renderPassengerRide(ride) {
   const head = {
     SEARCHING: [
       'searching',
-      ride.redispatched ? 'Tunakutafutia dereva mwingine' : 'Tunatafuta dereva karibu nawe…',
+      ride.redispatched ? 'Tunakutafutia dereva mwingine' : ride.rider ? `Tunamtafutia ${ride.rider.name.split(' ')[0]} dereva…` : 'Tunatafuta dereva karibu nawe…',
       ride.redispatched ? 'Dereva wa awali ameghairi. Usijali — tunamtafuta mwingine sasa hivi.' : 'Safari yako imepokelewa. Subiri kidogo.',
     ],
     ACCEPTED: ['coming', 'Dereva anakuja', etaText(ride, d?.etaMinutes, d?.distanceToPickupKm)],
@@ -215,9 +220,7 @@ export function renderPassengerRide(ride) {
     COMPLETED: [
       'done',
       `Umefika ${ride.destination.name}!`,
-      ride.promo
-        ? `Lipa dereva ${formatTsh(ride.passengerPays)} taslimu. Ofa ya NAYA imelipa ${formatTsh(ride.promo.discount)}.`
-        : `Lipa dereva ${formatTsh(ride.fare)} taslimu.`,
+      farepay.passengerHeadline(ride),
     ],
     NO_DRIVER: ['none', 'Hakuna dereva aliyepatikana karibu kwa sasa', 'Jaribu tena baada ya dakika chache.'],
     CANCELLED: ['none', 'Safari imeghairiwa', ride.cancelledBy === 'ADMIN' ? `Ofisi ya NAYA: ${ride.cancelReason ?? ''}` : ride.cancelReason ?? ''],
@@ -234,13 +237,15 @@ export function renderPassengerRide(ride) {
     ${ride.sosOpen ? sosSentHtml() : ''}
     ${ride.status === 'SEARCHING' ? pushPrompt('Washa arifa ujue dereva akipatikana, hata ukifunga app.') : ''}
     ${live ? '<div class="ride-map" id="ride-map" role="img" aria-label="Ramani: mahali pa kuchukuliwa, unakoenda, na dereva"></div>' : ''}
-    ${ride.pin ? pinCardHtml(ride.pin) : ''}
+    ${ride.rider ? riderCardHtml(ride) : ''}
+    ${ride.pin ? pinCardHtml(ride.pin, ride.rider) : ''}
     ${d ? driverCardHtml(ride) : ''}
+    ${live ? farepay.passengerLiveHtml(ride, fareUi) : ''}
     ${live ? safetyHtml({ share: true, sosOpen: ride.sosOpen }) : ''}
     <section class="card">${routeSummary(ride)}</section>
     ${
       ride.status === 'COMPLETED'
-        ? `<form class="card" id="rate-driver-form">
+        ? `${farepay.passengerCardHtml(ride, fareUi)}<form class="card" id="rate-driver-form">
             ${stars('rating', `Mpe ${esc(d?.name.split(' ')[0] ?? 'dereva')} nyota`)}
             <label for="rate-comment">Maoni <span class="optional">(si lazima)</span></label>
             <textarea id="rate-comment" maxlength="300" placeholder="Mf. Aliendesha kwa uangalifu"></textarea>
@@ -253,7 +258,7 @@ export function renderPassengerRide(ride) {
     }
     ${
       ride.status === 'NO_DRIVER' || ride.status === 'CANCELLED'
-        ? `<button class="btn btn-primary btn-block" type="button" data-ride="close">Sawa</button>
+        ? `${farepay.passengerRefundHtml(ride)}<button class="btn btn-primary btn-block" type="button" data-ride="close">Sawa</button>
            ${ride.status === 'NO_DRIVER' || ride.cancelledBy !== 'PASSENGER' ? feedbackLink(ride, { problem: true }) : ''}`
         : ''
     }
@@ -275,6 +280,7 @@ export function renderPassengerRide(ride) {
         ? cancelOpen
           ? `<div class="card confirm">
               <p><strong>Ghairi safari hii?</strong></p>
+              ${ride.farePay?.settlement === 'MOBILE' ? `<p class="muted">Umeshalipa ${formatTsh(ride.farePay.total)} kwa simu. Ukighairi, ofisi ya NAYA itakurudishia pesa.</p>` : ride.farePay?.settlement === 'WALLET' ? `<p class="muted">Umeshalipa ${formatTsh(ride.farePay.due)} kwa salio. Ukighairi, pesa inarudi kwenye salio lako papo hapo.</p>` : ''}
               <p class="alert alert-danger" id="cancel-error" role="alert" hidden></p>
               <div class="actions"><button class="btn btn-danger" type="button" data-ride="cancel-confirm">Ndiyo, ghairi</button>
               <button class="btn btn-ghost" type="button" data-ride="cancel-keep">Hapana</button></div>
@@ -288,11 +294,48 @@ export function renderPassengerRide(ride) {
   ensurePassengerPolling();
 }
 
-function pinCardHtml(pin) {
+function pinCardHtml(pin, rider = null) {
   return `<section class="card pin-card" aria-label="PIN ya safari">
     <span class="pin-label">PIN ya safari</span>
     <strong class="pin-digits">${esc(pin.split('').join(' '))}</strong>
-    <span class="muted">Safari ya ofa: mpe dereva PIN hii ukishapanda ili upate punguzo — kwanza hakikisha plate ni sahihi.</span>
+    <span class="muted">${
+      rider
+        ? `Safari ya ofa: ${esc(rider.name.split(' ')[0])} ataiona PIN hii kwenye link yake na kumpa dereva akishapanda. Unaweza pia kumtumia.`
+        : 'Safari ya ofa: mpe dereva PIN hii ukishapanda ili upate punguzo — kwanza hakikisha plate ni sahihi.'
+    }</span>
+  </section>`;
+}
+
+/** 0.25.0: safari ya mtu mwingine — aliyeagiza anaona anayesafiri, anaweza kumpigia na kumtumia link ya kufuatilia. */
+function riderCardHtml(ride) {
+  const r = ride.rider;
+  const first = r.name.split(' ')[0];
+  const live = ['SEARCHING', ...LIVE].includes(ride.status);
+  const url = r.link ? `${location.origin}${r.link}` : '';
+  const msg = ride.driver
+    ? t(`Habari ${first}, nimekuagizia ${VEHICLE_TYPES[ride.vehicleType].toLowerCase()} ya NAYA. Dereva ${ride.driver.name} (${ride.driver.plateNumber}) anakuja ${ride.pickup.name}. Fuatilia hapa: ${url}`)
+    : t(`Habari ${first}, nimekuagizia safari ya NAYA kutoka ${ride.pickup.name}. Fuatilia dereva hapa: ${url}`);
+  const smsLine = ride.status === 'SEARCHING'
+    ? `Dereva akipatikana, ${esc(first)} atapata SMS yenye jina la dereva, plate na link ya kufuatilia.`
+    : r.smsSent
+      ? `${esc(first)} amepata SMS yenye taarifa za dereva na link ya kufuatilia.`
+      : `SMS haijamfikia ${esc(first)} — mtumie link hii kwa WhatsApp au mpigie.`;
+  return `<section class="card rider-card" aria-label="Anayesafiri">
+    <div class="rider-who">
+      <span class="muted">Safari ya</span>
+      <strong>${esc(r.name)}</strong>
+      <span class="muted">${esc(formatPhone(r.phone))} · dereva anampigia yeye · wewe unalipa nauli</span>
+    </div>
+    ${live ? `<p class="muted small" style="margin:10px 0 0">${smsLine}</p>` : ''}
+    ${
+      live
+        ? `<div class="actions two">
+            <a class="btn btn-ghost call" href="${tel(r.phone)}">${ICON.phone} Mpigie ${esc(first)}</a>
+            ${url ? `<a class="btn btn-ghost call" href="https://wa.me/${esc(r.phone)}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">${ICON.share} Mtumie link</a>` : ''}
+          </div>
+          ${url ? `<div class="rider-link"><label class="muted small" for="rider-url">Link ya ${esc(first)} (anaona dereva, ramani na kitufe cha dharura)</label><input id="rider-url" readonly value="${esc(url)}"></div>` : ''}`
+        : ''
+    }
   </section>`;
 }
 
@@ -337,6 +380,8 @@ function sosSentHtml() {
 function quickPosition() {
   return new Promise((resolve) => {
     if (!navigator.geolocation) return resolve(null);
+    // Ombi la ruhusa ya GPS likiachwa bila jibu, "timeout" hapa chini haianzi — dharura isisubiri zaidi ya sekunde 3.
+    setTimeout(() => resolve(null), 3500);
     navigator.geolocation.getCurrentPosition(
       (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
       () => resolve(null),
@@ -385,7 +430,10 @@ function loadPassengerPhoto(rideId) {
 }
 
 const paxInitials = (name) => esc((name ?? '?').split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase());
-const paxMeta = (p) => (p?.rating ? `★ ${p.rating.average} · safari ${p.trips}` : p?.trips ? `Safari ${p.trips} na NAYA` : 'Abiria mpya');
+const paxMeta = (p) =>
+  p?.bookedBy
+    ? `Ameagizwa na ${p.bookedBy} (safari ya mtu mwingine)`
+    : p?.rating ? `★ ${p.rating.average} · safari ${p.trips}` : p?.trips ? `Safari ${p.trips} na NAYA` : 'Abiria mpya';
 
 function loadDriverPhoto(rideId) {
   const place = (url) => {
@@ -406,7 +454,14 @@ function loadDriverPhoto(rideId) {
 function ensurePassengerPolling() {
   if (pollTimer) return;
   pollTimer = setInterval(() => {
-    if (!ctx.isPassengerHome() || document.visibilityState !== 'visible' || !pollDue()) return;
+    if (!ctx.isPassengerHome() || document.visibilityState !== 'visible') return;
+    // Nauli kwa simu inasubiri PIN: uliza hali ya muamala (server inauliza kampuni ya malipo) kila sekunde 4
+    const pending = passengerRide?.farePay?.pending;
+    if (pending && Date.now() - farePollAt >= 4000) {
+      farePollAt = Date.now();
+      ctx.api.get(`/api/payments/${pending.id}`).then((p) => p.status !== 'PENDING' && refreshPassenger()).catch(() => {});
+    }
+    if (!pollDue()) return;
     refreshPassenger();
   }, 4000);
 }
@@ -471,6 +526,10 @@ function driverKey(s) {
     s.ride?.status,
     s.ride?.sosOpen,
     s.ride?.promoPayout?.state,
+    farepay.fareKey(s.ride?.farePay),
+    fareUi.debtConfirm,
+    fareUi.busy,
+    fareUi.error,
     s.earnings.today.total,
     s.subscription?.state,
     s.subscription?.daysLeft,
@@ -526,6 +585,10 @@ function renderDriverDashboard() {
   syncDriverService();
   if (!ctx.isDriverHome()) return;
   const s = driverData;
+  if ((s.ride?.id ?? null) !== fareRideId) {
+    fareRideId = s.ride?.id ?? null;
+    fareUi = {};
+  }
   const key = driverKey(s);
   if (key === lastKey && $('driver-screen')) return;
   lastKey = key;
@@ -730,9 +793,10 @@ function driverRideHtml(ride) {
   };
   if (ride.status === 'COMPLETED') {
     return `<section class="ride-head ride-done" role="status"><span class="ride-pulse" aria-hidden="true"></span>
-        <h1>Pokea ${formatTsh(ride.passengerPays ?? ride.fare)}</h1><p>Taslimu kutoka kwa ${esc(p?.name ?? 'abiria')}.${
-          ride.promo ? ` ${payoutLine(ride)}` : ''
-        }</p></section>
+        <h1>${['MOBILE', 'WALLET'].includes(ride.farePay?.settlement) ? 'Umelipwa' : 'Pokea'} ${formatTsh(ride.passengerPays ?? ride.fare)}</h1><p>${
+          ['MOBILE', 'WALLET'].includes(ride.farePay?.settlement) ? `${ride.farePay.settlement === 'WALLET' ? 'Kwa salio la NAYA' : 'Kwa simu'} kutoka kwa ${esc(p?.name ?? 'abiria')} — iko kwenye wallet yako.` : ride.farePay?.enabled ? `Kutoka kwa ${esc(p?.name ?? 'abiria')}: kwa simu (app yake) au taslimu.` : `Taslimu kutoka kwa ${esc(p?.name ?? 'abiria')}.`
+        }${ride.promo ? ` ${payoutLine(ride)}` : ''}</p></section>
+      ${farepay.driverSectionHtml(ride, fareUi)}
       <form class="card" id="rate-passenger-form">
         ${stars('rating', `Mpe ${esc(p?.name.split(' ')[0] ?? 'abiria')} nyota`)}
         <p class="alert alert-danger" id="rate-error" role="alert" hidden></p>
@@ -763,8 +827,9 @@ function driverRideHtml(ride) {
     <section class="card">
       <div class="driver-top">
         <span class="driver-photo pax-photo" id="pax-photo">${paxInitials(p?.name)}</span>
-        <span class="driver-who"><strong>${esc(p?.name ?? 'Abiria')}</strong><span class="muted">${esc(paxMeta(p))}</span><span class="muted">Abiria · ${formatTsh(ride.passengerPays ?? ride.fare)} taslimu</span></span>
+        <span class="driver-who"><strong>${esc(p?.name ?? 'Abiria')}</strong><span class="muted">${esc(paxMeta(p))}</span><span class="muted">Abiria · nauli ${formatTsh(ride.passengerPays ?? ride.fare)}${['MOBILE', 'WALLET'].includes(ride.farePay?.settlement) ? ' · imelipwa kupitia NAYA ✓' : ''}</span></span>
       </div>
+      ${farepay.driverLiveNote(ride)}
       <div class="actions two">
         ${p ? `<a class="btn btn-ghost call" href="${tel(p.phone)}">${ICON.phone} Piga simu</a>` : ''}
         ${step.target ? `<a class="btn btn-ghost call" href="${mapsLink(step.target)}" target="_blank" rel="noopener">${ICON.map} Ramani</a>` : ''}
@@ -897,6 +962,69 @@ async function onClick(event) {
   if (!el) return;
   const action = el.dataset.ride;
   const id = el.dataset.id;
+
+  // Nauli kwa simu (abiria / dereva)
+  if ((action === 'fare-open' || action === 'fare-close') && passengerRide) {
+    fareUi = { open: action === 'fare-open' };
+    lastKey = '';
+    renderPassengerRide(passengerRide);
+    if (action === 'fare-open') $('fp-phone')?.focus();
+    return;
+  }
+  if (action === 'fare-wallet' && passengerRide) {
+    fareUi = { open: true, busy: true, walletBusy: true };
+    lastKey = '';
+    renderPassengerRide(passengerRide);
+    try {
+      await ctx.api.post(`/api/rides/${passengerRide.id}/pay-wallet`, {});
+      fareUi = {};
+      ctx.toast('Umelipa kwa salio la NAYA');
+    } catch (err) {
+      if (ctx.handleError(err)) return;
+      fareUi = { open: true, error: err.message };
+    }
+    lastKey = '';
+    return refreshPassenger();
+  }
+  if (action === 'fare-pay' && passengerRide) {
+    const phone = farepay.phoneValue('fp-phone');
+    if (phone.replace(/\D/g, '').length < 9) {
+      fareUi = { open: true, error: 'Weka namba ya simu ya kulipia.' };
+      lastKey = '';
+      return renderPassengerRide(passengerRide);
+    }
+    fareUi = { open: true, busy: true };
+    lastKey = '';
+    renderPassengerRide(passengerRide);
+    try {
+      await ctx.api.post(`/api/rides/${passengerRide.id}/pay`, { phone });
+      fareUi = {};
+    } catch (err) {
+      if (ctx.handleError(err)) return;
+      fareUi = { open: true, error: err.message };
+    }
+    lastKey = '';
+    return refreshPassenger();
+  }
+  if (action === 'settle-debt' || action === 'settle-debt-keep') {
+    fareUi = { debtConfirm: action === 'settle-debt' };
+    lastKey = '';
+    return renderDriverDashboard();
+  }
+  if ((action === 'settle-cash' || action === 'settle-debt-confirm') && id) {
+    fareUi = { ...fareUi, busy: true, error: null };
+    el.disabled = true;
+    try {
+      await ctx.api.post(`/api/driver/rides/${id}/settle`, { how: action === 'settle-cash' ? 'CASH' : 'DEBT' });
+      fareUi = {};
+      ctx.toast(action === 'settle-cash' ? 'Imeandikwa: umepokea taslimu' : 'Deni limeandikwa');
+    } catch (err) {
+      if (ctx.handleError(err)) return;
+      fareUi = { ...fareUi, busy: false, error: err.message };
+    }
+    lastKey = '';
+    return refreshDriver();
+  }
 
   // Abiria
   if (action === 'cancel' || action === 'cancel-keep') {
@@ -1186,7 +1314,7 @@ export function historyHtml(list) {
   return `<ul class="trips">${list
     .slice(0, 5)
     .map(
-      (r) => `<li><span><strong>${esc(r.destination.name)}</strong><span class="muted">${esc(formatDate(r.requestedAt, true))} · kutoka ${esc(r.pickup.name)}</span></span>
+      (r) => `<li><span><strong>${esc(r.destination.name)}</strong><span class="muted">${esc(formatDate(r.requestedAt, true))} · kutoka ${esc(r.pickup.name)}${r.riderName ? ` · kwa ${esc(r.riderName)}` : ''}</span></span>
         <span class="trip-right">${r.status === 'COMPLETED' ? `<strong>${formatTsh(r.passengerPays ?? r.fare)}</strong>` : ''}<span class="badge badge-${label[r.status][0]}">${label[r.status][1]}</span></span></li>`,
     )
     .join('')}</ul>`;

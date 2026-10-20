@@ -26,6 +26,8 @@ import * as appUpdate from './update.js';
 import * as terms from './terms.js';
 import * as staff from './staff.js';
 import * as mywallet from './mywallet.js';
+import * as farepay from './farepay.js';
+import * as salio from './salio.js';
 import { initI18n, langSwitchHtml, onLangChange } from '/shared/i18n.js';
 import { finishSplash, previewSound, setSoundEnabled, soundEnabled, splashActive, splashReady } from './splash.js';
 
@@ -34,7 +36,7 @@ const api = createApi('naya_app_token');
 const $ = (id) => document.getElementById(id);
 const views = ['view-loading', 'view-intro', 'view-auth', 'view-verify', 'view-role', 'view-offline', 'view-app'];
 const MAX_BYTES = 3 * 1024 * 1024;
-const VERSION = '0.21.0';
+const VERSION = '0.25.0';
 
 let account = null; // { user, activeMode, driverStatus, canDrive }
 let driver = null; // wasifu wa udereva (mode ya Dereva)
@@ -45,6 +47,8 @@ let pendingUploadType = null;
 const thumbs = new Map();
 // Safari inayopangwa na abiria (Phase 4: makadirio ya nauli; kuagiza kunakuja Phase 5).
 const trip = { pickup: null, destination: null, estimate: null, estimateError: null, selected: null, gps: 'idle', loading: false };
+// 0.25.0: safari ya mtu mwingine — "Ni yangu" au "Ya mtu mwingine" (jina + namba ya anayesafiri)
+const forWhom = { other: false, name: '', phone: '' };
 let places = null; // maeneo ya huduma (cache)
 let tripHistory = null; // safari za abiria zilizopita (cache)
 let passengerOffers = null; // ofa za mteja { at, list } (cache ya dakika 1)
@@ -485,6 +489,7 @@ function startRealtime() {
           setSupportDot();
           if (tab === 'home') route();
           else if (tab === 'account' && location.hash === '#/akaunti') renderAccount();
+          else if (location.hash === '#/akaunti/salio') salio.render();
         } catch (err) {
           handleError(err);
         }
@@ -811,13 +816,42 @@ function estimateBlock() {
         )
         .join('')}
     </fieldset>
+    ${forWhomBlock()}
     <p class="alert alert-danger" id="book-error" role="alert" hidden></p>
-    <button class="btn btn-primary btn-block" type="button" data-action="book">Agiza safari</button>
+    <button class="btn btn-primary btn-block" type="button" data-action="book">${forWhom.other ? 'Mwagizie safari' : 'Agiza safari'}</button>
     <p class="muted small" style="margin-top:8px">${
       options.some((o) => o.promo)
-        ? 'Malipo: unalipa dereva kiasi kilichopunguzwa taslimu; NAYA inamlipa dereva kilichobaki.'
-        : 'Malipo: taslimu kwa dereva. Nauli ni makadirio kwa umbali wa barabara.'
+        ? `Malipo: unalipa kiasi kilichopunguzwa ${trip.estimate.ridePay ? 'kwa simu ukifika au taslimu' : 'taslimu'}; NAYA inamlipa dereva kilichobaki.`
+        : trip.estimate.ridePay
+          ? 'Malipo: ukifika, lipa kwa simu kwenye app (ada ndogo ya simu juu ya nauli) au taslimu kwa dereva.'
+          : 'Malipo: taslimu kwa dereva. Nauli ni makadirio kwa umbali wa barabara.'
     }</p>`;
+}
+
+/** "Safari hii ni ya nani?" — aliyeagiza analipa; dereva anampigia anayesafiri; anayesafiri anapata SMS yenye link. */
+function forWhomBlock() {
+  const gpsWarn = forWhom.other && trip.pickup?.type === 'gps'
+    ? '<p class="alert alert-warn" role="status">"Kutoka" ni mahali ulipo wewe sasa. Kama anayesafiri yuko mahali pengine, bonyeza Kutoka uchague mahali alipo.</p>'
+    : '';
+  return `<div class="for-whom">
+      <fieldset class="choice">
+        <legend>Safari hii ni ya nani?</legend>
+        <label><input type="radio" name="for-whom" value="me" ${forWhom.other ? '' : 'checked'}><span>Mimi</span></label>
+        <label><input type="radio" name="for-whom" value="other" ${forWhom.other ? 'checked' : ''}><span>Mtu mwingine</span></label>
+      </fieldset>
+      ${
+        forWhom.other
+          ? `<div class="for-other">
+              <label for="rider-name">Jina la anayesafiri</label>
+              <input id="rider-name" maxlength="60" autocomplete="off" placeholder="Mf. Mama Neema" value="${esc(forWhom.name)}">
+              <label for="rider-phone">Namba yake ya simu</label>
+              <input id="rider-phone" type="tel" inputmode="tel" maxlength="16" autocomplete="off" placeholder="07XX XXX XXX" value="${esc(forWhom.phone)}">
+              <p class="muted small">Dereva atampigia yeye. Dereva akipatikana, atapata SMS yenye jina la dereva, plate na link ya kufuatilia safari. Wewe ndiye unalipa nauli.</p>
+              ${gpsWarn}
+            </div>`
+          : ''
+      }
+    </div>`;
 }
 
 async function refreshEstimate() {
@@ -957,6 +991,8 @@ function renderAccount() {
   if (section === 'mipangilio') return renderSettings();
   if (section === 'ada') return renderSubscriptionPage();
   if (section === 'malipo-ya-ofa') return renderWalletPage();
+  if (section === 'deni') return farepay.renderDebtPage();
+  if (section === 'salio') return salio.render();
   if (section === 'wallet') return mywallet.render((location.hash.split('?')[0].split('/')[3] ?? '').trim());
   renderHub();
 }
@@ -1499,13 +1535,29 @@ $('app-content').addEventListener('click', async (event) => {
     button.textContent = 'Inaagiza…';
     try {
       const pickup = trip.pickup.type === 'gps' ? { lat: trip.pickup.lat, lng: trip.pickup.lng } : { locationId: trip.pickup.id };
-      await rides.book({ pickup, destination: { locationId: trip.destination.id }, vehicleType: trip.selected });
+      const rider = forWhom.other ? { name: forWhom.name.trim(), phone: forWhom.phone.trim() } : null;
+      if (rider && (rider.name.length < 2 || !rider.phone)) {
+        const box = $('book-error');
+        box.textContent = 'Andika jina na namba ya simu ya anayesafiri.';
+        box.hidden = false;
+        button.disabled = false;
+        button.textContent = 'Mwagizie safari';
+        return;
+      }
+      await rides.book({ pickup, destination: { locationId: trip.destination.id }, vehicleType: trip.selected, rider });
       tripHistory = null;
       passengerOffers = null;
+      Object.assign(forWhom, { other: false, name: '', phone: '' });
     } catch (err) {
+      // 0.22.0: deni la nauli → "Deni langu" (lipa kwanza ndipo uagize)
+      if (err.status === 402) {
+        toast(err.message);
+        location.hash = '#/akaunti/deni';
+        return;
+      }
       if (handleError(err, 'book-error')) return;
       button.disabled = false;
-      button.textContent = 'Agiza safari';
+      button.textContent = forWhom.other ? 'Mwagizie safari' : 'Agiza safari';
     }
     return;
   }
@@ -1564,6 +1616,19 @@ $('app-content').addEventListener('click', async (event) => {
 
 $('app-content').addEventListener('change', (event) => {
   if (event.target.name === 'vehicle') trip.selected = event.target.value;
+  if (event.target.name === 'for-whom') {
+    forWhom.other = event.target.value === 'other';
+    // Chora upya sehemu hii tu (ramani ya "NAYA karibu nawe" isianze upya)
+    const box = document.querySelector('.for-whom');
+    if (box) box.outerHTML = forWhomBlock();
+    const btn = document.querySelector('[data-action="book"]');
+    if (btn && !btn.disabled) btn.textContent = forWhom.other ? 'Mwagizie safari' : 'Agiza safari';
+    if (forWhom.other) $('rider-name')?.focus();
+  }
+});
+$('app-content').addEventListener('input', (event) => {
+  if (event.target.id === 'rider-name') forWhom.name = event.target.value;
+  if (event.target.id === 'rider-phone') forWhom.phone = event.target.value;
 });
 
 // Ukisubiri uthibitisho, hali inaangaliwa tena kila dakika moja.
@@ -1646,6 +1711,8 @@ akaunti.init({
 });
 appUpdate.init({ api });
 staff.init({ api, toast, handleError, logout: () => logout(), account: () => account, reloadAccount: () => loadAccount() });
+farepay.init({ api, toast, handleError, myPhone: () => account?.user?.phone ?? null });
+salio.init({ api, toast, handleError, myPhone: () => account?.user?.phone ?? null });
 rides.init({
   api,
   pushState: () => pushState(api),
@@ -1653,6 +1720,7 @@ rides.init({
   toast,
   handleError,
   firstName: () => firstName(),
+  myPhone: () => account?.user?.phone ?? null,
   emergency: () => account?.emergency ?? null,
   isPassengerHome: onPassengerHome,
   isDriverHome: () => account?.activeMode === 'DRIVER' && tab === 'home' && driver?.driver.status === 'APPROVED',

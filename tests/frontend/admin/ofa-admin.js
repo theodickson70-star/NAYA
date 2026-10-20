@@ -13,6 +13,7 @@ import { flagBadges, formatDate, formatPhone, formatTsh } from '/shared/labels.j
 import { toast as uiToast } from './ui.js';
 import { loadWallet } from './wallet-admin.js';
 import * as walletsAdmin from './wallets-admin.js';
+import * as nauliAdmin from './nauli-admin.js';
 
 let ctx = null;
 let host = null;
@@ -35,6 +36,7 @@ export function setup(context) {
   host.addEventListener('submit', onSubmit);
   host.addEventListener('input', onInput);
   walletsAdmin.setup({ api: ctx.api, onAuthError: ctx.onAuthError, tabs: () => tabs('wallet') }, host);
+  nauliAdmin.setup({ api: ctx.api, onAuthError: ctx.onAuthError, tabs: () => tabs('fare') }, host);
 }
 
 let view = 0; // kila ukurasa mpya: kazi za zamani (utafutaji uliochelewa n.k.) hazichori juu yake
@@ -49,6 +51,7 @@ export function open(parts) {
   if (root === 'malipo') {
     if (a === 'miamala') return loadTransactions();
     if (a === 'wallet') return walletsAdmin.open(b);
+    if (a === 'nauli') return nauliAdmin.open();
     if (a === 'madereva' && b) return loadPayoutDriver(b);
     if (a === 'madereva') return loadPayouts();
     return loadFinanceHome();
@@ -61,7 +64,7 @@ export function open(parts) {
 
 const cur = (on) => (on ? ' aria-current="page"' : '');
 const tabs = (current) =>
-  ['home', 'pay', 'tx', 'wallet'].includes(current)
+  ['home', 'pay', 'tx', 'wallet', 'fare'].includes(current)
     ? `<div class="page-head"><div><h1>Malipo</h1><p class="muted">Salio la Abliner, malipo ya ofa kwa madereva na miamala yote ya simu.</p></div>
         <a class="btn btn-ghost btn-small" href="#/mipangilio#malipo">Mipangilio ya malipo</a></div>
       <nav class="rp-tabs" aria-label="Malipo">
@@ -69,6 +72,7 @@ const tabs = (current) =>
         <a href="#/malipo/madereva"${cur(current === 'pay')}>Madeni ya ofa kwa madereva</a>
         <a href="#/malipo/miamala"${cur(current === 'tx')}>Miamala ya simu</a>
         <a href="#/malipo/wallet"${cur(current === 'wallet')}>Wallet za madereva</a>
+        <a href="#/malipo/nauli"${cur(current === 'fare')}>Nauli kwa simu</a>
       </nav>`
     : `<div class="page-head"><div><h1>Ofa za wateja</h1><p class="muted">Punguzo kwa wateja — NAYA inamlipa dereva sehemu yake.</p></div></div>
       <nav class="rp-tabs" aria-label="Ofa">
@@ -437,21 +441,21 @@ async function loadTransactions() {
     const chip = (key, value, label) => `<button type="button" class="chip" data-tx="${key}" data-value="${value}" aria-pressed="${txState[key] === value}">${label}</button>`;
     host.innerHTML = `${tabs('tx')}
       <p class="rp-lead">Kila muamala wa pesa ya simu: ada ya mwezi iliyolipwa na madereva, na malipo ya ofa yaliyotumwa na NAYA. Linganisha na taarifa ya kampuni ya malipo kwa kumbukumbu.</p>
-      <div class="filters rp-chips" role="group" aria-label="Aina">${chip('kind', '', 'Yote')}${chip('kind', 'SUBSCRIPTION', 'Ada ya mwezi')}${chip('kind', 'PROMO_PAYOUT', 'Malipo ya ofa')}${chip('kind', 'WALLET_WITHDRAWAL', 'Kutoa wallet')}</div>
+      <div class="filters rp-chips" role="group" aria-label="Aina">${chip('kind', '', 'Yote')}${chip('kind', 'SUBSCRIPTION', 'Ada ya mwezi')}${chip('kind', 'PROMO_PAYOUT', 'Malipo ya ofa')}${chip('kind', 'WALLET_WITHDRAWAL', 'Kutoa wallet')}${chip('kind', 'RIDE_FARE', 'Nauli kwa simu')}${chip('kind', 'CUSTOMER_TOPUP', 'Salio la abiria')}${chip('kind', 'CUSTOMER_REFUND', 'Marejesho')}</div>
       <div class="filters rp-chips" role="group" aria-label="Hali">${chip('status', '', 'Hali zote')}${chip('status', 'SUCCESS', 'Imefaulu')}${chip('status', 'PENDING', 'Inasubiri')}${chip('status', 'FAILED', 'Imeshindwa')}</div>
       <div class="rp-toolbar">
         <input type="search" id="tx-q" class="search" placeholder="Tafuta jina, simu au kumbukumbu" value="${esc(txState.q)}" aria-label="Tafuta">
         <button class="btn btn-ghost btn-small" type="button" data-tx-csv>Pakua Excel (CSV)</button>
       </div>
       ${rows.length
-        ? `<div class="rp-scroll"><table class="rp-table"><thead><tr><th>Muda</th><th>Aina</th><th>Dereva</th><th>Namba</th><th class="num">Kiasi</th><th>Hali</th><th>Kumbukumbu</th></tr></thead><tbody>${rows
+        ? `<div class="rp-scroll"><table class="rp-table"><thead><tr><th>Muda</th><th>Aina</th><th>Jina</th><th>Namba</th><th class="num">Kiasi</th><th>Hali</th><th>Kumbukumbu</th></tr></thead><tbody>${rows
             .map((t) => {
               const [tone, label] = PAY_STATUS[t.status];
               return `<tr><td class="rp-nowrap">${esc(formatDate(t.createdAt, true))}</td>
-                <td>${t.kind === 'SUBSCRIPTION' ? `Ada ya mwezi<span class="rp-sub">Imeingia${t.months ? ` · miezi ${n(t.months)}` : ''}</span>` : t.kind === 'WALLET_WITHDRAWAL' ? 'Kutoa wallet<span class="rp-sub">Imetoka</span>' : 'Malipo ya ofa<span class="rp-sub">Imetoka</span>'}</td>
-                <td><a href="#/malipo/madereva/${esc(t.driverId)}">${esc(t.driverName)}</a></td>
+                <td>${t.kind === 'SUBSCRIPTION' ? `Ada ya mwezi<span class="rp-sub">Imeingia${t.months ? ` · miezi ${n(t.months)}` : ''}</span>` : t.kind === 'WALLET_WITHDRAWAL' ? 'Kutoa wallet<span class="rp-sub">Imetoka</span>' : t.kind === 'RIDE_FARE' ? `${t.purpose === 'DEBT' ? 'Deni la nauli' : 'Nauli kwa simu'}<span class="rp-sub">Imeingia</span>` : t.kind === 'CUSTOMER_TOPUP' ? 'Salio la abiria<span class="rp-sub">Imeingia</span>' : t.kind === 'CUSTOMER_REFUND' ? 'Kurudishia mteja<span class="rp-sub">Imetoka</span>' : 'Malipo ya ofa<span class="rp-sub">Imetoka</span>'}</td>
+                <td>${['RIDE_FARE', 'CUSTOMER_TOPUP', 'CUSTOMER_REFUND'].includes(t.kind) ? `<a href="#/wateja/${esc(t.driverId)}">${esc(t.driverName)}</a><span class="rp-sub">Abiria</span>` : `<a href="#/malipo/madereva/${esc(t.driverId)}">${esc(t.driverName)}</a>`}</td>
                 <td>${esc(t.networkLabel)}<span class="rp-sub">${esc(formatPhone(t.phone))}</span></td>
-                <td class="num"><strong>${formatTsh(t.amount)}</strong>${t.kind === 'WALLET_WITHDRAWAL' ? (t.fee ? `<span class="rp-sub">ada ${formatTsh(t.fee)} (dereva)</span>` : '') : t.fee ? `<span class="rp-sub">+ ada ${formatTsh(t.fee)} (NAYA)</span>` : ''}</td>
+                <td class="num"><strong>${formatTsh(t.amount)}</strong>${t.kind === 'WALLET_WITHDRAWAL' ? (t.fee ? `<span class="rp-sub">ada ${formatTsh(t.fee)} (dereva)</span>` : '') : t.kind === 'RIDE_FARE' ? (t.fee ? `<span class="rp-sub">nauli ${formatTsh(t.fare ?? t.amount)} + ada ${formatTsh(t.fee)}</span>` : '') : t.kind === 'CUSTOMER_TOPUP' ? (t.fee ? `<span class="rp-sub">salio ${formatTsh(t.credit ?? t.amount)} + ada ${formatTsh(t.fee)}</span>` : '') : t.fee ? `<span class="rp-sub">+ ada ${formatTsh(t.fee)} (NAYA)</span>` : ''}</td>
                 <td><span class="badge badge-${tone}">${label}</span>${t.failureReason ? `<span class="rp-sub">${esc(t.failureReason)}</span>` : ''}</td>
                 <td><code>${esc(t.reference)}</code>${t.providerRef ? `<span class="rp-sub">${esc(t.providerRef)}</span>` : ''}</td></tr>`;
             })

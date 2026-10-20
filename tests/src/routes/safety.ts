@@ -2,11 +2,12 @@
 //   Abiria: POST /api/rides/:id/share            → link ya kumtumia ndugu
 //   Umma:   POST /api/share                       → ukurasa wa /safari/ (token iko kwenye body, si kwenye URL)
 //   Wote:   POST /api/sos                         → dharura kwa ofisi
+//   Umma:   POST /api/share/sos                   → dharura ya anayesafiri (safari ya mtu mwingine, 0.25.0)
 //   Ofisi:  GET /api/admin/sos, POST /api/admin/sos/:id/resolve
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { ADMIN_ROLES, requireRole } from '../middleware/auth.js';
-import { createShareLink, listSos, raiseSos, resolveSos, viewSharedRide } from '../services/safety.js';
+import { createShareLink, listSos, raiseRiderSos, raiseSos, resolveSos, viewSharedRide } from '../services/safety.js';
 import { ok } from '../utils/http.js';
 
 const idParam = z.object({ id: z.uuid({ error: 'Haikupatikana' }) });
@@ -29,6 +30,16 @@ export async function safetyRoutes(app: FastifyInstance): Promise<void> {
     const { token } = z.object({ token: z.string().max(64) }).parse(request.body ?? {});
     reply.header('cache-control', 'no-store');
     return ok(await viewSharedRide(token));
+  });
+
+  // 0.25.0: anayesafiri (safari ya mtu mwingine) — dharura kupitia link yake, bila akaunti
+  app.post('/api/share/sos', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (request, reply) => {
+    const { token, lat, lng } = z
+      .object({ token: z.string().max(64), lat: z.number().min(-12.5).max(-0.5).optional(), lng: z.number().min(29).max(41).optional() })
+      .parse(request.body ?? {});
+    const result = await raiseRiderSos(token, { lat, lng });
+    request.log.warn('DHARURA imetumwa na anayesafiri (link)');
+    return reply.status(result.alreadyOpen ? 200 : 201).send(ok(result));
   });
 
   app.post('/api/sos', { ...user, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (request, reply) => {

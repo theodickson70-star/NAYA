@@ -115,6 +115,7 @@ function loadUserPhoto(u) {
 
 function render(data) {
   setTimeout(() => loadUserPhoto(data.user), 0);
+  setTimeout(() => loadMoney(data.user.id), 0);
   current = data;
   const { user: u, driver: d, stats: st, rides, tickets, sos, notes, history, devices } = data;
   const suspended = u.status === 'SUSPENDED';
@@ -227,6 +228,11 @@ function render(data) {
       </div>
 
       <div>
+        <section class="panel um-money" id="um-money" aria-labelledby="um-money-h">
+          <h2 id="um-money-h">Pesa za mteja</h2>
+          <p class="muted">Inapakia…</p>
+        </section>
+
         <section class="panel">
           <h2>Mtumie ujumbe</h2>
           <form class="action-form" data-form="message">
@@ -300,6 +306,7 @@ async function run(button, errorId, work) {
 }
 
 async function onSubmit(event) {
+  if (event.target.id === 'rf-form') return onRefundSubmit(event);
   const form = event.target.closest('[data-form]');
   if (!form || !current) return;
   event.preventDefault();
@@ -349,5 +356,147 @@ async function onClick(event) {
       ? '<p class="alert alert-ok">Password ya muda imetumwa kwake kwa SMS.</p>'
       : `<div class="secret-box"><strong>Password ya muda</strong><code>${esc(res.temporaryPassword)}</code>
           <span class="muted small">Mpigie umpe password hii. Inaonyeshwa mara hii moja tu — ikifungwa haionekani tena. Aibadilishe baada ya kuingia.</span></div>`;
+  }
+}
+
+// ------------------------------------------------------------------ Pesa za mteja: salio + kumrudishia pesa (0.24.0)
+
+let money = null;
+const SETTLE = { MOBILE: 'alilipa kwa simu', WALLET: 'alilipa kwa salio', CASH: 'taslimu', DEBT: 'deni' };
+const REF_STATUS = { PENDING: ['warn', 'Inatumwa'], SUCCESS: ['ok', 'Imefika'], FAILED: ['bad', 'Imeshindwa'] };
+
+async function loadMoney(userId) {
+  const box = $('um-money');
+  if (!box) return;
+  try {
+    money = await ctx.api.get(`/api/admin/users/${userId}/money`);
+    if (current?.user.id !== userId || !$('um-money')) return;
+    drawMoney();
+  } catch (err) {
+    if (ctx.onAuthError(err)) return;
+    box.innerHTML = `<h2>Pesa za mteja</h2><p class="alert alert-danger" role="alert">${esc(err.message)}</p>`;
+  }
+}
+
+function rideOption(r) {
+  const paid = r.paidByPhone ? `${formatTsh(r.paidByPhone)} kwa simu` : r.settlement ? `${formatTsh(r.due)} ${SETTLE[r.settlement] ?? ''}` : formatTsh(r.due);
+  const when = formatDate(r.completedAt ?? r.requestedAt, true);
+  return `<option value="${esc(r.id)}" data-amount="${esc(r.paidByPhone ?? r.due)}" data-needed="${r.fareRefund === 'NEEDED' ? 1 : ''}">${
+    r.fareRefund === 'NEEDED' ? 'INAHITAJI KURUDISHWA · ' : ''
+  }${esc(r.from)} → ${esc(r.to)} · ${esc(when)} · ${esc(paid)}</option>`;
+}
+
+function drawMoney(result = null) {
+  const m = money;
+  const needed = m.rides.filter((r) => r.fareRefund === 'NEEDED');
+  const want = new URLSearchParams(location.hash.split('?')[1] ?? '').get('rudisha');
+  const history = [
+    ...m.refunds.map((r) => ({
+      at: r.createdAt,
+      html: `<li><span><strong>${formatTsh(r.amount)} kwa simu</strong> ${tag(REF_STATUS[r.status][0], REF_STATUS[r.status][1])}</span><span class="muted">${esc(formatDate(r.createdAt, true))} · ${esc(
+        formatPhone(r.phone),
+      )}${r.createdBy ? ` · ${esc(r.createdBy)}` : ''}</span><span class="note">${esc(r.note ?? '')}${r.failureReason ? ` — ${esc(r.failureReason)}` : ''}${r.providerRef ? ` · ${esc(r.providerRef)}` : ''}</span></li>`,
+    })),
+    ...m.entries
+      .filter((e) => e.kind === 'REFUND' || e.kind === 'ADJUSTMENT')
+      .map((e) => ({
+        at: e.createdAt,
+        html: `<li><span><strong>${e.amount > 0 ? '+' : '−'}${formatTsh(Math.abs(e.amount))} kwenye salio</strong> ${tag('ok', 'Papo hapo')}</span><span class="muted">${esc(formatDate(e.createdAt, true))}${
+          e.createdBy ? ` · ${esc(e.createdBy)}` : ''
+        }</span>${e.note ? `<span class="note">${esc(e.note)}</span>` : ''}</li>`,
+      })),
+  ]
+    .sort((a, b) => new Date(b.at) - new Date(a.at))
+    .slice(0, 10);
+  $('um-money').innerHTML = `
+    <h2 id="um-money-h">Pesa za mteja</h2>
+    <div class="mini-stats um-money-stats">
+      <div><strong>${formatTsh(m.balance)}</strong><span>Salio la NAYA${m.cashoutRequested ? ' · ameomba kurudishiwa' : ''}</span></div>
+      <div><strong>${formatTsh(m.limits.phoneLeftToday)}</strong><span>Marejesho kwa simu yaliyobaki leo (NAYA nzima)</span></div>
+    </div>
+    ${needed.length ? `<p class="alert alert-danger" role="alert"><strong>Safari ${needed.length} ${needed.length === 1 ? 'inasubiri' : 'zinasubiri'} kurudishiwa pesa.</strong> Ichague hapa chini.</p>` : ''}
+    ${
+      result
+        ? result.status === 'FAILED'
+          ? `<p class="alert alert-danger" role="alert">Kutuma kwenda ${esc(result.to)} kumeshindwa${result.failureReason ? `: ${esc(result.failureReason)}` : '.'} Hakuna pesa iliyotoka — jaribu namba nyingine au rudisha kwenye salio.</p>`
+          : result.salio
+            ? '<p class="alert alert-ok" role="status">Pesa imeingia kwenye Salio la NAYA la mteja papo hapo. Mteja amejulishwa.</p>'
+            : `<p class="alert alert-ok" role="status">${result.status === 'SUCCESS' ? 'Pesa imefika' : 'Pesa inatumwa'}${result.to ? ` kwenda ${esc(result.to)}` : ''}. Mteja amejulishwa.</p>`
+        : ''
+    }
+    <details class="um-refund"${needed.length || want ? ' open' : ''}>
+      <summary><strong>Mrudishie pesa</strong></summary>
+      <form class="action-form" id="rf-form" novalidate>
+        <label for="rf-ride">Safari husika <span class="muted">(si lazima)</span></label>
+        <select id="rf-ride"><option value="">— Bila safari (fidia / malalamiko ya jumla) —</option>${m.rides.map(rideOption).join('')}</select>
+        <div class="settings-grid">
+          <div><label for="rf-amount">Kiasi (TSh)</label><input id="rf-amount" inputmode="numeric" autocomplete="off" placeholder="0"></div>
+          <div><label for="rf-reason">Sababu</label><select id="rf-reason">${m.reasons.map((r) => `<option value="${r.code}">${esc(r.label)}</option>`).join('')}</select></div>
+        </div>
+        <fieldset class="rf-to"><legend>Rudisha wapi</legend>
+          <label class="check"><input type="radio" name="rf-to" value="SALIO" checked> Salio la NAYA <span class="muted small">— papo hapo, bila ada; anatumia kwa safari au anaomba kurudishiwa</span></label>
+          <label class="check"><input type="radio" name="rf-to" value="PHONE"${m.canPhone ? '' : ' disabled'}> Namba ya simu <span class="muted small">— Abliner inatuma; NAYA inabeba ada${m.canPhone ? '' : ' (haipatikani sasa)'}</span></label>
+        </fieldset>
+        <div id="rf-phone-box" hidden><label for="rf-phone">Namba ya kupokea</label><input id="rf-phone" type="tel" inputmode="tel" value="${esc(formatPhone(m.phone))}"></div>
+        <label for="rf-note">Maelezo (yanaonekana kwenye historia)</label>
+        <textarea id="rf-note" maxlength="250" placeholder="Mf. Alikatwa mara mbili tarehe 20/10 — kumbukumbu ya Abliner ABC123"></textarea>
+        <p class="small muted">Kikomo kwa marejesho moja: ${formatTsh(m.limits.maxPerRefund)}. Kwa safari, kiasi hakizidi alicholipa.</p>
+        <p class="alert alert-danger" id="rf-error" role="alert" hidden></p>
+        <div class="actions"><button class="btn btn-primary" type="submit">Rudisha pesa</button></div>
+      </form>
+    </details>
+    ${history.length ? `<h3 class="um-money-h3">Marejesho ya karibuni</h3><ul class="history">${history.map((h) => h.html).join('')}</ul>` : ''}`;
+  if (want && m.rides.some((r) => r.id === want)) {
+    $('rf-ride').value = want;
+    pickRide();
+  }
+  $('rf-ride').addEventListener('change', pickRide);
+  for (const r of document.querySelectorAll('input[name="rf-to"]')) r.addEventListener('change', () => ($('rf-phone-box').hidden = r.value !== 'PHONE' || !r.checked));
+}
+
+function pickRide() {
+  const opt = $('rf-ride').selectedOptions[0];
+  if (!opt?.value) return;
+  $('rf-amount').value = Number(opt.dataset.amount).toLocaleString('en-US');
+  if (opt.dataset.needed) {
+    $('rf-reason').value = 'RIDE_NOT_DONE';
+    if (money.canPhone) {
+      document.querySelector('input[name="rf-to"][value="PHONE"]').checked = true;
+      $('rf-phone-box').hidden = false;
+    }
+  }
+}
+
+async function onRefundSubmit(event) {
+  event.preventDefault();
+  if (!current || !money) return;
+  const err = $('rf-error');
+  err.hidden = true;
+  const amount = Number(String($('rf-amount').value).replace(/[^\d]/g, ''));
+  const to = document.querySelector('input[name="rf-to"]:checked')?.value ?? 'SALIO';
+  const note = $('rf-note').value.trim();
+  if (!amount) return fail(new Error('Weka kiasi cha kurudisha.'), 'rf-error');
+  if (note.length < 5) return fail(new Error('Andika maelezo ya kwa nini unarudisha pesa.'), 'rf-error');
+  const phone = to === 'PHONE' ? $('rf-phone').value.replace(/[^\d+]/g, '') : null;
+  const where = to === 'PHONE' ? `namba ${$('rf-phone').value}` : 'Salio la NAYA';
+  if (!confirm(`Mrudishie ${current.user.fullName} ${formatTsh(amount)} kwenye ${where}?${to === 'PHONE' ? ' Pesa halisi itatumwa sasa hivi.' : ''}`)) return;
+  const button = event.target.querySelector('button[type="submit"]');
+  button.disabled = true;
+  try {
+    const res = await ctx.api.post(`/api/admin/users/${current.user.id}/refund`, {
+      amount,
+      to,
+      phone,
+      reason: $('rf-reason').value,
+      note,
+      rideId: $('rf-ride').value || null,
+    });
+    money = res;
+    // Safari iliyochaguliwa kutoka Marejesho imeshughulikiwa — usiichague tena ukurasa ukichorwa upya
+    if (location.hash.includes('?rudisha=')) history.replaceState(null, '', location.hash.split('?')[0]);
+    drawMoney(res.last ?? { status: 'SUCCESS', salio: true });
+  } catch (e) {
+    button.disabled = false;
+    fail(e, 'rf-error');
   }
 }

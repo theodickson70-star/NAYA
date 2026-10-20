@@ -398,8 +398,8 @@ describe('Wallet — kinga za ziada (ukaguzi huru)', () => {
     const failed = (await db.query(`SELECT * FROM naya.payments WHERE user_id = $1 AND kind = 'WALLET_WITHDRAWAL' AND status = 'FAILED' LIMIT 1`, [ids.d1])).rows[0];
     assert.ok(failed, 'kuna kutoa kulikoshindwa (jaribio la juu)');
     const bal = await dbBalance('d1');
-    await applyResult(failed.reference, { status: 'SUCCESS', providerRef: 'LATE-1' });
-    await applyResult(failed.reference, { status: 'SUCCESS', providerRef: 'LATE-1' }); // mara mbili → alama moja
+    await applyResult(failed.reference, { status: 'SUCCESS', providerRef: `LATE-1-${s}` });
+    await applyResult(failed.reference, { status: 'SUCCESS', providerRef: `LATE-1-${s}` }); // mara mbili → alama moja
     const p = (await db.query('SELECT status, meta FROM naya.payments WHERE id = $1', [failed.id])).rows[0];
     assert.equal(p.status, 'FAILED');
     assert.equal(p.meta.lateSuccess, true);
