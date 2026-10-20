@@ -30,10 +30,24 @@ import {
 } from '../services/rides.js';
 import { ok } from '../utils/http.js';
 import { VEHICLE_TYPES } from '../validators/drivers.js';
+import { phoneSchema } from '../validators/auth.js';
 import { estimateSchema } from '../validators/places.js';
 
 const idParam = z.object({ id: z.uuid({ error: 'Haikupatikana' }) });
-const requestSchema = estimateSchema.extend({ vehicleType: z.enum(VEHICLE_TYPES, { error: 'Chagua bodaboda au bajaji' }) });
+// 0.25.0: rider = safari ya mtu mwingine (jina + namba ya anayesafiri). Bila rider → safari ya aliyeagiza mwenyewe.
+const riderSchema = z.object({
+  name: z
+    .string({ error: 'Andika jina la anayesafiri' })
+    .trim()
+    .min(2, 'Andika jina la anayesafiri')
+    .max(60, 'Jina ni refu mno')
+    .refine((v) => !/[<>]/.test(v), 'Jina lina herufi zisizoruhusiwa'),
+  phone: phoneSchema,
+});
+const requestSchema = estimateSchema.extend({
+  vehicleType: z.enum(VEHICLE_TYPES, { error: 'Chagua bodaboda au bajaji' }),
+  rider: riderSchema.nullish(),
+});
 const optionalReason = z.object({
   reason: z
     .string()

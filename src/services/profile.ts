@@ -134,7 +134,8 @@ export async function passengerPhotoForDriver(driverId: string, rideId: string) 
     db,
     `SELECT r.passenger_id FROM naya.rides r
       WHERE r.id = $1 AND (r.driver_id = $2 OR EXISTS (
-        SELECT 1 FROM naya.ride_offers o WHERE o.ride_id = r.id AND o.driver_id = $2 AND o.status = 'PENDING'))`,
+        SELECT 1 FROM naya.ride_offers o WHERE o.ride_id = r.id AND o.driver_id = $2 AND o.status = 'PENDING'))
+        AND r.rider_name IS NULL`, // safari ya mtu mwingine: picha ya aliyeagiza haionyeshwi kwa dereva
     [rideId, driverId],
   );
   if (!ride) throw notFound('Picha haipatikani');

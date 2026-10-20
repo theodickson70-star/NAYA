@@ -78,7 +78,7 @@ async function drawList() {
               (r) => `<a class="ride-row" href="#/safari/${esc(r.id)}">
                 <span class="col-time"><strong>${esc(formatDate(r.requestedAt, true))}</strong><br><span class="driver-sub">${esc(VEHICLE_TYPES[r.vehicleType])} · ${formatTsh(r.fare)}${r.promo ? ' · ofa' : ''}</span></span>
                 <span class="ride-route"><strong>${esc(r.pickupName)} → ${esc(r.destinationName)}</strong><span class="driver-sub">km ${r.distanceKm}</span></span>
-                <span class="col-people driver-sub">Abiria: ${esc(r.passengerName)}<br>Dereva: ${r.driverName ? `${esc(r.driverName)} (${esc(r.plateNumber ?? '')})` : '—'}</span>
+                <span class="col-people driver-sub">Abiria: ${esc(r.riderName ? `${r.riderName} (ameagizwa na ${r.passengerName})` : r.passengerName)}<br>Dereva: ${r.driverName ? `${esc(r.driverName)} (${esc(r.plateNumber ?? '')})` : '—'}</span>
                 <span>${badge(r.status)}</span>
               </a>`,
             )
@@ -134,8 +134,13 @@ function render(r) {
     }
     ${r.shared ? '<p class="muted small">Abiria ameshiriki safari hii na ndugu/rafiki.</p>' : ''}
     <div class="people">
-      <div class="panel-box"><h2>Abiria</h2>${
+      <div class="panel-box"><h2>${r.rider ? 'Aliyeagiza (analipa)' : 'Abiria'}</h2>${
         r.passenger ? `<p><a href="#/wateja/${esc(r.passenger.id)}"><strong>${esc(r.passenger.name)}</strong></a><br><a href="tel:+${esc(r.passenger.phone)}">${esc(formatPhone(r.passenger.phone))}</a></p>` : '—'
+      }${
+        r.rider
+          ? `<h2 style="margin-top:12px">Anayesafiri</h2><p><strong>${esc(r.rider.name)}</strong><br><a href="tel:+${esc(r.rider.phone)}">${esc(formatPhone(r.rider.phone))}</a></p>
+             <p class="muted small">${r.rider.smsAt ? `SMS ya dereva ilimfikia ${esc(formatDate(r.rider.smsAt, true))}` : 'Hajapata SMS ya dereva (bado au SMS haijatumwa)'}</p>`
+          : ''
       }${r.ratingForPassenger ? `<p class="muted">Nyota kutoka kwa dereva: ${'★'.repeat(r.ratingForPassenger)}</p>` : ''}</div>
       <div class="panel-box"><h2>Dereva</h2>${
         r.driver
@@ -157,7 +162,7 @@ function render(r) {
       (r.sos ?? []).length
         ? `<section class="panel"><h2>Dharura</h2><ul class="history">${r.sos
             .map(
-              (x) => `<li><span><strong>${x.role === 'PASSENGER' ? 'Abiria' : 'Dereva'}: ${esc(x.name)}</strong> · ${x.status === 'OPEN' ? 'Wazi' : 'Imeshughulikiwa'}</span><span class="muted">${esc(
+              (x) => `<li><span><strong>${x.role === 'PASSENGER' ? 'Abiria' : x.role === 'RIDER' ? 'Anayesafiri' : 'Dereva'}: ${esc(x.name)}</strong> · ${x.status === 'OPEN' ? 'Wazi' : 'Imeshughulikiwa'}</span><span class="muted">${esc(
                 formatDate(x.createdAt, true),
               )}</span>${x.note ? `<span class="note">${esc(x.note)}</span>` : ''}</li>`,
             )

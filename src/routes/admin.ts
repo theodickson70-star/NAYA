@@ -10,7 +10,9 @@ import { openSosCount } from '../services/safety.js';
 import { openSupportCount } from '../services/support.js';
 import { newFeedbackCount } from '../services/feedback.js';
 import { fcmStats } from '../services/fcm.js';
-import { smsEnabled, smsOverview } from '../services/sms.js';
+import { sendTestSms, smsEnabled, smsOverview } from '../services/sms.js';
+import { z } from 'zod';
+import { phoneSchema } from '../validators/auth.js';
 import { subscriptionStats } from '../services/subscriptions.js';
 import { countNewUsersSince, countUsersByRole } from '../services/users.js';
 import { ok } from '../utils/http.js';
@@ -56,4 +58,9 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
 
   /** SMS (Beem): imewashwa?, salio, na SMS za karibuni (aina na matokeo tu — si maandishi). */
   app.get('/api/admin/sms', adminOnly, async () => ok(await smsOverview()));
+  // 0.25.1: SMS moja ya majaribio — kuthibitisha funguo za Beem na Sender ID
+  app.post('/api/admin/sms/test', { ...adminOnly, config: { rateLimit: { max: 5, timeWindow: '10 minutes' } } }, async (request) => {
+    const { phone } = z.object({ phone: phoneSchema }).parse(request.body ?? {});
+    return ok(await sendTestSms(request.currentUser.id, phone));
+  });
 }

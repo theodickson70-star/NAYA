@@ -376,7 +376,7 @@ export async function renderActivity() {
           .map(
             (r) => `<li>
               <span class="acct-trip-route"><strong>${esc(r.destination.name)}</strong><span class="muted">kutoka ${esc(r.pickup.name)}</span>
-                <span class="muted small">${esc(formatDate(r.requestedAt, true))} · ${esc(VEHICLE_TYPES[r.vehicleType] ?? '')}</span></span>
+                <span class="muted small">${esc(formatDate(r.requestedAt, true))} · ${esc(VEHICLE_TYPES[r.vehicleType] ?? '')}${!drives && r.riderName ? ` · kwa ${esc(r.riderName)}` : ''}</span></span>
               <span class="trip-right">${
                 r.status === 'COMPLETED'
                   ? `<strong>${formatTsh(drives ? r.fare : r.passengerPays ?? r.fare)}</strong>${r.promo ? `<span class="acct-promo-tag">Ofa −${formatTsh(r.promo.discount)}</span>` : ''}`

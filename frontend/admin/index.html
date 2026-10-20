@@ -186,6 +186,14 @@
           <div class="stat"><span class="stat-value" id="sms-month">–</span><span class="stat-label">Mwezi huu</span></div>
         </section>
         <p class="alert alert-warn" id="sms-failed" hidden></p>
+        <form class="sms-test" id="sms-test-form" novalidate>
+          <label for="sms-test-phone">Tuma SMS ya majaribio <span class="muted" id="sms-sender"></span></label>
+          <div class="sms-test-row">
+            <input id="sms-test-phone" type="tel" inputmode="tel" maxlength="16" placeholder="Namba yako, mf. 0712 345 678" autocomplete="off">
+            <button class="btn btn-ghost" type="submit">Tuma</button>
+          </div>
+          <p class="alert" id="sms-test-result" role="status" hidden></p>
+        </form>
         <ul class="history" id="sms-recent"></ul>
       </section>
     </main>

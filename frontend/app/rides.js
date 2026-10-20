@@ -188,7 +188,7 @@ export async function book(body) {
 
 function passengerKey(r) {
   // Umbali/dakika hazimo hapa: zinasasishwa papo hapo bila kuchora skrini upya (ramani isianze upya).
-  return [r.status, r.redispatched, r.driver?.name, r.pin, r.sosOpen, r.shared, cancelOpen, sosSheet, shareUrl, farepay.fareKey(r.farePay), fareUi.busy, fareUi.error, fareUi.open].join('|');
+  return [r.status, r.redispatched, r.driver?.name, r.pin, r.sosOpen, r.shared, r.rider?.smsSent, cancelOpen, sosSheet, shareUrl, farepay.fareKey(r.farePay), fareUi.busy, fareUi.error, fareUi.open].join('|');
 }
 
 export function renderPassengerRide(ride) {
@@ -211,7 +211,7 @@ export function renderPassengerRide(ride) {
   const head = {
     SEARCHING: [
       'searching',
-      ride.redispatched ? 'Tunakutafutia dereva mwingine' : 'Tunatafuta dereva karibu nawe…',
+      ride.redispatched ? 'Tunakutafutia dereva mwingine' : ride.rider ? `Tunamtafutia ${ride.rider.name.split(' ')[0]} dereva…` : 'Tunatafuta dereva karibu nawe…',
       ride.redispatched ? 'Dereva wa awali ameghairi. Usijali — tunamtafuta mwingine sasa hivi.' : 'Safari yako imepokelewa. Subiri kidogo.',
     ],
     ACCEPTED: ['coming', 'Dereva anakuja', etaText(ride, d?.etaMinutes, d?.distanceToPickupKm)],
@@ -237,7 +237,8 @@ export function renderPassengerRide(ride) {
     ${ride.sosOpen ? sosSentHtml() : ''}
     ${ride.status === 'SEARCHING' ? pushPrompt('Washa arifa ujue dereva akipatikana, hata ukifunga app.') : ''}
     ${live ? '<div class="ride-map" id="ride-map" role="img" aria-label="Ramani: mahali pa kuchukuliwa, unakoenda, na dereva"></div>' : ''}
-    ${ride.pin ? pinCardHtml(ride.pin) : ''}
+    ${ride.rider ? riderCardHtml(ride) : ''}
+    ${ride.pin ? pinCardHtml(ride.pin, ride.rider) : ''}
     ${d ? driverCardHtml(ride) : ''}
     ${live ? farepay.passengerLiveHtml(ride, fareUi) : ''}
     ${live ? safetyHtml({ share: true, sosOpen: ride.sosOpen }) : ''}
@@ -293,11 +294,48 @@ export function renderPassengerRide(ride) {
   ensurePassengerPolling();
 }
 
-function pinCardHtml(pin) {
+function pinCardHtml(pin, rider = null) {
   return `<section class="card pin-card" aria-label="PIN ya safari">
     <span class="pin-label">PIN ya safari</span>
     <strong class="pin-digits">${esc(pin.split('').join(' '))}</strong>
-    <span class="muted">Safari ya ofa: mpe dereva PIN hii ukishapanda ili upate punguzo — kwanza hakikisha plate ni sahihi.</span>
+    <span class="muted">${
+      rider
+        ? `Safari ya ofa: ${esc(rider.name.split(' ')[0])} ataiona PIN hii kwenye link yake na kumpa dereva akishapanda. Unaweza pia kumtumia.`
+        : 'Safari ya ofa: mpe dereva PIN hii ukishapanda ili upate punguzo — kwanza hakikisha plate ni sahihi.'
+    }</span>
+  </section>`;
+}
+
+/** 0.25.0: safari ya mtu mwingine — aliyeagiza anaona anayesafiri, anaweza kumpigia na kumtumia link ya kufuatilia. */
+function riderCardHtml(ride) {
+  const r = ride.rider;
+  const first = r.name.split(' ')[0];
+  const live = ['SEARCHING', ...LIVE].includes(ride.status);
+  const url = r.link ? `${location.origin}${r.link}` : '';
+  const msg = ride.driver
+    ? t(`Habari ${first}, nimekuagizia ${VEHICLE_TYPES[ride.vehicleType].toLowerCase()} ya NAYA. Dereva ${ride.driver.name} (${ride.driver.plateNumber}) anakuja ${ride.pickup.name}. Fuatilia hapa: ${url}`)
+    : t(`Habari ${first}, nimekuagizia safari ya NAYA kutoka ${ride.pickup.name}. Fuatilia dereva hapa: ${url}`);
+  const smsLine = ride.status === 'SEARCHING'
+    ? `Dereva akipatikana, ${esc(first)} atapata SMS yenye jina la dereva, plate na link ya kufuatilia.`
+    : r.smsSent
+      ? `${esc(first)} amepata SMS yenye taarifa za dereva na link ya kufuatilia.`
+      : `SMS haijamfikia ${esc(first)} — mtumie link hii kwa WhatsApp au mpigie.`;
+  return `<section class="card rider-card" aria-label="Anayesafiri">
+    <div class="rider-who">
+      <span class="muted">Safari ya</span>
+      <strong>${esc(r.name)}</strong>
+      <span class="muted">${esc(formatPhone(r.phone))} · dereva anampigia yeye · wewe unalipa nauli</span>
+    </div>
+    ${live ? `<p class="muted small" style="margin:10px 0 0">${smsLine}</p>` : ''}
+    ${
+      live
+        ? `<div class="actions two">
+            <a class="btn btn-ghost call" href="${tel(r.phone)}">${ICON.phone} Mpigie ${esc(first)}</a>
+            ${url ? `<a class="btn btn-ghost call" href="https://wa.me/${esc(r.phone)}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">${ICON.share} Mtumie link</a>` : ''}
+          </div>
+          ${url ? `<div class="rider-link"><label class="muted small" for="rider-url">Link ya ${esc(first)} (anaona dereva, ramani na kitufe cha dharura)</label><input id="rider-url" readonly value="${esc(url)}"></div>` : ''}`
+        : ''
+    }
   </section>`;
 }
 
@@ -342,6 +380,8 @@ function sosSentHtml() {
 function quickPosition() {
   return new Promise((resolve) => {
     if (!navigator.geolocation) return resolve(null);
+    // Ombi la ruhusa ya GPS likiachwa bila jibu, "timeout" hapa chini haianzi — dharura isisubiri zaidi ya sekunde 3.
+    setTimeout(() => resolve(null), 3500);
     navigator.geolocation.getCurrentPosition(
       (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
       () => resolve(null),
@@ -390,7 +430,10 @@ function loadPassengerPhoto(rideId) {
 }
 
 const paxInitials = (name) => esc((name ?? '?').split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase());
-const paxMeta = (p) => (p?.rating ? `★ ${p.rating.average} · safari ${p.trips}` : p?.trips ? `Safari ${p.trips} na NAYA` : 'Abiria mpya');
+const paxMeta = (p) =>
+  p?.bookedBy
+    ? `Ameagizwa na ${p.bookedBy} (safari ya mtu mwingine)`
+    : p?.rating ? `★ ${p.rating.average} · safari ${p.trips}` : p?.trips ? `Safari ${p.trips} na NAYA` : 'Abiria mpya';
 
 function loadDriverPhoto(rideId) {
   const place = (url) => {
@@ -1271,7 +1314,7 @@ export function historyHtml(list) {
   return `<ul class="trips">${list
     .slice(0, 5)
     .map(
-      (r) => `<li><span><strong>${esc(r.destination.name)}</strong><span class="muted">${esc(formatDate(r.requestedAt, true))} · kutoka ${esc(r.pickup.name)}</span></span>
+      (r) => `<li><span><strong>${esc(r.destination.name)}</strong><span class="muted">${esc(formatDate(r.requestedAt, true))} · kutoka ${esc(r.pickup.name)}${r.riderName ? ` · kwa ${esc(r.riderName)}` : ''}</span></span>
         <span class="trip-right">${r.status === 'COMPLETED' ? `<strong>${formatTsh(r.passengerPays ?? r.fare)}</strong>` : ''}<span class="badge badge-${label[r.status][0]}">${label[r.status][1]}</span></span></li>`,
     )
     .join('')}</ul>`;

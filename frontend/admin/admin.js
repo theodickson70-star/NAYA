@@ -430,7 +430,39 @@ const SMS_KINDS = {
   driver_rejected: 'Ombi la dereva — marekebisho',
   subscription_due: 'Ada inakaribia kuisha',
   subscription_expired: 'Ada imeisha',
+  admin_test: 'SMS ya majaribio',
+  broadcast: 'Tangazo',
+  office_message: 'Ujumbe wa ofisi',
+  temp_password: 'Password ya muda',
+  rider_driver_found: 'Safari ya mtu mwingine — dereva',
+  rider_cancelled: 'Safari ya mtu mwingine — imeghairiwa',
 };
+
+// 0.25.1: SMS ya majaribio (kuthibitisha funguo za Beem na Sender ID)
+$('sms-test-form')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = form.querySelector('button');
+  const box = $('sms-test-result');
+  button.disabled = true;
+  button.textContent = 'Inatuma…';
+  box.hidden = true;
+  try {
+    const r = await api.post('/api/admin/sms/test', { phone: $('sms-test-phone').value });
+    box.className = `alert ${r.ok ? 'alert-ok' : 'alert-danger'}`;
+    box.textContent = r.ok
+      ? `Beem imepokea SMS (Sender ID: ${r.senderId}). Angalia simu yako — ikifika, SMS za NAYA ziko tayari.`
+      : `Haikutumwa: ${r.error}. Kagua BEEM_API_KEY, BEEM_SECRET_KEY, BEEM_SENDER_ID (${r.senderId}) na salio la Beem.`;
+    loadSms();
+  } catch (err) {
+    if (handleAuthError(err)) return;
+    box.className = 'alert alert-danger';
+    box.textContent = err.message;
+  }
+  box.hidden = false;
+  button.disabled = false;
+  button.textContent = 'Tuma';
+});
 
 async function loadSms() {
   try {
@@ -438,6 +470,7 @@ async function loadSms() {
     $('sms-panel').hidden = false;
     const n = (v) => Number(v).toLocaleString('sw-TZ');
     $('sms-balance').textContent = sms.balance == null ? '?' : n(sms.balance);
+    $('sms-sender').textContent = `· Sender ID: ${sms.senderId}`;
     $('sms-today').textContent = n(sms.sentToday);
     $('sms-month').textContent = n(sms.sentThisMonth);
     $('sms-failed').hidden = !sms.failedToday;

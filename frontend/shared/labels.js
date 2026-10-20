@@ -26,6 +26,8 @@ export const DOCUMENT_STATUS = {
 export const VEHICLE_TYPES = { BODABODA: 'Bodaboda', BAJAJI: 'Bajaji' };
 
 export const AUDIT_ACTIONS = {
+  'sms.test': 'SMS ya majaribio imetumwa',
+  'sms.activated': 'SMS zimewashwa (watumiaji waliopo hawaombwi kuthibitisha)',
   'customer.refund_salio': 'Amerudishiwa pesa (salio la NAYA)',
   'customer.refund_phone': 'Amerudishiwa pesa (kwa simu)',
   'customer_wallet.cashout_done': 'Amerudishiwa salio lake',

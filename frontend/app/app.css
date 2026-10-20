@@ -439,6 +439,18 @@ input, select, textarea { font-size: 17px; padding: 13px 14px; border-radius: va
 .choice input:focus-visible + span { outline: 3px solid var(--gold); outline-offset: 2px; }
 .optional { color: var(--muted); font-weight: 400; }
 
+/* 0.25.0: safari ya mtu mwingine */
+.for-whom { margin: 14px 0 12px; }
+.for-whom .choice span { padding: 11px 8px; }
+.for-other { margin-top: 12px; }
+.for-other .muted.small { margin: 8px 0 0; }
+.for-other .alert { margin: 10px 0 0; }
+.rider-card .rider-who { display: grid; gap: 2px; }
+.rider-card .actions { margin-top: 12px; }
+.rider-link { margin-top: 12px; }
+.rider-link input { width: 100%; margin-top: 6px; }
+.booked-by { display: inline-block; font-size: 13px; font-weight: 700; color: var(--g800); background: var(--g100); border-radius: 999px; padding: 2px 10px; margin-top: 4px; }
+
 /* Nyaraka */
 .docs { list-style: none; margin: 0; padding: 0; }
 .doc { display: grid; grid-template-columns: 64px 1fr; gap: 12px; padding: 14px 0; border-top: 1px solid var(--line); }

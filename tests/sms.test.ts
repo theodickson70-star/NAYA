@@ -7,7 +7,7 @@ import { buildApp } from '../src/app.js';
 import { db } from '../src/db/pool.js';
 import { runMigrations } from '../src/db/migrate.js';
 import { hashPassword } from '../src/services/auth.js';
-import { setSmsSenderForTests, toGsm } from '../src/services/sms.js';
+import { activateSmsOnce, setSmsSenderForTests, toGsm } from '../src/services/sms.js';
 
 let app: FastifyInstance;
 const s = String(Date.now()).slice(-6);
@@ -212,6 +212,58 @@ describe('NAYA Phase 9 — SMS zimewashwa', () => {
     assert.equal(res.status, 503);
     const failed = (await db.query(`SELECT count(*)::int AS n FROM naya.sms_log WHERE phone = $1 AND status = 'FAILED'`, [`255754${s}`])).rows[0].n;
     assert.ok(failed >= 1);
+  });
+
+  it('0.25.1: ofisi inatuma SMS ya majaribio — inafika, au inaonyesha kosa la Beem', async () => {
+    const adminToken = (await call('POST', '/api/auth/login', { phone: `0693${s}`, password: PASSWORD, portal: 'admin' })).json.data.token;
+    phones.push(`255695${s}`);
+    setSmsSenderForTests(async (to, message) => {
+      sent.push({ phone: to, message });
+      return { ok: true, requestId: 'test' };
+    });
+    const good = await call('POST', '/api/admin/sms/test', { phone: `0695${s}` }, adminToken);
+    assert.equal(good.status, 200, good.json.message);
+    assert.equal(good.json.data.ok, true);
+    assert.ok(good.json.data.senderId);
+    assert.match((await waitForSms(`255695${s}`, 1)).message, /SMS ya majaribio/);
+
+    setSmsSenderForTests(async () => ({ ok: false, error: 'Beem 400 (code 111): Invalid Sender Id' }));
+    const bad = await call('POST', '/api/admin/sms/test', { phone: `0695${s}` }, adminToken);
+    assert.equal(bad.status, 200);
+    assert.equal(bad.json.data.ok, false);
+    assert.match(bad.json.data.error, /Invalid Sender Id/);
+    assert.equal((await call('POST', '/api/admin/sms/test', { phone: '123' }, adminToken)).status, 400);
+    const userToken = (await call('POST', '/api/auth/login', { phone, password: PASSWORD, portal: 'app' })).json.data?.token;
+    if (userToken) assert.equal((await call('POST', '/api/admin/sms/test', { phone: `0695${s}` }, userToken)).status, 403);
+    setSmsSenderForTests(null);
+    assert.equal((await call('POST', '/api/admin/sms/test', { phone: `0695${s}` }, adminToken)).status, 409, 'bila funguo → 409');
+  });
+
+  it('0.25.1: SMS zikiwashwa mara ya kwanza, watumiaji waliopo hawazuiwi (mara moja tu)', async () => {
+    setSmsSenderForTests(async () => ({ ok: true, requestId: 'test' }));
+    phones.push(`255696${s}`);
+    const id = (
+      await db.query(`INSERT INTO naya.users (phone, full_name, role, password_hash) VALUES ($1, 'Mtumiaji wa Zamani', 'USER', $2) RETURNING id`, [
+        `255696${s}`,
+        await hashPassword(PASSWORD),
+      ])
+    ).rows[0].id;
+    const saved = (await db.query(`SELECT value FROM naya.settings WHERE key = 'sms_activation'`)).rows[0]?.value ?? null;
+    await db.query(`DELETE FROM naya.settings WHERE key = 'sms_activation'`);
+    try {
+      const n = await activateSmsOnce();
+      assert.ok((n ?? 0) >= 1);
+      const row = (await db.query('SELECT phone_verified_at, created_at FROM naya.users WHERE id = $1', [id])).rows[0];
+      assert.equal(row.phone_verified_at?.getTime(), row.created_at.getTime());
+      await db.query('UPDATE naya.users SET phone_verified_at = NULL WHERE id = $1', [id]);
+      assert.equal(await activateSmsOnce(), null, 'mara ya pili haifanyi kitu');
+      assert.equal((await db.query('SELECT phone_verified_at FROM naya.users WHERE id = $1', [id])).rows[0].phone_verified_at, null);
+    } finally {
+      await db.query(`DELETE FROM naya.settings WHERE key = 'sms_activation'`);
+      if (saved) await db.query(`INSERT INTO naya.settings (key, value) VALUES ('sms_activation', $1)`, [JSON.stringify(saved)]);
+      await db.query(`DELETE FROM naya.audit_logs WHERE action = 'sms.activated' AND created_at > now() - interval '5 minutes'`);
+      setSmsSenderForTests(null);
+    }
   });
 
   it('herufi zisizo za GSM zinabadilishwa (SMS isiwe ghali)', () => {

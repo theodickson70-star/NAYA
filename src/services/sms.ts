@@ -4,7 +4,9 @@
 // - Bila funguo, SMS zimezimwa: sendSms inarudisha false bila kosa.
 import { phoneLang, tr } from './i18n.js';
 import { env } from '../config/env.js';
-import { db, one } from '../db/pool.js';
+import { db, one, transaction } from '../db/pool.js';
+import { conflict } from '../utils/http.js';
+import { writeAudit } from './audit.js';
 
 const SEND_URL = `${env.beemBaseUrl}/v1/send`;
 const BALANCE_URL = `${env.beemBaseUrl}/public/v1/vendors/balance`;
@@ -132,4 +134,42 @@ export async function smsOverview() {
     sentThisMonth: stats?.sent_month ?? 0,
     recent: recent.rows,
   };
+}
+
+/**
+ * 0.25.1: Ofisi inatuma SMS moja ya majaribio (baada ya kuweka funguo za Beem na Sender ID kwenye Railway).
+ * Inarudisha jibu la Beem (limeandikwa kwenye sms_log) ili ofisi ione tatizo moja kwa moja: funguo, Sender ID au salio.
+ */
+export async function sendTestSms(adminId: string, phone: string) {
+  if (!smsEnabled()) throw conflict('SMS hazijawashwa. Weka BEEM_API_KEY na BEEM_SECRET_KEY kwenye Railway → Variables.');
+  const ok = await sendSms(phone, 'NAYA: Hii ni SMS ya majaribio kutoka ofisi ya NAYA. Mfumo wa SMS unafanya kazi.', 'admin_test');
+  const last = await one<{ error: string | null }>(
+    db,
+    `SELECT error FROM naya.sms_log WHERE phone = $1 AND kind = 'admin_test' ORDER BY created_at DESC LIMIT 1`,
+    [phone],
+  );
+  await writeAudit(db, { actorId: adminId, action: 'sms.test', targetType: 'sms', targetId: null, details: { ok, senderId: env.beemSenderId } }).catch(() => {});
+  return { ok, senderId: env.beemSenderId, error: ok ? null : last?.error ?? 'Beem haikukubali SMS' };
+}
+
+/**
+ * 0.25.1: Mara ya KWANZA SMS zinapowashwa (funguo za Beem zimewekwa), watumiaji waliopo — waliojisajili wakati SMS
+ * zimezimwa — wanahesabiwa kuwa wamethibitishwa, ili madereva na wateja wanaotumia NAYA sasa wasizuiwe ghafla
+ * kuagiza wala kwenda online. Watumiaji wapya kuanzia hapo wanathibitisha namba kwa SMS kama kawaida.
+ * Inafanyika mara moja tu (settings.sms_activation); haifuti data.
+ */
+export async function activateSmsOnce(log: (message: string) => void = () => {}): Promise<number | null> {
+  if (!smsEnabled()) return null;
+  return transaction(async (client) => {
+    const first = await client.query(
+      `INSERT INTO naya.settings (key, value) VALUES ('sms_activation', jsonb_build_object('at', now())) ON CONFLICT (key) DO NOTHING`,
+    );
+    if (first.rowCount === 0) return null; // ilishafanyika
+    const res = await client.query(`UPDATE naya.users SET phone_verified_at = created_at WHERE phone_verified_at IS NULL`);
+    const n = res.rowCount ?? 0;
+    await client.query(`UPDATE naya.settings SET value = value || jsonb_build_object('existingUsers', $1::int) WHERE key = 'sms_activation'`, [n]);
+    await writeAudit(client, { actorId: null, action: 'sms.activated', targetType: 'sms', targetId: null, details: { existingUsers: n, senderId: env.beemSenderId } });
+    log(`[sms] SMS zimewashwa kwa mara ya kwanza: watumiaji ${n} waliopo hawataombwa kuthibitisha namba.`);
+    return n;
+  });
 }

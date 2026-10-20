@@ -90,9 +90,12 @@ export const env = {
   androidApkUrl: read('ANDROID_APK_URL'),
   /** Si lazima: lazimisha namba ya toleo jipya la APK (vinginevyo inasomwa kutoka GitHub Releases). */
   androidLatestVersionCode: Number(read('ANDROID_LATEST_VERSION_CODE') ?? '') || null,
+  /** Si lazima: anwani ya NAYA kwa link zinazotumwa kwa SMS (mf. safari ya mtu mwingine). */
+  publicUrl: (read('PUBLIC_URL') ?? 'https://naya-production-e5cf.up.railway.app').replace(/\/$/, ''),
 };
 
 if (env.androidApkUrl && !/^https:\/\//.test(env.androidApkUrl)) problems.push('ANDROID_APK_URL lazima ianze na https://');
+if (!/^https:\/\/[^\s/]+/.test(env.publicUrl)) problems.push('PUBLIC_URL lazima ianze na https://');
 if (env.beemSenderId.length > 11) problems.push('BEEM_SENDER_ID isizidi herufi 11');
 if (!!env.beemApiKey !== !!env.beemSecretKey) problems.push('Weka BEEM_API_KEY na BEEM_SECRET_KEY zote mbili (au usiweke zote)');
 
