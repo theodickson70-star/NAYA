@@ -115,6 +115,18 @@ Alama za kutiliwa shaka (`rides.flags`), zinaonekana kwa ofisi kwenye safari, Ri
 DRIVER, PASSENGER, AUTO au ADMIN. Migration `021_safari_rahisi.sql` inaongeza safu tu (haifuti data); safari zinazoendelea zisizo
 za ofa zinaondolewa PIN ili zisikwame.
 
+## Taarifa kamili za dereva (0.27.0)
+
+Ofisi → Madereva → dereva: ukurasa sasa una vichupo — **Muhtasari · Bonus za ofa · Wallet · Safari · Malipo yote · Malalamiko na historia · Usajili na nyaraka** — na kitufe cha **Chapisha taarifa** (vichupo vyote kwenye karatasi moja).
+
+- **Muhtasari:** safari, nauli za mwezi, nyota, asilimia ya kukubali maombi, bonus inayodaiwa, salio la wallet, hali ya akaunti/ada/app, namba za kupokea pesa, na **"Kumweleza dereva"** — maelezo ya lugha rahisi (yanayotokana na kumbukumbu tu) ya bonus zake zimekwenda wapi; kitufe cha Nakili.
+- **Bonus za ofa:** kila safari ya ofa — kiasi, hali (Imelipwa / Imeshikiliwa / Imeshindwa / Inakusanywa / Haijalipwa / Imekataliwa) na sababu, na **pesa ilikwenda wapi** (wallet ya NAYA, au simu: namba, kumbukumbu ya NAYA na ya mtandao, imefanikiwa au la). Iliyoshikiliwa au iliyoshindwa inaweza **kulipwa au kukataliwa** hapohapo. Pia malipo yote ya bonus (wallet / simu moja kwa moja / ofisi kwa mkono, pamoja na yaliyofutwa).
+- **Wallet:** salio, bonus zilizoingia, nauli za simu, alichotoa, kilicho njiani, kutoa kulikoshindwa, na kila muamala pamoja na kumbukumbu za mtandao.
+- **Safari:** leo / wiki / mwezi / tangu aanze, maombi (amekubali, amekataa, hakujibu, ameghairi), safari 40 za karibuni, abiria waliomdai.
+- **Malipo yote:** kila muamala wa simu (ada, bonus, kutoa) na malipo ya ada ya mwezi.
+- **Malalamiko na historia:** maombi ya msaada yake na ya abiria kuhusu safari zake, nyota za chini, dharura, na kila hatua ya ofisi (pamoja na bonus zilizoidhinishwa/kukataliwa).
+- Kiungo cha moja kwa moja: `#/madereva/<id>?tab=bonus`. Inasoma tu (vitendo vya bonus vinatumia njia zilizopo). Hakuna migration.
+
 ## SMS kwenye matukio muhimu (0.26.1)
 
 Matukio haya yalikuwa na arifa ya app tu; sasa yanatuma pia SMS fupi (SMS 1, bila siri yoyote):

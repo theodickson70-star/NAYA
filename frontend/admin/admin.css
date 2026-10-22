@@ -1101,3 +1101,42 @@ a.kpi:hover, .queue-item:hover, .settings-tile:hover { transform: translateY(-2p
 @media (max-width: 1080px) { .smsc-grid { grid-template-columns: 1fr; } }
 @media (max-width: 760px) { .smsc-audience { grid-template-columns: 1fr 1fr; } .smsc-h-side { align-items: flex-start; text-align: left; } }
 @media (prefers-reduced-motion: reduce) { .smsc-bar i { transition: none; } }
+
+/* 0.27.0: Taarifa kamili za dereva */
+.dv-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 20px 0 4px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.dv-tabs button { font: inherit; font-size: 15px; font-weight: 700; padding: 8px 14px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--white); color: var(--ink); cursor: pointer; }
+.dv-tabs button[aria-selected="true"] { background: var(--naya-green); border-color: var(--naya-green); color: var(--white); }
+.dv-tabs button:focus-visible { outline: 3px solid var(--warning); outline-offset: 2px; }
+.dv-tabs .dv-print { margin-left: auto; border-style: dashed; }
+.dv-loading { margin-top: 20px; }
+.dv-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 20px; }
+.dv-tile { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
+.dv-tile strong { font-family: var(--font-display); font-size: 22px; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.dv-tile span { font-size: 13px; color: var(--muted); }
+.dv-tile.is-warn { border-color: var(--warning); box-shadow: inset 4px 0 0 var(--warning); }
+.dv-tile.is-good { border-color: var(--naya-green); box-shadow: inset 4px 0 0 var(--naya-green); }
+.dv-explain ul { margin: 0; padding-left: 20px; }
+.dv-explain li { margin: 6px 0; }
+.dv-split { margin: 14px 0 0; }
+.dv-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.dv-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }
+.dv-facts { margin-top: 18px; }
+.table-wrap { overflow-x: auto; }
+.dv-table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+.dv-table th { text-align: left; font-size: 13px; color: var(--muted); font-weight: 700; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.dv-table td { padding: 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.dv-table td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.dv-table td.pos { color: var(--naya-green-dark); }
+.dv-table td.neg { color: var(--danger); }
+.dv-table .mono, .dv-table td.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; overflow-wrap: anywhere; }
+.dv-table tr.is-void td, .history li.is-void { opacity: 0.55; text-decoration: line-through; }
+.dv-actions { white-space: nowrap; }
+.dv-actions .btn + .btn { margin-left: 4px; }
+@media print {
+  body.dv-printing .sidebar, body.dv-printing .appbar, body.dv-printing .dv-tabs, body.dv-printing .back-link,
+  body.dv-printing .decision, body.dv-printing .dv-actions, body.dv-printing [data-dv], body.dv-printing .sos-banner { display: none !important; }
+  body.dv-printing [data-panel] { display: block !important; }
+  body.dv-printing .shell { display: block; }
+  body.dv-printing .dv-table { font-size: 11px; }
+  body.dv-printing .panel, body.dv-printing .dv-tile { break-inside: avoid; }
+}

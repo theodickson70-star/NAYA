@@ -4,6 +4,7 @@ import { createApi, escapeHtml as esc, fetchHealth } from '/shared/api.js';
 import { connectRealtime } from '/shared/realtime.js';
 import * as broadcastAdmin from './broadcast-admin.js';
 import * as smsCenter from './sms-center-admin.js';
+import * as driverFull from './driver-full-admin.js';
 import { barChart, shortDay } from './charts.js';
 import * as feedbackAdmin from './feedback-admin.js';
 import * as liveAdmin from './live-admin.js';
@@ -708,6 +709,9 @@ function renderDriver(data) {
       ${badge(DRIVER_STATUS, driver.status)}
     </div>
     ${driver.rejectionReason ? `<p class="alert ${driver.status === 'SUSPENDED' ? 'alert-danger' : 'alert-warn'}"><strong>Sababu:</strong> ${esc(driver.rejectionReason)}</p>` : ''}
+    <nav class="dv-tabs" id="dv-tabs" role="tablist" aria-label="Taarifa za dereva"></nav>
+    <div id="dv-full"></div>
+    <div data-panel="usajili">
 
     <section class="panel">
       <h2>Chombo na leseni</h2>
@@ -757,7 +761,8 @@ function renderDriver(data) {
               )
               .join('')}</ul>`
       }
-    </section>`;
+    </section>
+    </div>`;
 
   // Picha ndogo za nyaraka (zinapakuliwa kwa token, si URL za wazi).
   for (const button of document.querySelectorAll('.doc-thumb[data-doc]')) {
@@ -778,6 +783,7 @@ function renderDriver(data) {
   bindDecision(data);
   driverOnPage = ['APPROVED', 'SUSPENDED'].includes(driver.status) ? data.user.id : null;
   if (driverOnPage) subsAdmin.loadDriverPanel(driverOnPage);
+  driverFull.mount(data.user.id, driver.status);
 }
 
 function decisionPanel(driver, docs) {
@@ -985,5 +991,6 @@ settingsAdmin.setup({ api, onAuthError: handleAuthError, toast });
 staffAdmin.setup({ api, onAuthError: handleAuthError, onPendingChange: setLocationsBadge, onApproved: () => places.loadLocations($('location-q').value) });
 broadcastAdmin.setup({ api, onAuthError: handleAuthError });
 smsCenter.setup({ api, onAuthError: handleAuthError });
+driverFull.setup({ api, onAuthError: handleAuthError });
 feedbackAdmin.setup({ api, onAuthError: handleAuthError });
 start();

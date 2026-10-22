@@ -10,6 +10,7 @@ import {
   reinstateDriver,
   suspendDriver,
 } from '../services/drivers.js';
+import { driverFull } from '../services/driver-full.js';
 import { ok } from '../utils/http.js';
 import { documentTypeParam, driverIdParam, driverListQuery, rejectSchema, suspendSchema } from '../validators/drivers.js';
 
@@ -21,6 +22,13 @@ export async function adminDriverRoutes(app: FastifyInstance): Promise<void> {
   app.get('/api/admin/drivers/:id', adminOnly, async (request) => {
     const { id } = driverIdParam.parse(request.params);
     return ok(await getDriverForAdmin(id));
+  });
+
+  // 0.27.0: taarifa kamili — safari, bonus za ofa safari kwa safari, wallet, malipo yote, ada, malalamiko
+  app.get('/api/admin/drivers/:id/full', adminOnly, async (request, reply) => {
+    const { id } = driverIdParam.parse(request.params);
+    reply.header('cache-control', 'no-store');
+    return ok(await driverFull(id));
   });
 
   app.get('/api/admin/drivers/:id/documents/:type/file', adminOnly, async (request, reply) => {
