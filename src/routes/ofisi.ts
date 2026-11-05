@@ -18,6 +18,7 @@ import {
   userCounts,
   userDetail,
   verifyPhoneManually,
+  setUserSmsMarketing,
 } from '../services/admin-users.js';
 import { AUDIENCES, audienceSizes, listBroadcasts, sendBroadcast } from '../services/broadcast.js';
 import { FEEDBACK_SOURCES, FEEDBACK_TOPICS, giveFeedback, handleFeedback, listFeedback, markFeedbackSeen, myFeedback, rideComments } from '../services/feedback.js';
@@ -125,6 +126,10 @@ export async function ofisiRoutes(app: FastifyInstance): Promise<void> {
   app.post('/api/admin/users/:id/reactivate', adminOnly, async (request) =>
     ok(await reactivateUser(request.currentUser.id, idParam.parse(request.params).id)),
   );
+  app.post('/api/admin/users/:id/sms-marketing', adminOnly, async (request) => {
+    const { receive } = z.object({ receive: z.boolean() }).parse(request.body ?? {});
+    return ok(await setUserSmsMarketing(request.currentUser.id, idParam.parse(request.params).id, receive));
+  });
   app.post('/api/admin/users/:id/verify-phone', adminOnly, async (request) =>
     ok(await verifyPhoneManually(request.currentUser.id, idParam.parse(request.params).id)),
   );

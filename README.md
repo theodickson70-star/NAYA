@@ -115,6 +115,17 @@ Alama za kutiliwa shaka (`rides.flags`), zinaonekana kwa ofisi kwenye safari, Ri
 DRIVER, PASSENGER, AUTO au ADMIN. Migration `021_safari_rahisi.sql` inaongeza safu tu (haifuti data); safari zinazoendelea zisizo
 za ofa zinaondolewa PIN ili zisikwame.
 
+## SMS: ratiba, za moja kwa moja, kujiondoa na gharama (0.29.0)
+
+Ofisi → **Kituo cha SMS**:
+
+- **Panga muda:** ukiandika SMS chagua "Panga muda" → tarehe na saa, na **Mara moja / Kila siku / Kila wiki**. Server inakagua kila dakika na kutuma muda ukifika (wapokeaji wanahesabiwa upya wakati wa kutuma). Sehemu ya **Zilizopangwa**: Simamisha · Endelea · Ghairi, na matokeo ya kila mara (imetumwa kwa watu X / haikutumwa na sababu, mf. salio).
+- **SMS za moja kwa moja** (zimezimwa mwanzoni — ofisi inaziwasha): **Karibu NAYA** (mteja mpya, saa 1 baada ya kujiunga, mara moja tu), **Mteja aliyepotea** (hajasafiri siku N, anakumbushwa mara moja kila siku N), **Dereva asiyeingia kazini** (siku N). Kila moja ina ujumbe wake, siku, na kikomo cha SMS kwa siku; zinatumwa saa 2 asubuhi – saa 2 usiku (08:00–20:00) tu. Ukumbusho wa ada ya dereva tayari unatumwa na mfumo wa ada, haurudiwi.
+- **Kujiondoa:** mtumiaji anazima "SMS za matangazo kutoka NAYA" kwenye app (Akaunti → Mipangilio), au ofisi kwenye ukurasa wake ("Mwondoe kwenye SMS za matangazo"). Waliojiondoa hawapati SMS za Kituo cha SMS wala za moja kwa moja; SMS za huduma (namba ya uthibitisho, password, pesa, safari, usalama) zinaendelea. Ujumbe wa huduma kutoka Kituo cha SMS unaweza kuwekwa **"Ujumbe muhimu wa huduma"** ili uwafikie wote.
+- **Gharama:** weka **Bei ya SMS moja (TSh)** — hakiki na historia zinaonyesha gharama kwa TSh (makadirio).
+- **Ripoti ya kufika (delivery report):** bado — inasubiri maelezo rasmi ya RodSMS ya hali ya ujumbe (hatubuni endpoint).
+- Migration `037_sms_ratiba.sql` inaongeza safu/majedwali mapya tu (haifuti data). Hakuna variable mpya ya Railway.
+
 ## SMS kupitia RodSMS (0.28.0)
 
 SMS zote za NAYA (namba za uthibitisho, "Umesahau password?", taarifa, safari ya mtu mwingine, Kituo cha SMS) sasa zinapita **RodSMS** kwa Sender ID ya **NAYA**. Beem haihitajiki tena.

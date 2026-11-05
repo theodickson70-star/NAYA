@@ -36,7 +36,7 @@ const api = createApi('naya_app_token');
 const $ = (id) => document.getElementById(id);
 const views = ['view-loading', 'view-intro', 'view-auth', 'view-verify', 'view-role', 'view-offline', 'view-app'];
 const MAX_BYTES = 3 * 1024 * 1024;
-const VERSION = '0.28.0';
+const VERSION = '0.29.0';
 
 let account = null; // { user, activeMode, driverStatus, canDrive }
 let driver = null; // wasifu wa udereva (mode ya Dereva)
@@ -1080,6 +1080,15 @@ function renderSettings() {
       <button class="link-btn" type="button" id="sound-test">Sikiliza sauti</button>
     </section>
 
+    <section class="card sound-card" aria-labelledby="smsm-title">
+      <div class="sound-row">
+        <span><h2 id="smsm-title">SMS za matangazo kutoka NAYA</h2><span class="muted" id="smsm-note">${
+          account.smsMarketing === false ? 'Umejiondoa. Hutapata SMS za ofa na habari.' : 'Ofa, habari na vikumbusho kwa SMS.'
+        } SMS za huduma (namba ya uthibitisho, pesa, safari na usalama) zinakufikia daima.</span></span>
+        <label class="switch"><input type="checkbox" id="sms-marketing-toggle"${account.smsMarketing === false ? '' : ' checked'}><span class="sr-only">Pokea SMS za matangazo</span><i aria-hidden="true"></i></label>
+      </div>
+    </section>
+
     <section class="card" aria-labelledby="pw-title">
       <details class="pw-details">
         <summary><h2 id="pw-title">Badilisha password</h2></summary>
@@ -1614,7 +1623,26 @@ $('app-content').addEventListener('click', async (event) => {
   }
 });
 
-$('app-content').addEventListener('change', (event) => {
+$('app-content').addEventListener('change', async (event) => {
+  if (event.target.id === 'sms-marketing-toggle') {
+    const box = event.target;
+    const receive = box.checked;
+    box.disabled = true;
+    try {
+      account = await api.put('/api/account/sms-marketing', { receive });
+      const note = $('smsm-note');
+      if (note) {
+        note.textContent = `${receive ? 'Ofa, habari na vikumbusho kwa SMS.' : 'Umejiondoa. Hutapata SMS za ofa na habari.'} SMS za huduma (namba ya uthibitisho, pesa, safari na usalama) zinakufikia daima.`;
+      }
+      toast(receive ? 'Utapokea SMS za matangazo' : 'Umejiondoa kwenye SMS za matangazo');
+    } catch (err) {
+      box.checked = !receive;
+      if (!handleError(err)) toast(err.message);
+    } finally {
+      box.disabled = false;
+    }
+    return;
+  }
   if (event.target.name === 'vehicle') trip.selected = event.target.value;
   if (event.target.name === 'for-whom') {
     forWhom.other = event.target.value === 'other';

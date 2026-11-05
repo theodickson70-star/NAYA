@@ -4,7 +4,8 @@ import { env } from './config/env.js';
 import { db } from './db/pool.js';
 import { runMigrations } from './db/migrate.js';
 import { activateSmsOnce } from './services/sms.js';
-import { markInterruptedCampaigns } from './services/sms-center.js';
+import { markInterruptedCampaigns, runDueSchedules } from './services/sms-center.js';
+import { runAutoSms } from './services/sms-auto.js';
 import { startListener, stopListener } from './realtime/hub.js';
 import { dispatchPending } from './services/rides.js';
 import { runSubscriptionChecks } from './services/subscriptions.js';
@@ -75,7 +76,35 @@ const paymentTimer = setInterval(async () => {
   }
 }, 60_000);
 
+// 0.29.0 SMS zilizopangwa (kila dakika) na SMS za moja kwa moja (kila dakika 10, saa 2 asubuhi – 2 usiku tu).
+let runningSchedules = false;
+const scheduleTimer = setInterval(async () => {
+  if (runningSchedules) return;
+  runningSchedules = true;
+  try {
+    await runDueSchedules();
+  } catch (error) {
+    app.log.error({ err: error }, 'SMS zilizopangwa zimeshindwa');
+  } finally {
+    runningSchedules = false;
+  }
+}, 60_000);
+let runningAuto = false;
+const autoSmsTimer = setInterval(async () => {
+  if (runningAuto) return;
+  runningAuto = true;
+  try {
+    await runAutoSms();
+  } catch (error) {
+    app.log.error({ err: error }, 'SMS za moja kwa moja zimeshindwa');
+  } finally {
+    runningAuto = false;
+  }
+}, 10 * 60_000);
+
 const shutdown = async () => {
+  clearInterval(scheduleTimer);
+  clearInterval(autoSmsTimer);
   clearInterval(dispatcher);
   clearInterval(paymentTimer);
   clearInterval(subscriptionTimer);

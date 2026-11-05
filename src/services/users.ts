@@ -27,6 +27,8 @@ export interface UserRow {
   photo_file_id?: string | null;
   photo_updated_at?: Date | null;
   emergency_name?: string | null;
+  /** 0.29.0: amejiondoa kwenye SMS za matangazo */
+  sms_opt_out_at?: Date | null;
   emergency_phone?: string | null;
   /** Password ya muda — lazima aibadilishe (migration 027). */
   must_change_password?: boolean;

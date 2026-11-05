@@ -24,6 +24,8 @@ export async function getAccount(user: UserRow) {
     /** SMS zikiwa zimewashwa, mtumiaji mpya anathibitisha namba kabla ya kuendelea. */
     verificationRequired: smsEnabled() && !user.phone_verified_at,
     smsEnabled: smsEnabled(),
+    /** 0.29.0: anapokea SMS za matangazo/ofa? (SMS za huduma — namba ya uthibitisho, pesa, usalama — zinaendelea daima) */
+    smsMarketing: !user.sms_opt_out_at,
     /** Link ya kupakua app ya Android (APK) — kwa madereva wanaotaka kengele ya maombi. */
     androidApkUrl: '/pakua/',
     /** Majibu ya ofisi (Msaada) ambayo mtumiaji bado hajasoma. */
@@ -52,4 +54,15 @@ export async function setMode(userId: string, mode: AppMode) {
   const user = await findUserById(db, userId);
   if (!user) throw notFound('Akaunti haikupatikana');
   return getAccount(user);
+}
+
+/** 0.29.0: mtumiaji anawasha/anazima SMS za matangazo (Akaunti). */
+export async function setSmsMarketing(user: UserRow, receive: boolean) {
+  await db.query(
+    `UPDATE naya.users SET sms_opt_out_at = CASE WHEN $2 THEN NULL ELSE coalesce(sms_opt_out_at, now()) END, updated_at = now() WHERE id = $1`,
+    [user.id, receive],
+  );
+  const fresh = await findUserById(db, user.id);
+  if (!fresh) throw notFound('Akaunti haikupatikana');
+  return getAccount(fresh);
 }

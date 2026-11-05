@@ -13,12 +13,12 @@ export type Audience = (typeof AUDIENCES)[number];
 export const MAX_BROADCAST_SMS = 500;
 
 const AUDIENCE_SQL: Record<Audience, string> = {
-  ALL: `SELECT u.id, u.phone FROM naya.users u WHERE u.role = 'USER' AND u.status = 'ACTIVE'`,
-  PASSENGERS: `SELECT u.id, u.phone FROM naya.users u LEFT JOIN naya.drivers d ON d.user_id = u.id
+  ALL: `SELECT u.id, u.phone, u.sms_opt_out_at AS opt_out FROM naya.users u WHERE u.role = 'USER' AND u.status = 'ACTIVE'`,
+  PASSENGERS: `SELECT u.id, u.phone, u.sms_opt_out_at AS opt_out FROM naya.users u LEFT JOIN naya.drivers d ON d.user_id = u.id
                 WHERE u.role = 'USER' AND u.status = 'ACTIVE' AND (d.user_id IS NULL OR d.status <> 'APPROVED')`,
-  DRIVERS: `SELECT u.id, u.phone FROM naya.users u JOIN naya.drivers d ON d.user_id = u.id
+  DRIVERS: `SELECT u.id, u.phone, u.sms_opt_out_at AS opt_out FROM naya.users u JOIN naya.drivers d ON d.user_id = u.id
              WHERE u.role = 'USER' AND u.status = 'ACTIVE' AND d.status = 'APPROVED'`,
-  ONLINE_DRIVERS: `SELECT u.id, u.phone FROM naya.users u JOIN naya.drivers d ON d.user_id = u.id
+  ONLINE_DRIVERS: `SELECT u.id, u.phone, u.sms_opt_out_at AS opt_out FROM naya.users u JOIN naya.drivers d ON d.user_id = u.id
                     WHERE u.role = 'USER' AND u.status = 'ACTIVE' AND d.status = 'APPROVED' AND d.is_online`,
 };
 
@@ -35,7 +35,7 @@ export async function sendBroadcast(adminId: string, input: { audience: Audience
   const title = input.title.trim();
   const body = input.body.trim();
   if (title.length < 2 || body.length < 2) throw badRequest('Andika kichwa na ujumbe');
-  const recipients = await many<{ id: string; phone: string }>(db, AUDIENCE_SQL[input.audience]);
+  const recipients = await many<{ id: string; phone: string; opt_out: Date | null }>(db, AUDIENCE_SQL[input.audience]);
   const withSms = input.sms && smsEnabled();
   if (withSms && recipients.length > MAX_BROADCAST_SMS) {
     throw badRequest(`SMS zinaruhusiwa kwa watu ${MAX_BROADCAST_SMS} tu kwa tangazo moja (kundi hili lina ${recipients.length}). Tuma bila SMS.`);
@@ -57,7 +57,8 @@ export async function sendBroadcast(adminId: string, input: { audience: Audience
     let smsSent = 0;
     for (const r of recipients) {
       await notify({ userId: r.id, event: 'support', kind: 'broadcast', title: title.slice(0, 80), body: body.slice(0, 300) });
-      if (withSms && (await sendSms(r.phone, `NAYA: ${title}. ${body}`.slice(0, 320), 'broadcast'))) smsSent += 1;
+      // 0.29.0: aliyejiondoa kwenye SMS za matangazo anapata arifa ya app tu
+      if (withSms && !r.opt_out && (await sendSms(r.phone, `NAYA: ${title}. ${body}`.slice(0, 320), 'broadcast'))) smsSent += 1;
     }
     if (withSms) await db.query('UPDATE naya.broadcasts SET sms_sent = $2 WHERE id = $1', [row!.id, smsSent]).catch(() => {});
   })().catch((error) => console.error(`[broadcast] ${(error as Error).message}`));

@@ -7,7 +7,7 @@
 //  - Ujumbe uleule kwa kundi lilelile ndani ya dakika 2 unazuiwa (kubonyeza mara mbili).
 //  - Kutuma kunaweza kusimamishwa katikati.
 import { createHash } from 'node:crypto';
-import { db, many, one } from '../db/pool.js';
+import { db, many, one, transaction } from '../db/pool.js';
 import { env } from '../config/env.js';
 import { badRequest, conflict, notFound } from '../utils/http.js';
 import { normalizeTzPhone } from '../utils/phone.js';
@@ -41,9 +41,11 @@ interface Recipient {
   full_name: string | null;
   plate_number: string | null;
   paid_until: Date | null;
+  /** 0.29.0: amejiondoa kwenye SMS za matangazo */
+  opt_out?: Date | null;
 }
 
-const USER_COLS = `u.id, u.phone, u.full_name, d.plate_number, d.paid_until`;
+const USER_COLS = `u.id, u.phone, u.full_name, d.plate_number, d.paid_until, u.sms_opt_out_at AS opt_out`;
 const ACTIVE_USER = `u.role = 'USER' AND u.status = 'ACTIVE'`;
 const NOT_DRIVER = `(d.user_id IS NULL OR d.status <> 'APPROVED')`;
 
@@ -121,7 +123,21 @@ export function parseNumbers(raw: string) {
   return { valid: [...valid], invalid };
 }
 
-async function recipients(audience: SmsAudience, numbers?: string): Promise<{ list: Recipient[]; invalid: string[] }> {
+/**
+ * Wapokeaji. Waliojiondoa kwenye SMS za matangazo wanaondolewa (skipped), isipokuwa ujumbe ni "muhimu" (wa huduma).
+ */
+async function recipients(
+  audience: SmsAudience,
+  numbers?: string,
+  opts: { important?: boolean } = {},
+): Promise<{ list: Recipient[]; invalid: string[]; skipped: number }> {
+  const all = await allRecipients(audience, numbers);
+  if (opts.important) return { ...all, skipped: 0 };
+  const list = all.list.filter((r) => !r.opt_out);
+  return { list, invalid: all.invalid, skipped: all.list.length - list.length };
+}
+
+async function allRecipients(audience: SmsAudience, numbers?: string): Promise<{ list: Recipient[]; invalid: string[] }> {
   if (audience === 'NUMBERS') {
     const { valid, invalid } = parseNumbers(numbers ?? '');
     if (!valid.length) throw badRequest(invalid.length ? `Namba hizi si sahihi: ${invalid.slice(0, 5).join(', ')}` : 'Andika namba za simu (moja kila mstari au kwa koma).');
@@ -147,6 +163,27 @@ export async function audienceSizes(): Promise<Record<string, number>> {
   return sizes;
 }
 
+// ------------------------------------------------------------------ mipangilio: bei ya SMS
+
+/** Bei ya SMS moja kwa TSh (kwa makadirio ya gharama tu — malipo halisi yako kwa kampuni ya SMS). 0 = haionyeshwi. */
+export async function getCenterSettings(): Promise<{ pricePerSms: number }> {
+  const row = await one<{ value: { pricePerSms?: number } }>(db, `SELECT value FROM naya.settings WHERE key = 'sms_center'`);
+  const n = Number(row?.value?.pricePerSms ?? 0);
+  return { pricePerSms: Number.isFinite(n) && n >= 0 ? Math.round(n) : 0 };
+}
+
+export async function saveCenterSettings(adminId: string, input: { pricePerSms: number }) {
+  const price = Math.round(input.pricePerSms);
+  if (!Number.isFinite(price) || price < 0 || price > 1000) throw badRequest('Bei ya SMS moja iwe kati ya TSh 0 na 1,000.');
+  await db.query(
+    `INSERT INTO naya.settings (key, value, updated_by) VALUES ('sms_center', $1, $2)
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_by = EXCLUDED.updated_by, updated_at = now()`,
+    [JSON.stringify({ pricePerSms: price }), adminId],
+  );
+  await writeAudit(db, { actorId: adminId, action: 'settings.sms_center', targetType: 'settings', targetId: null, details: { pricePerSms: price } });
+  return { pricePerSms: price };
+}
+
 // ------------------------------------------------------------------ hakiki + kutuma
 
 export interface CampaignInput {
@@ -154,11 +191,14 @@ export interface CampaignInput {
   message: string;
   numbers?: string;
   templateId?: string | null;
+  /** Ujumbe wa huduma (mf. hitilafu ya malipo): unawafikia hata waliojiondoa kwenye matangazo. */
+  important?: boolean;
 }
 
 export async function previewCampaign(input: CampaignInput) {
   const message = cleanMessage(input.message);
-  const { list, invalid } = await recipients(input.audience, input.numbers);
+  const { list, invalid, skipped } = await recipients(input.audience, input.numbers, { important: input.important });
+  const { pricePerSms } = await getCenterSettings();
   let units = 0;
   let maxParts = 0;
   for (const r of list) {
@@ -181,6 +221,9 @@ export async function previewCampaign(input: CampaignInput) {
     maxParts,
     balance,
     problems,
+    skippedOptOut: skipped,
+    pricePerSms,
+    cost: pricePerSms ? units * pricePerSms : null,
     samples: list.slice(0, 3).map((r) => {
       const text = render(message, r);
       return { name: r.full_name, phone: r.phone, text, parts: smsParts(text), chars: toGsm(text).length };
@@ -193,7 +236,7 @@ export async function sendCampaign(adminId: string, input: CampaignInput & { exp
   const message = cleanMessage(input.message);
   const problems = messageProblems(message);
   if (problems.length) throw badRequest(problems[0]);
-  const { list } = await recipients(input.audience, input.numbers);
+  const { list, skipped } = await recipients(input.audience, input.numbers, { important: input.important });
   if (!list.length) throw badRequest('Hakuna mtu kwenye kundi hili.');
   if (list.length !== input.expectedCount) {
     throw conflict(`Idadi ya watu imebadilika (sasa ${list.length}, uliona ${input.expectedCount}). Bonyeza "Hakiki" tena.`);
@@ -215,23 +258,39 @@ export async function sendCampaign(adminId: string, input: CampaignInput & { exp
     [targetKey, message],
   );
   if (dup) throw conflict('Ujumbe huu umeshatumwa kwa kundi hili sasa hivi. Subiri dakika 2 kama unataka kuutuma tena.');
-  const template = input.templateId ? await one<{ id: string }>(db, 'SELECT id FROM naya.sms_templates WHERE id = $1', [input.templateId]) : null;
-
-  const campaign = (await one<{ id: string }>(
-    db,
-    `INSERT INTO naya.sms_campaigns (audience, target_key, template_id, message, total, created_by) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-    [input.audience, targetKey, template?.id ?? null, message, list.length, adminId],
-  ))!;
+  const id = await createCampaignRow({ ...input, message, targetKey, total: list.length, skipped, createdBy: adminId, scheduleId: null });
   await writeAudit(db, {
     actorId: adminId,
     action: 'sms.campaign',
     targetType: 'sms_campaign',
-    targetId: campaign.id,
-    details: { audience: input.audience, recipients: list.length, units },
+    targetId: id,
+    details: { audience: input.audience, recipients: list.length, units, skippedOptOut: skipped, important: !!input.important },
   });
   // Kutuma kunaendelea nyuma ya pazia; ofisi inaona maendeleo kwenye historia.
-  void runCampaign(campaign.id, rendered).catch((error) => console.error(`[sms-center] ${(error as Error).message}`));
-  return { id: campaign.id, total: list.length, units };
+  void runCampaign(id, rendered).catch((error) => console.error(`[sms-center] ${(error as Error).message}`));
+  return { id, total: list.length, units, skippedOptOut: skipped };
+}
+
+async function createCampaignRow(x: {
+  audience: SmsAudience;
+  message: string;
+  templateId?: string | null;
+  important?: boolean;
+  targetKey: string;
+  total: number;
+  skipped: number;
+  createdBy: string | null;
+  scheduleId: string | null;
+}): Promise<string> {
+  const template = x.templateId ? await one<{ id: string }>(db, 'SELECT id FROM naya.sms_templates WHERE id = $1', [x.templateId]) : null;
+  const { pricePerSms } = await getCenterSettings();
+  const row = await one<{ id: string }>(
+    db,
+    `INSERT INTO naya.sms_campaigns (audience, target_key, template_id, message, total, created_by, schedule_id, important, skipped_opt_out, price_tzs)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+    [x.audience, x.targetKey, template?.id ?? null, x.message, x.total, x.createdBy, x.scheduleId, !!x.important, x.skipped, pricePerSms],
+  );
+  return row!.id;
 }
 
 async function runCampaign(id: string, items: Array<{ r: Recipient; text: string }>) {
@@ -284,7 +343,9 @@ export function listCampaigns() {
   return many(
     db,
     `SELECT c.id, c.audience, c.message, c.total, c.sent, c.failed, c.units, c.status, c.created_at AS "createdAt",
-            c.finished_at AS "finishedAt", u.full_name AS "createdBy", t.title AS "templateTitle"
+            c.finished_at AS "finishedAt", coalesce(u.full_name, CASE WHEN c.schedule_id IS NOT NULL THEN 'Ratiba' END) AS "createdBy",
+            t.title AS "templateTitle", c.important, c.skipped_opt_out AS "skippedOptOut", c.schedule_id AS "scheduleId",
+            CASE WHEN c.price_tzs > 0 THEN c.units * c.price_tzs END AS cost
        FROM naya.sms_campaigns c
        LEFT JOIN naya.users u ON u.id = c.created_by
        LEFT JOIN naya.sms_templates t ON t.id = c.template_id
@@ -362,11 +423,14 @@ export async function archiveTemplate(adminId: string, id: string) {
 }
 
 export async function smsCenterOverview() {
-  const [templates, campaigns, sizes, balance] = await Promise.all([
+  const [templates, campaigns, sizes, balance, schedules, settings, optedOut] = await Promise.all([
     listTemplates(),
     listCampaigns(),
     audienceSizes(),
     smsEnabled() ? smsBalance() : Promise.resolve(null),
+    listSchedules(),
+    getCenterSettings(),
+    one<{ n: number }>(db, `SELECT count(*)::int AS n FROM naya.users WHERE sms_opt_out_at IS NOT NULL AND role = 'USER'`),
   ]);
   return {
     enabled: smsEnabled(),
@@ -377,7 +441,127 @@ export async function smsCenterOverview() {
     sizes,
     templates,
     campaigns,
+    schedules,
+    settings,
+    optedOut: optedOut?.n ?? 0,
     placeholders: PLACEHOLDERS,
     limits: { maxRecipients: MAX_RECIPIENTS, maxParts: MAX_PARTS },
   };
+}
+
+// ------------------------------------------------------------------ 0.29.0: ratiba (kutuma baadaye / kujirudia)
+
+export const SCHEDULE_REPEATS = ['NONE', 'DAILY', 'WEEKLY'] as const;
+export type ScheduleRepeat = (typeof SCHEDULE_REPEATS)[number];
+const MAX_SCHEDULE_DAYS = 90;
+
+export async function createSchedule(adminId: string, input: CampaignInput & { runAt: string; repeat: ScheduleRepeat }) {
+  const message = cleanMessage(input.message);
+  const problems = messageProblems(message);
+  if (problems.length) throw badRequest(problems[0]);
+  const runAt = new Date(input.runAt);
+  if (Number.isNaN(runAt.getTime())) throw badRequest('Chagua tarehe na saa ya kutuma.');
+  if (runAt.getTime() < Date.now() + 60_000) throw badRequest('Chagua muda ujao (angalau dakika 1 kuanzia sasa).');
+  if (runAt.getTime() > Date.now() + MAX_SCHEDULE_DAYS * 86_400_000) throw badRequest(`Unaweza kupanga hadi siku ${MAX_SCHEDULE_DAYS} mbele.`);
+  // Kagua kundi sasa (namba sahihi, si tupu) — idadi halisi inahesabiwa wakati wa kutuma
+  const { list } = await recipients(input.audience, input.numbers, { important: input.important });
+  if (!list.length) throw badRequest('Hakuna mtu kwenye kundi hili kwa sasa.');
+  if (list.some((r) => smsParts(render(message, r)) > MAX_PARTS)) throw badRequest(`Ujumbe ni mrefu mno — usizidi SMS ${MAX_PARTS}.`);
+  const row = await one<{ id: string }>(
+    db,
+    `INSERT INTO naya.sms_schedules (audience, numbers, message, template_id, important, repeat, run_at, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+    [input.audience, input.audience === 'NUMBERS' ? input.numbers ?? '' : null, message, input.templateId ?? null, !!input.important, input.repeat, runAt, adminId],
+  );
+  await writeAudit(db, { actorId: adminId, action: 'sms.scheduled', targetType: 'sms_schedule', targetId: row!.id, details: { audience: input.audience, runAt, repeat: input.repeat } });
+  return listSchedules();
+}
+
+export function listSchedules() {
+  return many(
+    db,
+    `SELECT s.id, s.audience, s.message, s.important, s.repeat, s.run_at AS "runAt", s.status, s.runs, s.last_run_at AS "lastRunAt",
+            s.last_note AS "lastNote", s.created_at AS "createdAt", u.full_name AS "createdBy",
+            (SELECT count(*)::int FROM regexp_split_to_table(coalesce(s.numbers, ''), '[\\s,;]+') x WHERE x <> '') AS "numberCount"
+       FROM naya.sms_schedules s LEFT JOIN naya.users u ON u.id = s.created_by
+      WHERE s.status IN ('ACTIVE', 'PAUSED') OR s.updated_at > now() - interval '7 days'
+      ORDER BY (s.status = 'ACTIVE') DESC, s.run_at
+      LIMIT 50`,
+  );
+}
+
+export async function setScheduleStatus(adminId: string, id: string, action: 'pause' | 'resume' | 'cancel') {
+  const s = await one<{ status: string; run_at: Date; repeat: ScheduleRepeat }>(db, 'SELECT status, run_at, repeat FROM naya.sms_schedules WHERE id = $1', [id]);
+  if (!s) throw notFound('Ratiba haikupatikana');
+  if (s.status === 'DONE' || s.status === 'CANCELLED') throw conflict('Ratiba hii imeshaisha.');
+  let next = s.run_at;
+  if (action === 'resume') {
+    // Muda wake ukiwa umepita wakati imesimamishwa: inayojirudia inaruka hadi muda ujao; ya mara moja inatumwa sasa hivi.
+    if (s.repeat !== 'NONE') while (next.getTime() <= Date.now()) next = nextRun(next, s.repeat)!;
+  }
+  const status = action === 'pause' ? 'PAUSED' : action === 'resume' ? 'ACTIVE' : 'CANCELLED';
+  await db.query('UPDATE naya.sms_schedules SET status = $2, run_at = $3, updated_at = now() WHERE id = $1', [id, status, next]);
+  await writeAudit(db, { actorId: adminId, action: `sms.schedule_${action}`, targetType: 'sms_schedule', targetId: id, details: {} });
+  return listSchedules();
+}
+
+/** Muda unaofuata wa ratiba inayojirudia (saa ileile). null = haijirudii. */
+export function nextRun(from: Date, repeat: ScheduleRepeat): Date | null {
+  if (repeat === 'DAILY') return new Date(from.getTime() + 86_400_000);
+  if (repeat === 'WEEKLY') return new Date(from.getTime() + 7 * 86_400_000);
+  return null;
+}
+
+/**
+ * Kila dakika: ratiba zilizofika muda wake zinatumwa. Row lock (SKIP LOCKED) — server mbili hazitumi ratiba ileile.
+ * Wapokeaji wanahesabiwa upya wakati wa kutuma (mf. "Wateja wapya" wa wiki hiyo).
+ */
+export async function runDueSchedules(): Promise<number> {
+  const due = await transaction(async (client) => {
+    const rows = await many<{ id: string; audience: SmsAudience; numbers: string | null; message: string; template_id: string | null; important: boolean; repeat: ScheduleRepeat; run_at: Date; created_by: string | null }>(
+      client,
+      `SELECT id, audience, numbers, message, template_id, important, repeat, run_at, created_by FROM naya.sms_schedules
+        WHERE status = 'ACTIVE' AND run_at <= now() ORDER BY run_at LIMIT 5 FOR UPDATE SKIP LOCKED`,
+    );
+    for (const r of rows) {
+      let next = nextRun(r.run_at, r.repeat);
+      while (next && next.getTime() <= Date.now()) next = nextRun(next, r.repeat); // server ilizima muda mrefu: usitume mara nyingi
+      await client.query(
+        `UPDATE naya.sms_schedules SET run_at = coalesce($2, run_at), status = CASE WHEN $2::timestamptz IS NULL THEN 'DONE' ELSE status END,
+                runs = runs + 1, last_run_at = now(), updated_at = now() WHERE id = $1`,
+        [r.id, next],
+      );
+    }
+    return rows;
+  });
+  for (const r of due) {
+    let note: string | null = null;
+    let campaignId: string | null = null;
+    try {
+      if (!smsEnabled()) throw new Error(`SMS hazijawashwa. ${smsSetupHint() ?? ''}`.trim());
+      const { list, skipped } = await recipients(r.audience, r.numbers ?? undefined, { important: r.important });
+      const items = list.slice(0, MAX_RECIPIENTS).map((x) => ({ r: x, text: render(r.message, x) }));
+      if (!items.length) throw new Error('Hakuna mtu kwenye kundi hili wakati wa kutuma.');
+      const units = items.reduce((t, x) => t + smsParts(x.text), 0);
+      const balance = await smsBalance();
+      if (balance !== null && units > balance) throw new Error(`Salio la SMS (${balance}) halitoshi kwa SMS ${units}.`);
+      campaignId = await createCampaignRow({
+        audience: r.audience,
+        message: r.message,
+        templateId: r.template_id,
+        important: r.important,
+        targetKey: `schedule:${r.id}:${Date.now()}`,
+        total: items.length,
+        skipped,
+        createdBy: r.created_by,
+        scheduleId: r.id,
+      });
+      note = `Imetumwa kwa watu ${items.length}${list.length > MAX_RECIPIENTS ? ` (kati ya ${list.length} — kikomo ${MAX_RECIPIENTS})` : ''}`;
+      void runCampaign(campaignId, items).catch((error) => console.error(`[sms-ratiba] ${(error as Error).message}`));
+    } catch (error) {
+      note = `Haikutumwa: ${(error as Error).message}`.slice(0, 200);
+    }
+    await db.query('UPDATE naya.sms_schedules SET last_note = $2, last_campaign_id = coalesce($3, last_campaign_id) WHERE id = $1', [r.id, note, campaignId]);
+  }
+  return due.length;
 }

@@ -1098,7 +1098,32 @@ a.kpi:hover, .queue-item:hover, .settings-tile:hover { transform: translateY(-2p
 .smsc-bar { height: 6px; border-radius: 999px; background: var(--line); margin-top: 8px; overflow: hidden; }
 .smsc-bar i { display: block; height: 100%; background: var(--naya-green); transition: width 0.4s ease; }
 .smsc-fail-list { margin: 8px 0 0; padding-left: 18px; font-size: 14px; }
-@media (max-width: 1080px) { .smsc-grid { grid-template-columns: 1fr; } }
+/* 0.29.0 ratiba, SMS za moja kwa moja, bei */
+.smsc-check { display: flex; gap: 8px; align-items: flex-start; margin-top: 14px; font-weight: 600; }
+.smsc-check input, .smsc-when > label input { width: auto; flex: none; margin: 4px 0 0; min-height: 0; }
+.smsc-check > span { display: block; flex: 1; min-width: 0; }
+.smsc-check > span span { display: inline; }
+.smsc-when > label { margin: 0; font-weight: 600; }
+.smsc-when > label input { margin: 0; }
+.smsc-check .muted { font-weight: 400; }
+.smsc-when { border: 0; padding: 0; margin: 14px 0 0; display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.smsc-when legend { font-weight: 700; margin-bottom: 6px; padding: 0; }
+.smsc-when > label { display: flex; gap: 6px; align-items: center; }
+.smsc-when-fields { flex-basis: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.smsc-when-fields input, .smsc-when-fields select { width: 100%; }
+.smsc-auto { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 12px; }
+.smsc-rule { border: 1px solid var(--line); border-radius: var(--radius-md); padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+.smsc-rule.is-on { border-color: var(--naya-green); }
+.smsc-rule h3 { margin: 0; font-size: 16px; }
+.smsc-rule p { margin: 0; }
+.smsc-rule textarea { width: 100%; }
+.smsc-rule-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.smsc-rule-row input { width: 100%; }
+.smsc-rule-stats { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.smsc-rule-stats strong { color: var(--ink); }
+.smsc-price { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 14px; }
+.smsc-price input { width: 140px; }
+@media (max-width: 1080px) { .smsc-grid { grid-template-columns: 1fr; } .smsc-auto { grid-template-columns: 1fr; } }
 @media (max-width: 760px) { .smsc-audience { grid-template-columns: 1fr 1fr; } .smsc-h-side { align-items: flex-start; text-align: left; } }
 @media (prefers-reduced-motion: reduce) { .smsc-bar i { transition: none; } }
 

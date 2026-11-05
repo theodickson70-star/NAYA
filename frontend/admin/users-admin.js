@@ -135,6 +135,7 @@ function render(data) {
           ${d ? tag(DRIVER_STATUS[d.status]?.tone ?? 'muted', `Dereva: ${DRIVER_STATUS[d.status]?.label ?? d.status}`) : tag('muted', 'Abiria')}
           ${d?.online ? tag('ok', 'Online sasa') : ''}
           ${devices?.androidApp ? tag('ok', 'Ana app ya Android') : ''}
+          ${u.smsOptOutAt ? tag('warn', `Amejiondoa SMS za matangazo (${formatDate(u.smsOptOutAt)})`) : ''}
         </div>
         ${u.emergencyPhone ? `<p class="small">Mtu wa dharura: <strong>${esc(u.emergencyName || '–')}</strong> · <a href="tel:+${esc(u.emergencyPhone)}">${esc(formatPhone(u.emergencyPhone))}</a></p>` : ''}
       </div>
@@ -268,6 +269,7 @@ function render(data) {
           <div class="actions" style="margin-top:6px">
             ${u.phoneVerifiedAt ? '' : '<button class="btn btn-ghost btn-small" type="button" data-act="verify">Thibitisha namba yake</button>'}
             <button class="btn btn-ghost btn-small" type="button" data-act="temp">Mpe password ya muda</button>
+            <button class="btn btn-ghost btn-small" type="button" data-act="sms-marketing">${u.smsOptOutAt ? 'Mrudishe kwenye SMS za matangazo' : 'Mwondoe kwenye SMS za matangazo'}</button>
             ${d?.online ? '<button class="btn btn-ghost btn-small" type="button" data-act="offline">Mtoe online</button>' : ''}
           </div>
           <div id="temp-box"></div>
@@ -338,6 +340,12 @@ async function onClick(event) {
   const act = button.dataset.act;
   if (act === 'verify') {
     const res = await run(button, 'act-error', () => ctx.api.post(`/api/admin/users/${id}/verify-phone`));
+    if (res) render(res);
+  }
+  if (act === 'sms-marketing') {
+    const receive = !!current.user.smsOptOutAt;
+    if (!receive && !confirm('Hatapata SMS za matangazo (Kituo cha SMS na SMS za moja kwa moja). SMS za huduma zitaendelea. Endelea?')) return;
+    const res = await run(button, 'act-error', () => ctx.api.post(`/api/admin/users/${id}/sms-marketing`, { receive }));
     if (res) render(res);
   }
   if (act === 'offline') {

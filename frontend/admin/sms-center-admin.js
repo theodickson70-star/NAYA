@@ -1,5 +1,6 @@
 // Ofisi: Kituo cha SMS (0.26.0) — chagua wapokeaji, template au ujumbe wako, hakiki (idadi, mfano, gharama), tuma,
 // na ufuatilie maendeleo. Templates za wateja na madereva zinahifadhiwa hapa.
+// 0.29.0: kupanga muda (mara moja / kila siku / kila wiki), SMS za moja kwa moja, waliojiondoa, gharama kwa TSh.
 import { escapeHtml as esc } from '/shared/api.js';
 import { formatDate, formatPhone } from '/shared/labels.js';
 
@@ -72,6 +73,17 @@ export function setup(context) {
     ta.selectionStart = ta.selectionEnd = at + word.length;
     ta.dispatchEvent(new Event('input'));
   });
+  $('smsc-important').addEventListener('change', invalidate);
+  $('smsc-when').addEventListener('change', () => {
+    $('smsc-when-fields').hidden = !later();
+    if (later() && !$('smsc-run-at').value) $('smsc-run-at').value = defaultRunAt();
+    invalidate();
+    if (preview) drawPreview(preview.data);
+    else $('smsc-send').textContent = later() ? 'Panga' : 'Tuma';
+  });
+  $('smsc-schedules').addEventListener('click', onScheduleAction);
+  $('smsc-auto').addEventListener('submit', saveRule);
+  $('smsc-price-form').addEventListener('submit', savePrice);
   $('smsc-preview-btn').addEventListener('click', runPreview);
   $('smsc-form').addEventListener('submit', send);
   $('smsc-tpl-new').addEventListener('click', () => {
@@ -83,6 +95,17 @@ export function setup(context) {
   $('smsc-tpl-editor').addEventListener('submit', saveTemplate);
   $('smsc-history').addEventListener('click', onHistoryAction);
 }
+
+const later = () => $('smsc-when').querySelector('input:checked')?.value === 'later';
+const money = (n) => `TSh ${Math.round(n).toLocaleString('sw-TZ')}`;
+const pad = (n) => String(n).padStart(2, '0');
+/** Kesho saa 3 asubuhi (muda wa kawaida wa kutuma). */
+function defaultRunAt() {
+  const d = new Date(Date.now() + 86_400_000);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T09:00`;
+}
+const REPEAT = { NONE: 'Mara moja', DAILY: 'Kila siku', WEEKLY: 'Kila wiki' };
+const SCHED_STATUS = { ACTIVE: ['ok', 'Inasubiri'], PAUSED: ['warn', 'Imesimamishwa'], DONE: ['muted', 'Imetumwa'], CANCELLED: ['muted', 'Imeghairiwa'] };
 
 const audience = () => $('smsc-audience').querySelector('input:checked')?.value ?? 'CUSTOMERS';
 /** Kundi la templates linalofaa wapokeaji hawa. */
@@ -129,6 +152,12 @@ export async function load() {
   drawChips();
   drawTemplates();
   drawHistory();
+  drawSchedules();
+  drawAuto();
+  if (document.activeElement !== $('smsc-price')) $('smsc-price').value = info.settings?.pricePerSms ?? 0;
+  $('smsc-optout-note').textContent = info.optedOut
+    ? `Watu ${info.optedOut.toLocaleString('sw-TZ')} wamejiondoa kwenye SMS za matangazo (kwenye app: Akaunti → SMS za matangazo, au ofisi kwenye ukurasa wa mtumiaji). Wanaendelea kupata SMS za huduma: namba ya uthibitisho, pesa, safari na usalama.`
+    : 'Hakuna aliyejiondoa kwenye SMS za matangazo.';
   count();
 }
 
@@ -163,14 +192,15 @@ function count() {
   $('smsc-counter').classList.toggle('is-long', partsOf(n) > (info?.limits.maxParts ?? 3));
 }
 
-const formKey = () => JSON.stringify({ a: audience(), m: $('smsc-message').value, n: audience() === 'NUMBERS' ? $('smsc-numbers').value : '' });
+const formKey = () =>
+  JSON.stringify({ a: audience(), m: $('smsc-message').value, n: audience() === 'NUMBERS' ? $('smsc-numbers').value : '', i: $('smsc-important').checked });
 
 function invalidate() {
   if (preview && preview.key === formKey()) return;
   preview = null;
   $('smsc-preview').innerHTML = '';
   $('smsc-send').disabled = true;
-  $('smsc-send').textContent = 'Tuma';
+  $('smsc-send').textContent = later() ? 'Panga' : 'Tuma';
   $('smsc-ok').hidden = true;
 }
 
@@ -180,6 +210,7 @@ function body() {
     message: $('smsc-message').value,
     numbers: audience() === 'NUMBERS' ? $('smsc-numbers').value : undefined,
     templateId: $('smsc-message').dataset.template || null,
+    important: $('smsc-important').checked,
   };
 }
 
@@ -208,6 +239,9 @@ function drawPreview(d) {
         <div><strong>${d.units.toLocaleString('sw-TZ')}</strong><span>SMS (makadirio)</span></div>
         <div><strong>${d.balance == null ? '—' : Number(d.balance).toLocaleString('sw-TZ')}</strong><span>salio la SMS</span></div>
       </div>
+      ${d.cost != null ? `<p class="small">Gharama (makadirio): <strong>${money(d.cost)}</strong> <span class="muted">· ${money(d.pricePerSms)} kwa SMS</span></p>` : ''}
+      ${d.skippedOptOut ? `<p class="muted small">Watu ${d.skippedOptOut} wamejiondoa kwenye matangazo — hawatatumiwa.</p>` : ''}
+      ${later() ? '<p class="muted small">Unapanga muda: idadi ya watu inahesabiwa upya wakati wa kutuma.</p>' : ''}
       ${d.invalidCount ? `<p class="alert alert-warn">Namba ${d.invalidCount} si sahihi na zitarukwa: ${esc(d.invalid.join(', '))}</p>` : ''}
       ${d.problems.map((p) => `<p class="alert alert-danger">${esc(p)}</p>`).join('')}
       ${
@@ -220,16 +254,20 @@ function drawPreview(d) {
           : '<p class="muted">Hakuna mtu kwenye kundi hili.</p>'
       }
     </div>`;
-  $('smsc-send').disabled = blocked;
-  $('smsc-send').textContent = blocked ? 'Tuma' : `Tuma kwa watu ${d.count.toLocaleString('sw-TZ')}`;
+  // Kupanga muda: salio linakaguliwa wakati wa kutuma, si sasa
+  const blockedLater = d.count === 0 || d.problems.some((p) => !/^Salio la SMS/.test(p));
+  const off = later() ? blockedLater : blocked;
+  $('smsc-send').disabled = off;
+  $('smsc-send').textContent = off ? (later() ? 'Panga' : 'Tuma') : later() ? `Panga kwa watu ${d.count.toLocaleString('sw-TZ')}` : `Tuma kwa watu ${d.count.toLocaleString('sw-TZ')}`;
 }
 
 async function send(event) {
   event.preventDefault();
   if (!preview || preview.key !== formKey()) return runPreview();
   const d = preview.data;
+  if (later()) return schedule(d);
   const who = audience() === 'NUMBERS' ? `namba ${d.count}` : `${LABEL[audience()]} (watu ${d.count})`;
-  if (!confirm(`Tuma SMS kwa ${who}?\nMakadirio: SMS ${d.units}. Haiwezi kurudishwa nyuma ikishatumwa.`)) return;
+  if (!confirm(`Tuma SMS kwa ${who}?\nMakadirio: SMS ${d.units}${d.cost != null ? ` (${money(d.cost)})` : ''}. Haiwezi kurudishwa nyuma ikishatumwa.`)) return;
   const button = $('smsc-send');
   button.disabled = true;
   button.textContent = 'Inatuma…';
@@ -252,6 +290,160 @@ async function send(event) {
     error(err.message);
     button.disabled = false;
     button.textContent = 'Tuma';
+  }
+}
+
+function resetCompose() {
+  $('smsc-message').value = '';
+  $('smsc-message').dataset.template = '';
+  $('smsc-important').checked = false;
+  if (audience() === 'NUMBERS') $('smsc-numbers').value = '';
+  preview = null;
+  $('smsc-preview').innerHTML = '';
+  $('smsc-send').disabled = true;
+  count();
+}
+
+async function schedule(d) {
+  const local = $('smsc-run-at').value;
+  const when = local ? new Date(local) : null;
+  if (!when || Number.isNaN(when.getTime())) return error('Chagua tarehe na saa ya kutuma.');
+  const repeat = $('smsc-repeat').value;
+  const whenText = when.toLocaleString('sw-TZ', { weekday: 'long', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  if (!confirm(`Panga SMS kwa ${LABEL[audience()]} (watu ${d.count} kwa sasa)?\nItatumwa: ${whenText}${repeat === 'NONE' ? '' : ` · ${REPEAT[repeat].toLowerCase()}`}.`)) return;
+  const button = $('smsc-send');
+  button.disabled = true;
+  error('');
+  try {
+    info.schedules = await ctx.api.post('/api/admin/sms-center/schedules', { ...body(), runAt: when.toISOString(), repeat });
+    $('smsc-ok').textContent = `Imepangwa: ${whenText}. Iko kwenye "Zilizopangwa" — unaweza kuisimamisha au kuighairi kabla haijatumwa.`;
+    resetCompose();
+    $('smsc-send').textContent = 'Panga';
+    drawSchedules();
+    $('smsc-ok').hidden = false;
+  } catch (err) {
+    if (ctx.onAuthError(err)) return;
+    error(err.message);
+    button.disabled = false;
+  }
+}
+
+// ------------------------------------------------------------------ zilizopangwa
+
+function drawSchedules() {
+  const list = info.schedules ?? [];
+  $('smsc-schedules').innerHTML = list.length
+    ? list
+        .map((s) => {
+          const [tone, label] = SCHED_STATUS[s.status] ?? ['muted', s.status];
+          const open = s.status === 'ACTIVE' || s.status === 'PAUSED';
+          const who = s.audience === 'NUMBERS' ? `Namba ${s.numberCount}` : LABEL[s.audience] ?? s.audience;
+          return `<li>
+            <div class="smsc-h-main">
+              <p class="smsc-h-msg">${esc(s.message)}</p>
+              <span class="muted small">${esc(who)} · ${REPEAT[s.repeat] ?? s.repeat}${s.important ? ' · muhimu' : ''}${s.createdBy ? ` · ${esc(s.createdBy)}` : ''}</span>
+              ${s.lastNote ? `<p class="small ${/^Haikutumwa/.test(s.lastNote) ? 'smsc-bad' : 'muted'}">${s.lastRunAt ? `${esc(formatDate(s.lastRunAt, true))}: ` : ''}${esc(s.lastNote)}</p>` : ''}
+            </div>
+            <div class="smsc-h-side">
+              <span class="badge badge-${tone}">${label}</span>
+              ${open ? `<span class="small">${s.status === 'ACTIVE' ? 'Inatumwa' : 'Ilipangwa'}: <strong>${esc(formatDate(s.runAt, true))}</strong></span>` : ''}
+              ${s.runs ? `<span class="muted small">imetumwa mara ${s.runs}</span>` : ''}
+              ${s.status === 'ACTIVE' ? `<button class="btn btn-ghost btn-small" type="button" data-s="pause" data-id="${s.id}">Simamisha</button>` : ''}
+              ${s.status === 'PAUSED' ? `<button class="btn btn-ghost btn-small" type="button" data-s="resume" data-id="${s.id}">Endelea</button>` : ''}
+              ${open ? `<button class="btn btn-ghost btn-small btn-plain" type="button" data-s="cancel" data-id="${s.id}">Ghairi</button>` : ''}
+            </div>
+          </li>`;
+        })
+        .join('')
+    : '<li class="muted">Hakuna SMS zilizopangwa. Chagua "Panga muda" unapoandika SMS.</li>';
+}
+
+async function onScheduleAction(e) {
+  const b = e.target.closest('[data-s]');
+  if (!b) return;
+  if (b.dataset.s === 'cancel' && !confirm('Ghairi ratiba hii? Haitatumwa tena.')) return;
+  b.disabled = true;
+  try {
+    info.schedules = await ctx.api.post(`/api/admin/sms-center/schedules/${b.dataset.id}/${b.dataset.s}`);
+    drawSchedules();
+  } catch (err) {
+    if (ctx.onAuthError(err)) return;
+    error(err.message);
+    b.disabled = false;
+  }
+}
+
+// ------------------------------------------------------------------ SMS za moja kwa moja
+
+const RULE_HELP = {
+  WELCOME: 'Mteja mpya anapata SMS hii saa 1 baada ya kujiunga (mara moja tu).',
+  INACTIVE_CUSTOMER: 'Mteja asiyesafiri kwa siku hizi anapata SMS ya kumkumbusha.',
+  IDLE_DRIVER: 'Dereva aliyethibitishwa ambaye hajaingia kazini kwa siku hizi.',
+};
+
+function drawAuto() {
+  const auto = info.auto;
+  if (!auto) return;
+  $('smsc-auto-hours').textContent = `Zinatumwa saa ${pad(auto.hours.start)}:00–${pad(auto.hours.end)}:00 tu`;
+  $('smsc-auto').innerHTML = auto.rules
+    .map((r) => {
+      const days = r.rule === 'WELCOME' ? '' : `<div><label for="smsc-r-days-${r.rule}">Siku</label><input type="number" id="smsc-r-days-${r.rule}" name="days" min="3" max="365" value="${r.days}"></div>`;
+      return `<form class="smsc-rule ${r.enabled ? 'is-on' : ''}" data-rule="${r.rule}" novalidate>
+        <h3>${esc(r.label)}</h3>
+        <p class="muted small">${esc(RULE_HELP[r.rule] ?? '')}</p>
+        <label class="smsc-check"><input type="checkbox" name="enabled" ${r.enabled ? 'checked' : ''}> Washa</label>
+        <label for="smsc-r-msg-${r.rule}">Ujumbe</label>
+        <textarea id="smsc-r-msg-${r.rule}" name="message" rows="4" maxlength="480">${esc(r.message)}</textarea>
+        <div class="smsc-rule-row">${days}<div><label for="smsc-r-cap-${r.rule}">SMS kwa siku (kikomo)</label><input type="number" id="smsc-r-cap-${r.rule}" name="dailyCap" min="1" max="1000" value="${r.dailyCap}"></div></div>
+        <div class="smsc-rule-stats">
+          <span>Wanasubiri: <strong>${r.waiting}</strong></span>
+          <span>Leo: <strong>${r.today}</strong></span>
+          <span>Siku 7: <strong>${r.week}</strong></span>
+          ${r.failedWeek ? `<span class="smsc-bad">zimeshindwa ${r.failedWeek}</span>` : ''}
+          ${r.lastSentAt ? `<span>ya mwisho ${esc(formatDate(r.lastSentAt, true))}</span>` : ''}
+        </div>
+        <p class="alert alert-danger" role="alert" hidden></p>
+        <div class="actions"><button class="btn btn-ghost btn-small" type="submit">Hifadhi</button></div>
+      </form>`;
+    })
+    .join('');
+}
+
+async function saveRule(e) {
+  e.preventDefault();
+  const f = e.target.closest('form[data-rule]');
+  if (!f) return;
+  const box = f.querySelector('.alert');
+  box.hidden = true;
+  const enabled = f.elements.enabled.checked;
+  if (enabled && !f.classList.contains('is-on') && !confirm('Washa SMS hizi? Mfumo utaanza kuzituma wenyewe (zinatumia salio la SMS).')) return;
+  try {
+    info.auto = await ctx.api.put(`/api/admin/sms-center/auto/${f.dataset.rule}`, {
+      enabled,
+      message: f.elements.message.value,
+      days: Number(f.elements.days?.value ?? 1),
+      dailyCap: Number(f.elements.dailyCap.value),
+    });
+    drawAuto();
+  } catch (err) {
+    if (ctx.onAuthError(err)) return;
+    box.textContent = err.message;
+    box.hidden = false;
+  }
+}
+
+async function savePrice(e) {
+  e.preventDefault();
+  try {
+    info.settings = await ctx.api.put('/api/admin/sms-center/settings', { pricePerSms: Number($('smsc-price').value || 0) });
+    $('smsc-price').value = info.settings.pricePerSms;
+    $('smsc-price-note').textContent = info.settings.pricePerSms ? `Imehifadhiwa: ${money(info.settings.pricePerSms)} kwa SMS.` : 'Imehifadhiwa: gharama haitaonyeshwa.';
+    info.campaigns = (await ctx.api.get('/api/admin/sms-center')).campaigns;
+    drawHistory();
+    if (preview) runPreview();
+  } catch (err) {
+    if (ctx.onAuthError(err)) return;
+    error(err.message);
   }
 }
 
@@ -379,7 +571,9 @@ function drawHistory() {
             <div class="smsc-h-side">
               <span class="badge badge-${tone}">${label}</span>
               <span class="small"><strong>${c.sent}</strong>/${c.total} zimepokelewa${c.failed ? ` · <span class="smsc-bad">${c.failed} zimeshindwa</span>` : ''}</span>
-              <span class="muted small">SMS ${c.units}</span>
+              <span class="muted small">SMS ${c.units}${c.cost != null ? ` · ${money(c.cost)}` : ''}</span>
+              ${c.skippedOptOut ? `<span class="muted small">${c.skippedOptOut} wamejiondoa</span>` : ''}
+              ${c.important ? '<span class="badge badge-warn">Muhimu</span>' : ''}
               ${c.status === 'SENDING' ? `<button class="btn btn-ghost btn-small" type="button" data-h="stop" data-id="${c.id}">Simamisha</button>` : ''}
               ${c.failed ? `<button class="btn btn-ghost btn-small btn-plain" type="button" data-h="failures" data-id="${c.id}">Zilizoshindwa</button>` : ''}
             </div>

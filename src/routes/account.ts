@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { issueToken, requireRole } from '../middleware/auth.js';
 import { changePassword } from '../services/auth.js';
 import { passwordSchema } from '../validators/auth.js';
-import { getAccount, setMode } from '../services/account.js';
+import { getAccount, setMode, setSmsMarketing } from '../services/account.js';
 import { toPublicUser } from '../services/users.js';
 import { acceptCurrentTerms } from '../services/terms.js';
 import { ok } from '../utils/http.js';
@@ -30,6 +30,12 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
     const account = await setMode(request.currentUser.id, mode);
     request.log.info({ userId: request.currentUser.id, mode }, 'mode imebadilishwa');
     return ok(account);
+  });
+
+  /** 0.29.0: SMS za matangazo — kupokea au kujiondoa */
+  app.put('/api/account/sms-marketing', userOnly, async (request) => {
+    const { receive } = z.object({ receive: z.boolean({ error: 'Chagua ndiyo au hapana' }) }).parse(request.body);
+    return ok(await setSmsMarketing(request.currentUser, receive));
   });
 
   /** Kukubali masharti ya sasa (watumiaji wa zamani au toleo jipya). driver=true → pia masharti ya dereva. */

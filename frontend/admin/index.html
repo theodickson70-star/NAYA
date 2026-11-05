@@ -611,6 +611,17 @@
             <div class="smsc-ph" id="smsc-ph" aria-label="Weka neno linalojazwa kwa kila mtu"></div>
             <span class="smsc-counter" id="smsc-counter">herufi 0 · SMS 0</span>
           </div>
+          <label class="smsc-check"><input type="checkbox" id="smsc-important"><span>Ujumbe muhimu wa huduma <span class="muted small">— uwafikie hata waliojiondoa kwenye matangazo (mf. hitilafu ya malipo, mabadiliko ya huduma). Usitumie kwa matangazo.</span></span></label>
+          <fieldset class="smsc-when" id="smsc-when">
+            <legend>Lini</legend>
+            <label><input type="radio" name="smsc-when" value="now" checked> Sasa hivi</label>
+            <label><input type="radio" name="smsc-when" value="later"> Panga muda</label>
+            <div class="smsc-when-fields" id="smsc-when-fields" hidden>
+              <div><label for="smsc-run-at">Tarehe na saa</label><input type="datetime-local" id="smsc-run-at"></div>
+              <div><label for="smsc-repeat">Kujirudia</label>
+                <select id="smsc-repeat"><option value="NONE">Mara moja</option><option value="DAILY">Kila siku, saa hiyo</option><option value="WEEKLY">Kila wiki, siku na saa hiyo</option></select></div>
+            </div>
+          </fieldset>
           <div id="smsc-preview" aria-live="polite"></div>
           <div class="actions">
             <button class="btn btn-ghost" type="button" id="smsc-preview-btn">Hakiki</button>
@@ -624,9 +635,27 @@
           <div id="smsc-tpl-list"></div>
         </section>
       </div>
+      <section class="panel" id="smsc-sched-panel">
+        <div class="panel-head"><h2>Zilizopangwa</h2><span class="muted small">Zinatumwa na server kwa muda uliopangwa (saa za Tanzania)</span></div>
+        <ul class="history smsc-history" id="smsc-schedules"></ul>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>SMS za moja kwa moja</h2><span class="muted small" id="smsc-auto-hours"></span></div>
+        <p class="muted small">Mfumo unazituma wenyewe mtu akifikia hali fulani. Kila mtu anapata SMS ya aina moja mara moja tu ndani ya siku ulizoweka, na waliojiondoa kwenye matangazo hawapati. Ukumbusho wa ada ya dereva unatumwa tayari na mfumo wa ada — haurudiwi hapa.</p>
+        <div class="smsc-auto" id="smsc-auto"></div>
+      </section>
       <section class="panel">
         <h2>Zilizotumwa</h2>
         <ul class="history smsc-history" id="smsc-history"></ul>
+      </section>
+      <section class="panel">
+        <h2>Bei na waliojiondoa</h2>
+        <form class="smsc-price" id="smsc-price-form" novalidate>
+          <div><label for="smsc-price">Bei ya SMS moja (TSh)</label><input type="number" id="smsc-price" min="0" max="1000" step="1" inputmode="numeric"></div>
+          <button class="btn btn-ghost" type="submit">Hifadhi bei</button>
+          <span class="muted small" id="smsc-price-note">Kwa makadirio ya gharama tu. Weka bei uliyonunulia SMS kwa kampuni ya SMS. 0 = usionyeshe gharama.</span>
+        </form>
+        <p class="muted small" id="smsc-optout-note"></p>
       </section>
     </main>
 

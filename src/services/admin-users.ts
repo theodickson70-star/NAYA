@@ -74,7 +74,8 @@ export async function userDetail(id: string) {
     db,
     `SELECT u.id, u.full_name AS "fullName", u.phone, u.status, u.suspended_reason AS "suspendedReason", u.active_mode AS "activeMode",
             u.phone_verified_at AS "phoneVerifiedAt", u.created_at AS "createdAt", u.last_login_at AS "lastLoginAt", u.role, u.terms_accepted_at AS "termsAcceptedAt", u.terms_version AS "termsVersion",
-            (u.photo_file_id IS NOT NULL) AS "hasPhoto", u.photo_updated_at AS "photoUpdatedAt", u.emergency_name AS "emergencyName", u.emergency_phone AS "emergencyPhone"
+            (u.photo_file_id IS NOT NULL) AS "hasPhoto", u.photo_updated_at AS "photoUpdatedAt", u.emergency_name AS "emergencyName", u.emergency_phone AS "emergencyPhone",
+            u.sms_opt_out_at AS "smsOptOutAt"
        FROM naya.users u WHERE u.id = $1`,
     [id],
   );
@@ -292,4 +293,17 @@ export async function globalSearch(q: string) {
         )
       : [];
   return { users, rides };
+}
+
+/** 0.29.0: ofisi inamwondoa/inamrudisha mtu kwenye SMS za matangazo (mf. amepiga simu kuomba asitumiwe). */
+export async function setUserSmsMarketing(adminId: string, id: string, receive: boolean) {
+  await transaction(async (client) => {
+    await appUser(client, id);
+    await client.query(
+      `UPDATE naya.users SET sms_opt_out_at = CASE WHEN $2 THEN NULL ELSE coalesce(sms_opt_out_at, now()) END, updated_at = now() WHERE id = $1`,
+      [id, receive],
+    );
+    await writeAudit(client, { actorId: adminId, action: receive ? 'user.sms_marketing_on' : 'user.sms_marketing_off', targetType: 'user', targetId: id });
+  });
+  return userDetail(id);
 }
