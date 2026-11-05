@@ -10,7 +10,7 @@ import { openSosCount } from '../services/safety.js';
 import { openSupportCount } from '../services/support.js';
 import { newFeedbackCount } from '../services/feedback.js';
 import { fcmStats } from '../services/fcm.js';
-import { sendTestSms, smsEnabled, smsOverview } from '../services/sms.js';
+import { sendTestSms, smsEnabled, smsOverview, smsProvider, smsSenderLabel, smsSetupHint } from '../services/sms.js';
 import { z } from 'zod';
 import { phoneSchema } from '../validators/auth.js';
 import { subscriptionStats } from '../services/subscriptions.js';
@@ -49,16 +49,16 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       sosOpen,
       supportOpen: await openSupportCount(),
       feedbackNew: await newFeedbackCount(),
-      sms: { enabled: smsEnabled() },
+      sms: { enabled: smsEnabled(), provider: smsProvider()?.label ?? null, senderId: smsSenderLabel(), hint: smsSetupHint() },
       app: await fcmStats(),
       apkDownloads: await downloadStats(),
       system: { database: database === 'ok' ? 'ok' : 'error', version: VERSION, phase: PHASE },
     });
   });
 
-  /** SMS (Beem): imewashwa?, salio, na SMS za karibuni (aina na matokeo tu — si maandishi). */
+  /** SMS (Abliner / Beem): imewashwa?, salio, na SMS za karibuni (aina na matokeo tu — si maandishi). */
   app.get('/api/admin/sms', adminOnly, async () => ok(await smsOverview()));
-  // 0.25.1: SMS moja ya majaribio — kuthibitisha funguo za Beem na Sender ID
+  // 0.25.1: SMS moja ya majaribio — kuthibitisha funguo za SMS na Sender ID
   app.post('/api/admin/sms/test', { ...adminOnly, config: { rateLimit: { max: 5, timeWindow: '10 minutes' } } }, async (request) => {
     const { phone } = z.object({ phone: phoneSchema }).parse(request.body ?? {});
     return ok(await sendTestSms(request.currentUser.id, phone));

@@ -115,6 +115,23 @@ Alama za kutiliwa shaka (`rides.flags`), zinaonekana kwa ofisi kwenye safari, Ri
 DRIVER, PASSENGER, AUTO au ADMIN. Migration `021_safari_rahisi.sql` inaongeza safu tu (haifuti data); safari zinazoendelea zisizo
 za ofa zinaondolewa PIN ili zisikwame.
 
+## SMS kupitia RodSMS (0.28.0)
+
+SMS zote za NAYA (namba za uthibitisho, "Umesahau password?", taarifa, safari ya mtu mwingine, Kituo cha SMS) sasa zinapita **RodSMS** kwa Sender ID ya **NAYA**. Beem haihitajiki tena.
+
+**Kuunganisha (Railway → Variables):**
+1. RodSMS → API keys → key yenye **Send SMS** na **Read SMS** → `RODSMS_API_KEY` = `rodsms_live_…`
+2. `SMS_SENDER_ID` = `NAYA`
+3. `SMS_PROVIDER` = `rodsms`
+4. Si lazima: `RODSMS_RATE_PER_MIN` = kikomo cha key (chaguo-msingi 60). Futa `BEEM_API_KEY`, `BEEM_SECRET_KEY`, `BEEM_SENDER_ID`.
+
+Kisha Ofisi → Muhtasari → SMS: "SMS zimewashwa (RodSMS · Sender ID NAYA)", salio la SMS na hali ya Sender ID; tuma **SMS ya majaribio** kwa namba yako. SMS zinanunuliwa kwenye RodSMS → Buy SMS.
+
+- RodSMS: `POST /api/v1/messages` (`sender_id`, `recipient` 255…, `message`, `sms_type`), salio `GET /api/v1/balance`, Sender IDs `GET /api/v1/sender-ids`; makosa `insufficient_credits`, `sender_id_unusable`, `unauthorized`… yanaonyeshwa ofisini kwa Kiswahili.
+- **Kasi:** SMS zinapangwa zisizidi kikomo cha key kwa dakika (60 = SMS 1 kwa sekunde); ukipandisha "Requests per minute" kwenye RodSMS, weka namba ileile kwenye `RODSMS_RATE_PER_MIN`. 429 → inasubiri na kujaribu tena.
+- Njia nyingine: `SMS_PROVIDER=abliner` (ABLINER_API_KEY ya malipo) au `SMS_PROVIDER=beem`. Kuzima: `SMS_PROVIDER=none`. Makosa ya mipangilio ya SMS hayasimamishi server.
+- **Usalama:** nakala za code au database zilizoingia kimakosa ndani ya `frontend/` (mf. `frontend/src`, `frontend/database`) hazionekani tena kwenye mtandao (404).
+
 ## Taarifa kamili za dereva (0.27.0)
 
 Ofisi → Madereva → dereva: ukurasa sasa una vichupo — **Muhtasari · Bonus za ofa · Wallet · Safari · Malipo yote · Malalamiko na historia · Usajili na nyaraka** — na kitufe cha **Chapisha taarifa** (vichupo vyote kwenye karatasi moja).
@@ -432,7 +449,7 @@ App → **Akaunti** sasa ni menyu (kama Bolt/Uber), si orodha ndefu ya kadi:
 - **Dharura (SOS):** abiria au dereva anabonyeza *Dharura* → ofisi inaona bango jekundu na kengele papo hapo (Ofisi → Dharura),
   pamoja na namba za simu za wote wawili na mahali. App pia ina kitufe cha kupiga Polisi (112).
 
-## SMS kupitia Beem (Phase 9)
+## SMS (Phase 9) — sasa kupitia RodSMS (tazama 0.28.0); maelezo ya Beem hapa chini ni ya zamani
 
 1. Fungua akaunti ya [Beem](https://beem.africa), nunua SMS, na omba **Sender ID** (mf. `NAYA`). Mpaka iidhinishwe, tumia `INFO`.
 2. Beem → Profile → *Authentication Information*: nakili **API Key** na **Secret Key**.

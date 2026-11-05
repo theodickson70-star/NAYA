@@ -113,6 +113,20 @@ export async function buildApp(options: { logger?: boolean } = {}): Promise<Fast
   await app.register(ripotiRoutes);
   await app.register(ofaRoutes);
 
+  // 0.28.0 Usalama: kama nakala za code/database zimeingia kimakosa ndani ya folda ya frontend (mf. zip ilifunguliwa
+  // ndani ya folda isiyo sahihi), zisionekane kwenye mtandao. Kurasa halisi za NAYA haziko chini ya njia hizi.
+  const HIDDEN = /^\/(?:src|database|tests|mobile|frontend|node_modules|dist)(?:\/|$)|^\/(?:package(?:-lock)?\.json|railway\.json|tsconfig(?:\.test)?\.json|README\.md)$|\/\.env/i;
+  app.addHook('onRequest', async (request, reply) => {
+    const raw = (request.url.split('?')[0] ?? '').replace(/\/{2,}/g, '/');
+    let path = raw;
+    try {
+      path = decodeURIComponent(raw);
+    } catch {
+      // anwani mbovu — tumia kama ilivyo
+    }
+    if (!path.startsWith('/api/') && HIDDEN.test(path)) return reply.code(404).send({ success: false, message: 'Haikupatikana' });
+  });
+
   // Kurasa za NAYA: /app/ (app moja ya abiria na dereva) na /admin/ (ofisi).
   await app.register(fastifyStatic, { root: FRONTEND_DIR, prefix: '/', index: ['index.html'] });
   await app.register(fastifyStatic, { root: LEAFLET_DIR, prefix: '/vendor/leaflet/', decorateReply: false });

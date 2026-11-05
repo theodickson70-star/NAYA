@@ -172,7 +172,7 @@
           <ul class="system-list">
             <li><span id="sys-api" class="dot dot-wait"></span>Server ya NAYA</li>
             <li><span id="sys-db" class="dot dot-wait"></span>Database (Supabase)</li>
-            <li><span id="sys-sms" class="dot dot-wait"></span><span id="sys-sms-text">SMS (Beem)</span></li>
+            <li><span id="sys-sms" class="dot dot-wait"></span><span id="sys-sms-text">SMS</span></li>
             <li><span id="sys-app" class="dot dot-wait"></span><span id="sys-app-text">App ya Android (kengele ya maombi)</span></li>
           </ul>
           <p class="muted small" id="sys-version"></p>
@@ -182,10 +182,11 @@
       <section class="panel" aria-labelledby="sms-title" id="sms-panel" hidden>
         <div class="panel-head"><h2 id="sms-title">SMS</h2><a href="#/sms" id="sms-center-link" hidden>Fungua Kituo cha SMS</a></div>
         <section class="stat-strip stat-strip-sms" aria-label="SMS">
-          <div class="stat"><span class="stat-value" id="sms-balance">–</span><span class="stat-label">Salio la Beem</span></div>
+          <div class="stat"><span class="stat-value" id="sms-balance">–</span><span class="stat-label">Salio la SMS</span></div>
           <div class="stat"><span class="stat-value" id="sms-today">–</span><span class="stat-label">Zilizotumwa leo</span></div>
           <div class="stat"><span class="stat-value" id="sms-month">–</span><span class="stat-label">Mwezi huu</span></div>
         </section>
+        <p class="muted small" id="sms-provider"></p>
         <p class="alert alert-warn" id="sms-failed" hidden></p>
         <form class="sms-test" id="sms-test-form" novalidate>
           <label for="sms-test-phone">Tuma SMS ya majaribio <span class="muted" id="sms-sender"></span></label>

@@ -40,7 +40,7 @@ function updateSmsNote() {
     ? '(SMS hazijawashwa)'
     : n > info.maxSms
       ? `(kundi hili lina watu ${n} — SMS zinaruhusiwa kwa ${info.maxSms} tu)`
-      : `(SMS ${n} — zinalipiwa kwa Beem)`;
+      : `(SMS ${n} — zinalipiwa)`;
 }
 
 export async function load() {

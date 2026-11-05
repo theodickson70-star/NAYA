@@ -1,7 +1,7 @@
 // 0.26.0: Kituo cha SMS (ofisi) — templates za wateja na madereva, kutuma SMS kwa kundi au kwa namba, na historia.
 //
 // Kinga:
-//  - Hakiki kwanza: ofisi inaona idadi ya watu, mfano wa SMS, sehemu (SMS 1 = herufi 160) na makadirio dhidi ya salio la Beem.
+//  - Hakiki kwanza: ofisi inaona idadi ya watu, mfano wa SMS, sehemu (SMS 1 = herufi 160) na makadirio dhidi ya salio la SMS.
 //  - Kutuma kunahitaji idadi ileile iliyoonekana kwenye hakiki (kundi likibadilika katikati, ofisi inaambiwa).
 //  - Kikomo cha watu kwa mara moja; ujumbe usizidi SMS 3; maneno ya [kujaza] na {maneno yasiyojulikana} yanazuiwa.
 //  - Ujumbe uleule kwa kundi lilelile ndani ya dakika 2 unazuiwa (kubonyeza mara mbili).
@@ -12,7 +12,7 @@ import { env } from '../config/env.js';
 import { badRequest, conflict, notFound } from '../utils/http.js';
 import { normalizeTzPhone } from '../utils/phone.js';
 import { writeAudit } from './audit.js';
-import { sendSms, smsBalance, smsEnabled, toGsm } from './sms.js';
+import { sendSms, smsBalance, smsEnabled, smsProvider, smsSenderLabel, smsSetupHint, toGsm } from './sms.js';
 
 export const SMS_AUDIENCES = [
   'ALL',
@@ -170,8 +170,8 @@ export async function previewCampaign(input: CampaignInput) {
   const problems = messageProblems(message);
   if (maxParts > MAX_PARTS) problems.push(`Ujumbe ni mrefu: SMS ${maxParts} kwa kila mtu. Ufupishe usizidi SMS ${MAX_PARTS} (herufi ~${MAX_PARTS * 153}).`);
   if (list.length > MAX_RECIPIENTS) problems.push(`Kundi lina watu ${list.length}; unaweza kutuma kwa watu ${MAX_RECIPIENTS} kwa mara moja.`);
-  if (balance !== null && units > balance) problems.push(`Salio la Beem (${balance}) halitoshi kwa SMS ${units}. Jaza salio kwanza.`);
-  if (!smsEnabled()) problems.push('SMS hazijawashwa (funguo za Beem hazipo).');
+  if (balance !== null && units > balance) problems.push(`Salio la SMS (${balance}) halitoshi kwa SMS ${units}. Jaza salio kwanza.`);
+  if (!smsEnabled()) problems.push(`SMS hazijawashwa. ${smsSetupHint() ?? ''}`.trim());
   return {
     audience: input.audience,
     count: list.length,
@@ -189,7 +189,7 @@ export async function previewCampaign(input: CampaignInput) {
 }
 
 export async function sendCampaign(adminId: string, input: CampaignInput & { expectedCount: number }) {
-  if (!smsEnabled()) throw conflict('SMS hazijawashwa. Weka funguo za Beem kwenye Railway → Variables.');
+  if (!smsEnabled()) throw conflict(`SMS hazijawashwa. ${smsSetupHint() ?? ''}`.trim());
   const message = cleanMessage(input.message);
   const problems = messageProblems(message);
   if (problems.length) throw badRequest(problems[0]);
@@ -203,7 +203,7 @@ export async function sendCampaign(adminId: string, input: CampaignInput & { exp
   const units = rendered.reduce((sum, x) => sum + smsParts(x.text), 0);
   if (rendered.some((x) => smsParts(x.text) > MAX_PARTS)) throw badRequest(`Ujumbe ni mrefu mno — usizidi SMS ${MAX_PARTS}.`);
   const balance = await smsBalance();
-  if (balance !== null && units > balance) throw conflict(`Salio la Beem (${balance}) halitoshi kwa SMS ${units}. Jaza salio kwanza.`);
+  if (balance !== null && units > balance) throw conflict(`Salio la SMS (${balance}) halitoshi kwa SMS ${units}. Jaza salio kwanza.`);
   // Watu walewale + ujumbe uleule ndani ya dakika 2 = kubonyeza mara mbili
   const targetKey =
     input.audience === 'NUMBERS'
@@ -370,7 +370,9 @@ export async function smsCenterOverview() {
   ]);
   return {
     enabled: smsEnabled(),
-    senderId: env.beemSenderId,
+    senderId: smsSenderLabel(),
+    providerLabel: smsProvider()?.label ?? null,
+    setupHint: smsSetupHint(),
     balance,
     sizes,
     templates,

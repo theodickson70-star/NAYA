@@ -413,7 +413,9 @@ async function loadOverview() {
     renderQueue(data, walletP, financeP, locationsP, driverWalletsP, farePayP, cwP);
     loadTrend();
     setDot('sys-sms', data.sms.enabled ? 'ok' : 'wait');
-    $('sys-sms-text').textContent = data.sms.enabled ? 'SMS (Beem) zimewashwa' : 'SMS (Beem) hazijawashwa — weka BEEM_API_KEY na BEEM_SECRET_KEY';
+    $('sys-sms-text').textContent = data.sms.enabled
+      ? `SMS zimewashwa (${data.sms.provider ?? 'SMS'}${data.sms.senderId ? ` · Sender ID ${data.sms.senderId}` : ''})`
+      : `SMS hazijawashwa — ${data.sms.hint ?? 'weka SMS_SENDER_ID kwenye Railway → Variables'}`;
     if (data.sms.enabled) loadSms();
     else $('sms-panel').hidden = true;
     setDot('sys-app', data.app.enabled ? 'ok' : 'wait');
@@ -461,7 +463,7 @@ const SMS_KINDS = {
   support_reply: 'Ofisi imejibu (msaada)',
 };
 
-// 0.25.1: SMS ya majaribio (kuthibitisha funguo za Beem na Sender ID)
+// 0.25.1: SMS ya majaribio (kuthibitisha funguo za SMS na Sender ID)
 $('sms-test-form')?.addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = event.currentTarget;
@@ -474,8 +476,8 @@ $('sms-test-form')?.addEventListener('submit', async (event) => {
     const r = await api.post('/api/admin/sms/test', { phone: $('sms-test-phone').value });
     box.className = `alert ${r.ok ? 'alert-ok' : 'alert-danger'}`;
     box.textContent = r.ok
-      ? `Beem imepokea SMS (Sender ID: ${r.senderId}). Angalia simu yako — ikifika, SMS za NAYA ziko tayari.`
-      : `Haikutumwa: ${r.error}. Kagua BEEM_API_KEY, BEEM_SECRET_KEY, BEEM_SENDER_ID (${r.senderId}) na salio la Beem.`;
+      ? `${r.provider ?? 'Kampuni ya SMS'} imepokea SMS (Sender ID: ${r.senderId ?? '—'}). Angalia simu yako — ikifika, SMS za NAYA ziko tayari.`
+      : `Haikutumwa: ${r.error}. Kagua funguo, Sender ID (${r.senderId ?? '—'}) na salio la SMS kwenye ${r.provider ?? 'kampuni ya SMS'}.`;
     loadSms();
   } catch (err) {
     if (handleAuthError(err)) return;
@@ -498,7 +500,10 @@ async function loadSms() {
     $('sms-today').textContent = n(sms.sentToday);
     $('sms-month').textContent = n(sms.sentThisMonth);
     $('sms-failed').hidden = !sms.failedToday;
-    $('sms-failed').textContent = `SMS ${sms.failedToday} zimeshindwa leo. Angalia salio la Beem na Sender ID (${sms.senderId}).`;
+    $('sms-failed').textContent = `SMS ${sms.failedToday} zimeshindwa leo. Angalia salio la SMS na Sender ID (${sms.senderId ?? '—'}) kwenye ${sms.providerLabel ?? 'kampuni ya SMS'}.`;
+    $('sms-provider').textContent = `${sms.providerLabel ?? ''}${sms.senderId ? ` · Sender ID ${sms.senderId}` : ''}${
+      sms.senderStatus === 'approved' ? ' (imeidhinishwa)' : sms.senderStatus === 'pending' ? ' (inasubiri kuidhinishwa)' : sms.senderStatus === 'not_found' ? ' (haijaonekana kwenye akaunti)' : ''
+    }`;
     $('sms-recent').innerHTML = sms.recent
       .slice(0, 8)
       .map(

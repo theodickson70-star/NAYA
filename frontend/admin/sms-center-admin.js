@@ -112,8 +112,8 @@ export async function load() {
     return error(err.message);
   }
   $('smsc-status').textContent = info.enabled
-    ? `Sender ID: ${info.senderId} · Salio la Beem: ${info.balance == null ? 'halijulikani' : `SMS ${Number(info.balance).toLocaleString('sw-TZ')}`}`
-    : 'SMS hazijawashwa — weka funguo za Beem kwenye Railway → Variables. Unaweza kuandaa templates.';
+    ? `${info.providerLabel ? `${info.providerLabel} · ` : ''}Sender ID: ${info.senderId ?? '—'} · Salio la SMS: ${info.balance == null ? 'halijulikani' : `SMS ${Number(info.balance).toLocaleString('sw-TZ')}`}`
+    : `SMS hazijawashwa — ${info.setupHint ?? 'weka SMS_SENDER_ID kwenye Railway → Variables'} Unaweza kuandaa templates.`;
   const current = audience();
   $('smsc-audience').innerHTML =
     '<legend>Wapokeaji</legend>' +
@@ -206,7 +206,7 @@ function drawPreview(d) {
       <div class="smsc-preview-stats">
         <div><strong>${d.count.toLocaleString('sw-TZ')}</strong><span>watu</span></div>
         <div><strong>${d.units.toLocaleString('sw-TZ')}</strong><span>SMS (makadirio)</span></div>
-        <div><strong>${d.balance == null ? '—' : Number(d.balance).toLocaleString('sw-TZ')}</strong><span>salio la Beem</span></div>
+        <div><strong>${d.balance == null ? '—' : Number(d.balance).toLocaleString('sw-TZ')}</strong><span>salio la SMS</span></div>
       </div>
       ${d.invalidCount ? `<p class="alert alert-warn">Namba ${d.invalidCount} si sahihi na zitarukwa: ${esc(d.invalid.join(', '))}</p>` : ''}
       ${d.problems.map((p) => `<p class="alert alert-danger">${esc(p)}</p>`).join('')}
@@ -378,7 +378,7 @@ function drawHistory() {
             </div>
             <div class="smsc-h-side">
               <span class="badge badge-${tone}">${label}</span>
-              <span class="small"><strong>${c.sent}</strong>/${c.total} zimefika Beem${c.failed ? ` · <span class="smsc-bad">${c.failed} zimeshindwa</span>` : ''}</span>
+              <span class="small"><strong>${c.sent}</strong>/${c.total} zimepokelewa${c.failed ? ` · <span class="smsc-bad">${c.failed} zimeshindwa</span>` : ''}</span>
               <span class="muted small">SMS ${c.units}</span>
               ${c.status === 'SENDING' ? `<button class="btn btn-ghost btn-small" type="button" data-h="stop" data-id="${c.id}">Simamisha</button>` : ''}
               ${c.failed ? `<button class="btn btn-ghost btn-small btn-plain" type="button" data-h="failures" data-id="${c.id}">Zilizoshindwa</button>` : ''}

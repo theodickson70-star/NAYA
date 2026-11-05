@@ -74,6 +74,13 @@ export const env = {
   vapidPublicKey: read('VAPID_PUBLIC_KEY'),
   vapidPrivateKey: read('VAPID_PRIVATE_KEY'),
   vapidSubject: read('VAPID_SUBJECT') ?? 'mailto:admin@naya.co.tz',
+  /**
+   * 0.28.0: kampuni ya SMS — "rodsms" (RODSMS_API_KEY), "abliner" (ABLINER_API_KEY ya malipo), "beem", au "none".
+   * Ikiachwa tupu: RodSMS kama RODSMS_API_KEY ipo; vinginevyo Beem kama funguo zake zipo.
+   */
+  smsProvider: (read('SMS_PROVIDER') ?? '').toLowerCase() || null,
+  /** Jina la mtumaji (Sender ID) lililoidhinishwa, mf. NAYA (herufi ≤ 11). */
+  smsSenderId: read('SMS_SENDER_ID'),
   // SMS kupitia Beem Africa (kuthibitisha namba, kurejesha password, taarifa muhimu). Bila funguo hizi, SMS zimezimwa.
   beemApiKey: read('BEEM_API_KEY'),
   beemSecretKey: read('BEEM_SECRET_KEY'),
@@ -97,6 +104,11 @@ export const env = {
 if (env.androidApkUrl && !/^https:\/\//.test(env.androidApkUrl)) problems.push('ANDROID_APK_URL lazima ianze na https://');
 if (!/^https:\/\/[^\s/]+/.test(env.publicUrl)) problems.push('PUBLIC_URL lazima ianze na https://');
 if (env.beemSenderId.length > 11) problems.push('BEEM_SENDER_ID isizidi herufi 11');
+// Makosa ya SMS hayasimamishi server (SMS zinazimwa tu, na ofisi inaona kwa nini) — ni maonyo.
+if (env.smsProvider && !['rodsms', 'abliner', 'beem', 'none'].includes(env.smsProvider)) {
+  console.warn(`[config] SMS_PROVIDER="${env.smsProvider}" haijulikani — tumia rodsms, abliner, beem au none. SMS zimezimwa.`);
+}
+if (env.smsSenderId && env.smsSenderId.length > 11) console.warn('[config] SMS_SENDER_ID isizidi herufi 11 — mitandao inaweza kuikataa.');
 if (!!env.beemApiKey !== !!env.beemSecretKey) problems.push('Weka BEEM_API_KEY na BEEM_SECRET_KEY zote mbili (au usiweke zote)');
 
 if (problems.length > 0) {
