@@ -1,0 +1,329 @@
+import 'package:flutter/material.dart';
+
+import '../../services/api.dart';
+import '../../services/format.dart';
+import '../../theme.dart';
+import '../../widgets/common.dart';
+import '../shared/customers_screen.dart';
+import 'agent_forms.dart';
+
+class AgentHome extends StatefulWidget {
+  final Map<String, dynamic> profile;
+  const AgentHome({super.key, required this.profile});
+  @override
+  State<AgentHome> createState() => _AgentHomeState();
+}
+
+class _AgentHomeState extends State<AgentHome> {
+  bool _loading = true;
+  String? _sessionId;
+  Map<String, dynamic>? _summary;
+  List<Map<String, dynamic>> _txs = [];
+  List<Map<String, dynamic>> _adjs = [];
+  List<String> _networks = networks.map((e) => e.code).toList();
+
+  String get _outletName => (widget.profile['outlets'] as Map?)?['name']?.toString() ?? 'Kibanda';
+  String? get _outletId => widget.profile['outlet_id'] as String?;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      if (_outletId != null) {
+        final lines = await Api.outletLines(_outletId!);
+        if (lines.isNotEmpty) _networks = lines.map((e) => e['network'].toString()).toList();
+      }
+      _sessionId = await Api.myOpenSession();
+      if (_sessionId != null) {
+        final r = await Future.wait([
+          Api.sessionSummary(_sessionId!),
+          Api.sessionTransactions(_sessionId!),
+          Api.sessionAdjustments(_sessionId!),
+        ]);
+        _summary = r[0] as Map<String, dynamic>;
+        _txs = r[1] as List<Map<String, dynamic>>;
+        _adjs = r[2] as List<Map<String, dynamic>>;
+      } else {
+        _summary = null;
+        _txs = [];
+        _adjs = [];
+      }
+    } catch (e) {
+      if (mounted) showMsg(context, errorText(e), error: true);
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _newTx(String type) async {
+    final ok = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => TransactionSheet(type: type, networks: _networks),
+    );
+    if (ok == true) _load();
+  }
+
+  Future<void> _adjust() async {
+    final ok = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => AdjustmentSheet(networks: _networks),
+    );
+    if (ok == true) _load();
+  }
+
+  Future<void> _void(Map<String, dynamic> t) async {
+    if (t['voided'] == true) return;
+    final reason = await askText(context, 'Batilisha muamala wa ${tzs(t['amount'])}?',
+        hint: 'Sababu (lazima). Muamala utabaki kwenye rekodi, mmiliki ataona.');
+    if (reason == null || reason.isEmpty || !mounted) return;
+    final ok = await runTask(context, () => Api.voidTransaction(t['id'], reason), success: 'Muamala umebatilishwa');
+    if (ok) _load();
+  }
+
+  Future<void> _closeDay() async {
+    final floats = ((_summary?['floats'] as List?) ?? []).map((e) => e['network'].toString()).toList();
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(builder: (_) => CloseDayScreen(networks: floats.isEmpty ? _networks : floats)),
+    );
+    if (result != null && mounted) {
+      await showDialog(context: context, builder: (_) => CloseResultDialog(result: result));
+      _load();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        titleSpacing: 16,
+        title: Row(children: [
+          const BrandMark(size: 34, showName: false),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(_outletName, style: display(18), overflow: TextOverflow.ellipsis),
+              Text(widget.profile['full_name']?.toString() ?? '',
+                  style: const TextStyle(fontSize: 12, color: Naya.muted, fontFamily: kBodyFont)),
+            ]),
+          ),
+        ]),
+        actions: [
+          IconButton(
+            tooltip: 'Wateja',
+            icon: const Icon(Icons.people_alt_outlined),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomersScreen())),
+          ),
+          IconButton(onPressed: _load, icon: const Icon(Icons.refresh), tooltip: 'Onyesha upya'),
+          IconButton(
+            tooltip: 'Toka',
+            onPressed: () async {
+              if (await confirm(context, 'Toka', 'Unataka kutoka kwenye akaunti?')) await Api.signOut();
+            },
+            icon: const Icon(Icons.logout),
+          ),
+        ],
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _outletId == null
+              ? const EmptyState(icon: Icons.store_mall_directory_outlined, text: 'Hujapangiwa kibanda bado.\nWasiliana na mmiliki.')
+              : _sessionId == null
+                  ? OpenDayView(networks: _networks, onOpened: _load)
+                  : _sessionView(),
+    );
+  }
+
+  Widget _sessionView() {
+    final s = _summary!;
+    final floats = (s['floats'] as List?) ?? [];
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(padding: const EdgeInsets.fromLTRB(14, 4, 14, 14), children: [
+        // Salio la sasa
+        HeroPanel(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(color: Naya.gold, borderRadius: BorderRadius.circular(20)),
+                child: const Text('SIKU IKO WAZI',
+                    style: TextStyle(color: Naya.goldOn, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
+              ),
+              const Spacer(),
+              Text('Tangu ${timeOnly(s['opened_at'])}',
+                  style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.7))),
+            ]),
+            const SizedBox(height: 14),
+            Text('Cash mkononi', style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 13)),
+            const SizedBox(height: 2),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(tzs(s['expected_cash']), style: display(34, color: Colors.white)),
+            ),
+            const SizedBox(height: 14),
+            for (final f in floats) _heroFloat(f as Map),
+            const SizedBox(height: 10),
+            Container(height: 1, color: Colors.white.withValues(alpha: 0.12)),
+            const SizedBox(height: 12),
+            Row(children: [
+              Expanded(child: HeroStat(label: 'Miamala leo', value: '${s['tx_count'] ?? 0}')),
+              Expanded(child: HeroStat(label: 'Kamisheni', value: tzs(s['commission']), gold: true)),
+            ]),
+          ]),
+        ),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(
+            child: _bigButton('KUWEKA', 'Mteja anaweka pesa', Icons.south_west, Naya.green, Colors.white,
+                () => _newTx('deposit')),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: _bigButton('KUTOA', 'Mteja anatoa pesa', Icons.north_east, Naya.gold, Naya.goldOn,
+                () => _newTx('withdrawal')),
+          ),
+        ]),
+        const SizedBox(height: 10),
+        Row(children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: _adjust,
+              icon: const Icon(Icons.swap_horiz),
+              label: const Text('Float / Mtaji'),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: _closeDay,
+              style: OutlinedButton.styleFrom(foregroundColor: Naya.danger),
+              icon: const Icon(Icons.lock_clock),
+              label: const Text('Funga siku'),
+            ),
+          ),
+        ]),
+        const SectionTitle('Miamala yangu leo', hint: 'Bonyeza kwa muda mrefu kubatilisha muamala uliokosewa'),
+        if (_txs.isEmpty) const EmptyState(icon: Icons.receipt_long_outlined, text: 'Bado hakuna muamala leo'),
+        for (final t in _txs) _txTile(t),
+        if (_adjs.isNotEmpty) ...[
+          const SectionTitle('Marekebisho', hint: 'Float, mtaji na matumizi'),
+          Card(
+            child: Column(children: [
+              for (final a in _adjs)
+                ListTile(
+                  leading: const Icon(Icons.swap_horiz),
+                  title: Text(adjustmentKinds[a['kind']] ?? a['kind'].toString()),
+                  subtitle: Text([
+                    if (a['network'] != null) networkOf(a['network']).label,
+                    if ((a['note'] ?? '').toString().isNotEmpty) a['note'],
+                    timeOnly(a['created_at']),
+                  ].join(' • ')),
+                  trailing: Text(tzs(a['amount']), style: const TextStyle(fontWeight: FontWeight.w700)),
+                ),
+            ]),
+          ),
+        ],
+        const SizedBox(height: 40),
+      ]),
+    );
+  }
+
+  Widget _heroFloat(Map f) {
+    final v = n(f['expected']);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(children: [
+        CircleAvatar(radius: 5, backgroundColor: networkOf(f['network']?.toString()).color),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text('Float ${f['label']}', style: TextStyle(color: Colors.white.withValues(alpha: 0.85))),
+        ),
+        Text(tzs(v),
+            style: TextStyle(
+              color: v < 0 ? const Color(0xFFFFB4A6) : Colors.white,
+              fontWeight: FontWeight.w700,
+            )),
+      ]),
+    );
+  }
+
+  Widget _bigButton(String title, String sub, IconData icon, Color color, Color fg, VoidCallback onTap) {
+    return Material(
+      color: color,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 14),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: fg.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(12)),
+              child: Icon(icon, color: fg, size: 26),
+            ),
+            const SizedBox(height: 14),
+            Text(title, style: display(20, color: fg)),
+            const SizedBox(height: 2),
+            Text(sub, style: TextStyle(color: fg.withValues(alpha: 0.75), fontSize: 12)),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  Widget _txTile(Map<String, dynamic> t) {
+    final deposit = t['tx_type'] == 'deposit';
+    final voided = t['voided'] == true;
+    final c = deposit ? Naya.deposit : Naya.withdraw;
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      child: ListTile(
+        onLongPress: () => _void(t),
+        leading: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: deposit ? Naya.mint : Naya.goldSoft,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(deposit ? Icons.south_west : Icons.north_east, color: c, size: 20),
+        ),
+        title: Row(children: [
+          Flexible(
+            child: Text(tzs(t['amount']),
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: voided ? Naya.offline : Naya.ink,
+                    decoration: voided ? TextDecoration.lineThrough : null)),
+          ),
+          const SizedBox(width: 8),
+          NetworkChip(t['network'].toString()),
+        ]),
+        subtitle: Text([
+          deposit ? 'Kuweka' : 'Kutoa',
+          if ((t['customer_phone'] ?? '').toString().isNotEmpty) t['customer_phone'],
+          if ((t['reference'] ?? '').toString().isNotEmpty) 'Ref ${t['reference']}',
+          if (voided) 'IMEBATILISHWA: ${t['void_reason']}',
+        ].join(' • ')),
+        trailing: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Text(timeOnly(t['created_at']), style: const TextStyle(fontSize: 12, color: Naya.muted)),
+          if (n(t['commission']) > 0)
+            Text('+${plain(t['commission'])}',
+                style: const TextStyle(fontSize: 12, color: Naya.green, fontWeight: FontWeight.w700)),
+        ]),
+      ),
+    );
+  }
+}

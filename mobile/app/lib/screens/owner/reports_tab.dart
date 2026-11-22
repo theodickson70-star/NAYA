@@ -1,0 +1,273 @@
+import 'package:flutter/material.dart';
+
+import '../../services/api.dart';
+import '../../services/format.dart';
+import '../../widgets/common.dart';
+import 'owner_home.dart';
+import '../../theme.dart';
+
+class ReportsTab extends StatefulWidget {
+  const ReportsTab({super.key});
+  @override
+  State<ReportsTab> createState() => _ReportsTabState();
+}
+
+class _ReportsTabState extends State<ReportsTab> {
+  late DateTimeRange _range = _thisMonth();
+  String? _outlet;
+  String? _agent;
+  List<Map<String, dynamic>> _outlets = [];
+  List<Map<String, dynamic>> _agents = [];
+  Map<String, dynamic>? _data;
+  bool _loading = false;
+
+  static DateTimeRange _thisMonth() {
+    final now = DateTime.now();
+    return DateTimeRange(start: DateTime(now.year, now.month, 1), end: DateTime(now.year, now.month, now.day));
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    Api.outlets().then((o) {
+      if (mounted) setState(() => _outlets = o);
+    });
+    Api.agents().then((a) {
+      if (mounted) setState(() => _agents = a);
+    });
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final d = await Api.report(_range.start, _range.end, _outlet, agentId: _agent);
+      if (mounted) setState(() => _data = d);
+    } catch (e) {
+      if (mounted) showMsg(context, errorText(e), error: true);
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  void _preset(String p) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    setState(() {
+      switch (p) {
+        case 'leo':
+          _range = DateTimeRange(start: today, end: today);
+        case 'jana':
+          final y = today.subtract(const Duration(days: 1));
+          _range = DateTimeRange(start: y, end: y);
+        case 'wiki':
+          _range = DateTimeRange(start: today.subtract(const Duration(days: 6)), end: today);
+        case 'mwezi':
+          _range = _thisMonth();
+        case 'mwezi_uliopita':
+          final first = DateTime(now.year, now.month - 1, 1);
+          _range = DateTimeRange(start: first, end: DateTime(now.year, now.month, 0));
+      }
+    });
+    _load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final d = _data;
+    final t = (d?['totals'] as Map?) ?? {};
+    return Scaffold(
+      appBar: AppBar(title: const Text('Ripoti')),
+      body: ListView(padding: const EdgeInsets.all(12), children: [
+        Wrap(spacing: 6, runSpacing: 6, children: [
+          for (final p in const {
+            'leo': 'Leo',
+            'jana': 'Jana',
+            'wiki': 'Siku 7',
+            'mwezi': 'Mwezi huu',
+            'mwezi_uliopita': 'Mwezi uliopita',
+          }.entries)
+            ActionChip(label: Text(p.value), onPressed: () => _preset(p.key)),
+        ]),
+        const SizedBox(height: 8),
+        Row(children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.date_range),
+              label: Text('${niceDate(_range.start)} - ${niceDate(_range.end)}', overflow: TextOverflow.ellipsis),
+              onPressed: () async {
+                final r = await showDateRangePicker(
+                  context: context,
+                  firstDate: DateTime(2024),
+                  lastDate: DateTime.now(),
+                  initialDateRange: _range,
+                );
+                if (r != null) {
+                  setState(() => _range = r);
+                  _load();
+                }
+              },
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: DropdownButtonFormField<String?>(
+              value: _outlet,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'Kibanda', isDense: true),
+              items: [
+                const DropdownMenuItem<String?>(value: null, child: Text('Vyote')),
+                for (final o in _outlets)
+                  DropdownMenuItem<String?>(value: o['id'].toString(), child: Text(o['name'].toString())),
+              ],
+              onChanged: (v) {
+                setState(() => _outlet = v);
+                _load();
+              },
+            ),
+          ),
+        ]),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String?>(
+          value: _agent,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'Mfanyakazi', isDense: true, prefixIcon: Icon(Icons.badge_outlined)),
+          items: [
+            const DropdownMenuItem<String?>(value: null, child: Text('Wafanyakazi wote')),
+            for (final a in _agents)
+              DropdownMenuItem<String?>(
+                value: a['id'].toString(),
+                child: Text('${a['full_name'] ?? '-'}${a['active'] == false ? ' (amezimwa)' : ''}'),
+              ),
+          ],
+          onChanged: (v) {
+            setState(() => _agent = v);
+            _load();
+          },
+        ),
+        const SizedBox(height: 12),
+        if (_loading) const LinearProgressIndicator(),
+        if (d != null) ...[
+          GridView.count(
+            crossAxisCount: MediaQuery.of(context).size.width > 700 ? 4 : 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            childAspectRatio: 1.9,
+            children: [
+              StatCard(title: 'Kamisheni', value: tzs(t['commission']), icon: Icons.payments, color: Naya.green),
+              StatCard(title: 'Miamala', value: '${t['tx_count'] ?? 0}', icon: Icons.receipt_long),
+              StatCard(title: 'Kuweka', value: tzs(t['deposits']), icon: Icons.south_west, color: Naya.deposit),
+              StatCard(title: 'Kutoa', value: tzs(t['withdrawals']), icon: Icons.north_east, color: Naya.withdraw),
+            ],
+          ),
+          _section('Kwa mtandao', [
+            for (final r in (d['by_network'] as List? ?? []))
+              ListTile(
+                dense: true,
+                leading: CircleAvatar(radius: 6, backgroundColor: networkOf(r['network']?.toString()).color),
+                title: Text(r['label'].toString()),
+                subtitle: Text('${r['tx_count']} miamala • Kuweka ${tzs(r['deposits'])} • Kutoa ${tzs(r['withdrawals'])}'),
+                trailing: Text(tzs(r['commission']), style: const TextStyle(fontWeight: FontWeight.bold)),
+              ),
+          ]),
+          _section('Kwa mfanyakazi', [
+            for (final r in (d['by_agent'] as List? ?? []))
+              ListTile(
+                dense: true,
+                onTap: _agent == null
+                    ? () {
+                        setState(() => _agent = r['agent_id'].toString());
+                        _load();
+                      }
+                    : null,
+                leading: CircleAvatar(
+                  radius: 16,
+                  backgroundColor: r['active'] == false ? Naya.line : Naya.mint,
+                  child: Text(
+                    (r['agent_name'] ?? '?').toString().trim().isEmpty ? '?' : r['agent_name'].toString().trim()[0].toUpperCase(),
+                    style: TextStyle(color: r['active'] == false ? Naya.muted : Naya.green, fontWeight: FontWeight.w700),
+                  ),
+                ),
+                title: Text('${r['agent_name'] ?? '-'}${r['active'] == false ? ' (amezimwa)' : ''}'),
+                subtitle: Text([
+                  '${r['tx_count']} miamala',
+                  'Kuweka ${tzs(r['deposits'])}',
+                  'Kutoa ${tzs(r['withdrawals'])}',
+                  if (n(r['voided']) > 0) 'Amebatilisha ${r['voided']}',
+                ].join(' • ')),
+                trailing: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(tzs(r['commission']), style: const TextStyle(fontWeight: FontWeight.bold)),
+                    VarianceText(r['variance'], fontSize: 11),
+                  ],
+                ),
+              ),
+          ]),
+          _section('Kwa kibanda', [
+            for (final r in (d['by_outlet'] as List? ?? []))
+              ListTile(
+                dense: true,
+                leading: const Icon(Icons.storefront),
+                title: Text(r['outlet_name'].toString()),
+                subtitle: Text('${r['tx_count']} miamala • Matumizi ${tzs(r['expenses'])}'),
+                trailing: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(tzs(r['commission']), style: const TextStyle(fontWeight: FontWeight.bold)),
+                    VarianceText(r['variance'], fontSize: 11),
+                  ],
+                ),
+              ),
+          ]),
+          _section('Kwa siku', [
+            for (final r in (d['by_day'] as List? ?? []))
+              ListTile(
+                dense: true,
+                title: Text(r['day'].toString()),
+                subtitle: Text('${r['tx_count']} miamala • Thamani ${tzs(r['volume'])}'),
+                trailing: Text(tzs(r['commission'])),
+              ),
+          ]),
+          _section('Upatanisho wa kila siku (zamu)', [
+            for (final r in (d['sessions'] as List? ?? []))
+              ListTile(
+                dense: true,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => SessionDetailScreen(
+                      sessionId: r['session_id'].toString(),
+                      title: '${r['outlet_name']} • ${r['work_date']}',
+                    ),
+                  ),
+                ),
+                title: Text('${r['outlet_name']} • ${r['work_date']}'),
+                subtitle: Text('${r['agent_name'] ?? '-'} • ${r['status'] == 'open' ? 'Bado wazi' : 'Imefungwa'}'),
+                trailing: r['status'] == 'open'
+                    ? const Icon(Icons.lock_open, color: Naya.gold)
+                    : VarianceText(n(r['cash_variance']) + n(r['float_variance']), fontSize: 12),
+              ),
+          ]),
+        ],
+      ]),
+    );
+  }
+
+  Widget _section(String title, List<Widget> children) => Card(
+        margin: const EdgeInsets.only(top: 10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Text(title, style: const TextStyle(fontFamily: kDisplayFont, fontWeight: FontWeight.w800, fontSize: 16)),
+            ),
+            if (children.isEmpty)
+              const Padding(padding: EdgeInsets.all(16), child: Text('Hakuna data', style: TextStyle(color: Naya.muted))),
+            ...children,
+          ]),
+        ),
+      );
+}
