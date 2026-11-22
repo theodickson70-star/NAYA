@@ -1,128 +1,113 @@
-// NAYA Staff (0.19.0)
-//   Staff (app):  GET  /api/staff/home
-//                 GET  /api/staff/drivers · POST /api/staff/drivers · GET /api/staff/drivers/:id
-//                 PUT  /api/staff/drivers/:id/vehicle · PUT /api/staff/drivers/:id/documents/:type (picha/PDF)
-//                 GET  /api/staff/drivers/:id/documents/:type/file · POST /api/staff/drivers/:id/submit
-//                 GET  /api/staff/locations · POST /api/staff/locations
-//   Ofisi:        GET/POST /api/admin/staff · POST /api/admin/staff/lookup · POST /api/admin/staff/:id/suspend|activate|reset-password
-//                 GET /api/admin/locations/pending · POST /api/admin/locations/:id/review
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { z } from 'zod';
-import { ADMIN_ROLES, requireRole } from '../middleware/auth.js';
-import { readDocument, saveDocument, updateVehicle } from '../services/drivers.js';
-import { ALLOWED_MIME_TYPES, MAX_DOCUMENT_BYTES } from '../services/files.js';
-import {
-  assertMyDriver,
-  assertPasswordChanged,
-  assertStaffAccess,
-  createStaff,
-  listStaff,
-  lookupStaffPhone,
-  myDriver,
-  myDrivers,
-  myLocations,
-  pendingLocations,
-  proposeLocation,
-  registerDriver,
-  resetStaffPassword,
-  reviewLocation,
-  setStaffActive,
-  staffHome,
-  submitDriver,
-} from '../services/staff.js';
-import { lookupForUser } from '../services/name-lookup.js';
-import { badRequest, ok } from '../utils/http.js';
-import { phoneSchema } from '../validators/auth.js';
-import { documentTypeParam, vehicleSchema } from '../validators/drivers.js';
-import { locationSchema } from '../validators/places.js';
+import { needOwner, setFlash } from '../auth.js';
+import { html } from '../html.js';
+import { dateTime, phoneLocal } from '../format.js';
+import { addStaff, listMaduka, listStaff, moveStaff, resetStaffPassword, toggleStaff } from '../services/business.js';
+import { page } from '../views/layout.js';
+import { csrfField, empty, field, select } from '../views/ui.js';
+import { body, isUuid, send, str, tryForm } from './util.js';
+import { AppError } from '../errors.js';
 
-const idParam = z.object({ id: z.uuid({ error: 'Haikupatikana' }) });
-const fullName = z.string({ error: 'Weka jina kamili' }).trim().min(3, 'Jina liwe na angalau herufi 3').max(120, 'Jina ni refu mno');
-
-export async function staffRoutes(app: FastifyInstance): Promise<void> {
-  // Picha za nyaraka zinatumwa kama bytes tupu (kama dereva mwenyewe) — parser hii ipo ndani ya plugin hii tu.
-  app.addContentTypeParser([...ALLOWED_MIME_TYPES], { parseAs: 'buffer', bodyLimit: MAX_DOCUMENT_BYTES }, (_req, body, done) => done(null, body));
-
-  const staffOnly = {
-    preHandler: [
-      // Akaunti ya STAFF, au akaunti ya abiria/dereva iliyopewa ruhusa ya staff na ofisi (0.19.1)
-      requireRole('STAFF', 'USER'),
-      async (request: FastifyRequest) => {
-        assertStaffAccess(request.currentUser);
-        assertPasswordChanged(request.currentUser as { must_change_password?: boolean });
-      },
-    ],
-  };
-  const sid = (request: { currentUser: { id: string } }) => request.currentUser.id;
-
-  app.get('/api/staff/home', staffOnly, async (request) => ok(await staffHome(sid(request))));
-
-  // ---- bodaboda
-  app.get('/api/staff/drivers', staffOnly, async (request) => ok(await myDrivers(sid(request))));
-  app.post('/api/staff/drivers', { ...staffOnly, config: { rateLimit: { max: 30, timeWindow: '10 minutes' } } }, async (request, reply) => {
-    const body = z.object({ fullName, phone: phoneSchema }).parse(request.body);
-    const vehicle = vehicleSchema.parse(request.body);
-    return reply.status(201).send(ok(await registerDriver(sid(request), { ...body, vehicle })));
-  });
-  app.get('/api/staff/drivers/:id', staffOnly, async (request) => ok(await myDriver(sid(request), idParam.parse(request.params).id)));
-  app.put('/api/staff/drivers/:id/vehicle', staffOnly, async (request) => {
-    const { id } = idParam.parse(request.params);
-    await assertMyDriver(sid(request), id);
-    await updateVehicle(id, vehicleSchema.parse(request.body));
-    return ok(await myDriver(sid(request), id));
-  });
-  app.put(
-    '/api/staff/drivers/:id/documents/:type',
-    { ...staffOnly, bodyLimit: MAX_DOCUMENT_BYTES, config: { rateLimit: { max: 60, timeWindow: '1 minute' } } },
-    async (request) => {
-      const { id } = idParam.parse(request.params);
-      const { type } = documentTypeParam.parse(request.params);
-      if (!Buffer.isBuffer(request.body)) throw badRequest('Tuma picha (JPG, PNG, WEBP) au PDF.');
-      await assertMyDriver(sid(request), id);
-      await saveDocument(id, type, request.body, request.headers['content-type']);
-      return ok(await myDriver(sid(request), id));
-    },
-  );
-  app.get('/api/staff/drivers/:id/documents/:type/file', staffOnly, async (request, reply) => {
-    const { id } = idParam.parse(request.params);
-    const { type } = documentTypeParam.parse(request.params);
-    await assertMyDriver(sid(request), id);
-    const file = await readDocument(id, type);
-    return reply.header('content-type', file.mimeType).header('cache-control', 'private, no-store').send(file.content);
-  });
-  app.post('/api/staff/drivers/:id/submit', staffOnly, async (request) => ok(await submitDriver(sid(request), idParam.parse(request.params).id)));
-
-  // ---- maeneo
-  app.get('/api/staff/locations', staffOnly, async (request) => ok(await myLocations(sid(request))));
-  app.post('/api/staff/locations', { ...staffOnly, config: { rateLimit: { max: 40, timeWindow: '10 minutes' } } }, async (request, reply) =>
-    reply.status(201).send(ok(await proposeLocation(sid(request), locationSchema.parse(request.body)))),
-  );
-
-  // ---- ofisi
-  const adminOnly = { preHandler: requireRole(...ADMIN_ROLES) };
-  const aid = sid;
-  app.get('/api/admin/staff', adminOnly, async () => ok(await listStaff()));
-  app.post('/api/admin/staff', adminOnly, async (request, reply) => {
-    const input = z.object({ fullName, phone: phoneSchema, linkExisting: z.boolean().optional() }).parse(request.body);
-    return reply.status(201).send(ok(await createStaff(aid(request), input)));
-  });
-  // Namba tayari ina akaunti? (abiria/dereva → "Mpe ruhusa ya NAYA Staff?")
-  app.post('/api/admin/staff/lookup', adminOnly, async (request) => {
-    const { phone } = z.object({ phone: phoneSchema }).parse(request.body);
-    const found = await lookupStaffPhone(phone);
-    if (found.exists) return ok(found);
-    // Namba mpya kwa NAYA: jina kutoka mtandao (Abliner Name Lookup), ofisi inaweza kulirekebisha.
-    const net = await lookupForUser(request.currentUser, phone, 'STAFF');
-    return ok({ ...found, lookupAvailable: net.available, networkName: net.found ? net.displayName : null, networkLabel: net.networkLabel });
-  });
-  app.post('/api/admin/staff/:id/suspend', adminOnly, async (request) => ok(await setStaffActive(aid(request), idParam.parse(request.params).id, false)));
-  app.post('/api/admin/staff/:id/activate', adminOnly, async (request) => ok(await setStaffActive(aid(request), idParam.parse(request.params).id, true)));
-  app.post('/api/admin/staff/:id/reset-password', adminOnly, async (request) => ok(await resetStaffPassword(aid(request), idParam.parse(request.params).id)));
-  app.get('/api/admin/locations/pending', adminOnly, async () => ok(await pendingLocations()));
-  app.post('/api/admin/locations/:id/review', adminOnly, async (request) => {
-    const { approve, note } = z
-      .object({ approve: z.boolean({ error: 'Chagua kuidhinisha au kukataa' }), note: z.string().trim().max(200).optional().transform((v) => v || null) })
-      .parse(request.body);
-    return ok(await reviewLocation(aid(request), idParam.parse(request.params).id, approve, note));
+async function addForm(req: FastifyRequest, error?: string, v: Record<string, string> = {}) {
+  const u = needOwner(req);
+  const maduka = (await listMaduka(u.biashara_id)).filter((d) => d.active);
+  return page(req, {
+    title: 'Ongeza mfanyakazi',
+    active: 'wafanyakazi',
+    body: html`<form method="post" action="/wafanyakazi/ongeza" class="card narrow" novalidate>
+      ${error ? html`<div class="flash flash-kosa" role="alert">${error}</div>` : ''}
+      ${csrfField(req.csrf)}
+      ${field('Jina kamili', 'jina', { required: true, value: v.jina, autofocus: true })}
+      ${field('Namba ya simu', 'simu', { type: 'tel', value: v.simu, placeholder: '07XXXXXXXX' })}
+      ${select('Duka atakalofanyia kazi', 'duka_id', maduka.map((d) => ({ value: d.id, label: d.jina })), v.duka_id, { required: true })}
+      ${field('Username', 'username', { required: true, value: v.username, autocomplete: 'off', hint: 'Herufi ndogo na namba, bila nafasi (mf. asha.sokoni)' })}
+      ${field('Password ya muda', 'password', { required: true, type: 'text', autocomplete: 'off', hint: 'Mpe mfanyakazi. Ataombwa kuweka password yake mwenyewe akiingia mara ya kwanza.' })}
+      <div class="btn-row"><button class="btn" type="submit">Ongeza mfanyakazi</button><a class="btn btn-ghost" href="/wafanyakazi">Ghairi</a></div>
+    </form>`,
   });
 }
+
+export async function staffRoutes(app: FastifyInstance) {
+  app.get('/wafanyakazi', async (req, reply) => {
+    const u = needOwner(req);
+    const [list, maduka] = await Promise.all([listStaff(u.biashara_id), listMaduka(u.biashara_id)]);
+    const opts = maduka.filter((d) => d.active).map((d) => ({ value: d.id, label: d.jina }));
+    return send(
+      reply,
+      page(req, {
+        title: 'Wafanyakazi',
+        active: 'wafanyakazi',
+        actions: html`<a class="btn" href="/wafanyakazi/ongeza">+ Ongeza mfanyakazi</a>`,
+        body: list.length
+          ? html`<div class="staff">${list.map(
+              (s) => html`<article class="card staff-card ${s.active ? '' : 'off'}">
+                <div class="staff-top">
+                  <div class="avatar">${s.jina.trim()[0]?.toUpperCase() ?? '?'}</div>
+                  <div><h2>${s.jina}</h2><p class="muted">@${s.username}${s.simu ? ` · ${phoneLocal(s.simu)}` : ''}</p></div>
+                  <span class="pill ${s.active ? 'pill-on' : 'pill-void'}">${s.active ? 'Hai' : 'Amezimwa'}</span>
+                </div>
+                <p class="small muted">Duka: <b>${s.duka_jina ?? 'Hajapangiwa'}</b> · Aliingia mwisho: ${s.ameingia_mwisho ? dateTime(s.ameingia_mwisho) : 'bado'}</p>
+                <div class="staff-actions">
+                  <form method="post" action="/wafanyakazi/${s.id}/badilisha" data-confirm="${s.active ? `Zima akaunti ya ${s.jina}? Atatolewa kwenye mfumo papo hapo.` : `Washa akaunti ya ${s.jina}?`}">
+                    ${csrfField(req.csrf)}<button class="btn ${s.active ? 'btn-danger-ghost' : 'btn-ghost'}" type="submit">${s.active ? 'Zima' : 'Washa'}</button></form>
+                  <a class="btn btn-ghost" href="/ripoti?mfanyakazi=${s.id}">Ripoti yake</a>
+                  <a class="btn btn-ghost" href="/kumbukumbu?mtumiaji=${s.id}">Kumbukumbu</a>
+                </div>
+                <details><summary>Hamisha duka / weka password mpya</summary>
+                  <form method="post" action="/wafanyakazi/${s.id}/duka" class="inline-form">${csrfField(req.csrf)}
+                    ${select('Duka', 'duka_id', opts, s.duka_id)}<button class="btn btn-ghost" type="submit">Hamisha</button></form>
+                  <form method="post" action="/wafanyakazi/${s.id}/password" class="inline-form">${csrfField(req.csrf)}
+                    ${field('Password mpya ya muda', 'password', { required: true, autocomplete: 'off' })}<button class="btn btn-ghost" type="submit">Weka</button></form>
+                </details>
+              </article>`,
+            )}</div>`
+          : empty('Bado huna mfanyakazi.', html`<a class="btn" href="/wafanyakazi/ongeza">Ongeza mfanyakazi wa kwanza</a>`),
+      }),
+    );
+  });
+
+  app.get('/wafanyakazi/ongeza', async (req, reply) => send(reply, await addForm(req)));
+  app.post('/wafanyakazi/ongeza', async (req, reply) => {
+    const u = needOwner(req);
+    const b = body(req);
+    const v = { jina: str(b, 'jina'), username: str(b, 'username'), simu: str(b, 'simu'), password: str(b, 'password'), duka_id: str(b, 'duka_id') };
+    const r = await tryForm(() => addStaff({ id: u.id, biashara_id: u.biashara_id, jina: u.jina }, v, req.ip));
+    if (!r.ok) return send(reply, await addForm(req, r.error, { ...v, password: '' }), 400);
+    await setFlash(req, 'sawa', `${v.jina.trim()} ameongezwa. Mpe username @${v.username.trim().toLowerCase()} na password ya muda.`);
+    return reply.redirect('/wafanyakazi');
+  });
+
+  const idOf = (req: FastifyRequest) => {
+    const id = (req.params as { id: string }).id;
+    if (!isUuid(id)) throw new AppError('Mfanyakazi hayupo', 404);
+    return id;
+  };
+  // Kuzima / kuwasha (prompt: /mfanyakazi/badilisha/<id>)
+  const toggle = async (req: FastifyRequest, id: string) => {
+    const u = needOwner(req);
+    const active = await toggleStaff({ id: u.id, biashara_id: u.biashara_id, jina: u.jina }, id, req.ip);
+    await setFlash(req, 'sawa', active ? 'Mfanyakazi amewashwa' : 'Mfanyakazi amezimwa na ametolewa kwenye mfumo');
+  };
+  app.post('/wafanyakazi/:id/badilisha', async (req, reply) => {
+    await toggle(req, idOf(req));
+    return reply.redirect('/wafanyakazi');
+  });
+  app.post('/mfanyakazi/badilisha/:id', async (req, reply) => {
+    await toggle(req, idOf(req));
+    return reply.redirect('/wafanyakazi');
+  });
+  app.post('/wafanyakazi/:id/duka', async (req, reply) => {
+    const u = needOwner(req);
+    const r = await tryForm(() => moveStaff({ id: u.id, biashara_id: u.biashara_id, jina: u.jina }, idOf(req), str(body(req), 'duka_id'), req.ip));
+    await setFlash(req, r.ok ? 'sawa' : 'kosa', r.ok ? 'Mfanyakazi amehamishwa' : r.error);
+    return reply.redirect('/wafanyakazi');
+  });
+  app.post('/wafanyakazi/:id/password', async (req, reply) => {
+    const u = needOwner(req);
+    const r = await tryForm(() => resetStaffPassword({ id: u.id, biashara_id: u.biashara_id, jina: u.jina }, idOf(req), str(body(req), 'password'), req.ip));
+    await setFlash(req, r.ok ? 'sawa' : 'kosa', r.ok ? 'Password ya muda imewekwa. Ataombwa kuibadilisha akiingia.' : r.error);
+    return reply.redirect('/wafanyakazi');
+  });
+}
+
+

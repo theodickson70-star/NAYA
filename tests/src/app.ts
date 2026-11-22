@@ -1,128 +1,119 @@
-// Kujenga NAYA API (bila kuiwasha) — server.ts na tests wanaitumia.
-import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import cors from '@fastify/cors';
+import { join } from 'node:path';
+import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
+import cookie from '@fastify/cookie';
+import formbody from '@fastify/formbody';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
-import fastifyStatic from '@fastify/static';
-import Fastify, { type FastifyInstance } from 'fastify';
-import { env } from './config/env.js';
-import { registerJwt } from './middleware/auth.js';
-import { registerErrorHandling } from './middleware/errors.js';
-import { accountRoutes } from './routes/account.js';
-import { adminDriverRoutes } from './routes/admin-drivers.js';
-import { adminRoutes } from './routes/admin.js';
+import fstatic from '@fastify/static';
+import { checkCsrf, loadSession } from './auth.js';
+import { config } from './config.js';
+import { db } from './db.js';
+import { AppError } from './errors.js';
+import { errorPage } from './views/layout.js';
 import { authRoutes } from './routes/auth.js';
-import { driverRoutes } from './routes/drivers.js';
-import { healthRoutes } from './routes/health.js';
-import { ofisiRoutes } from './routes/ofisi.js';
-import { placeRoutes } from './routes/places.js';
-import { pushRoutes } from './routes/push.js';
-import { rideRoutes } from './routes/rides.js';
-import { ofaRoutes } from './routes/ofa.js';
-import { ripotiRoutes } from './routes/ripoti.js';
-import { pakuaRoutes } from './routes/pakua.js';
-import { profileRoutes } from './routes/profile.js';
-import { paymentRoutes } from './routes/payments.js';
+import { homeRoutes } from './routes/home.js';
+import { txRoutes } from './routes/tx.js';
+import { customerRoutes } from './routes/customers.js';
 import { staffRoutes } from './routes/staff.js';
-import { walletRoutes } from './routes/wallet.js';
-import { ridePaymentRoutes } from './routes/ride-payments.js';
-import { safetyRoutes } from './routes/safety.js';
-import { subscriptionRoutes } from './routes/subscriptions.js';
-import { streamRoutes } from './routes/stream.js';
+import { floatRoutes } from './routes/float.js';
+import { dukaRoutes } from './routes/maduka.js';
+import { settingsRoutes } from './routes/settings.js';
+import { reportRoutes } from './routes/reports.js';
 
-const FRONTEND_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
-// Ramani (Leaflet) inatolewa na server hii hii — hakuna script ya CDN ya nje.
-const LEAFLET_DIR = join(dirname(createRequire(import.meta.url).resolve('leaflet/package.json')), 'dist');
+const PUBLIC = new Set(['/ingia', '/sajili', '/afya']);
 
-export async function buildApp(options: { logger?: boolean } = {}): Promise<FastifyInstance> {
-  const app = Fastify({
-    logger:
-      options.logger === false
-        ? false
-        : {
-            serializers: {
-              // Tiketi ya realtime iko kwenye URL (EventSource haiwezi kutuma headers) — isiandikwe kwenye logs.
-              req: (req) => ({
-                method: req.method,
-                url: req.url.replace(/([?&]ticket=)[^&]*/g, '$1[siri]'),
-                host: req.host,
-                remoteAddress: req.ip,
-              }),
-            },
-          },
-    trustProxy: true, // Railway iko nyuma ya proxy — IP halisi ya mtumiaji kwa rate limit
-    bodyLimit: 1_000_000,
-  });
+export async function buildApp(opts: { logger?: boolean } = {}) {
+  const app = Fastify({ logger: opts.logger ?? false, trustProxy: true, bodyLimit: 64 * 1024 });
 
-  // Usalama: headers (helmet), CORS (kurasa za NAYA ziko kwenye anwani hii hii, hazihitaji CORS), rate limit.
   await app.register(helmet, {
     contentSecurityPolicy: {
       directives: {
-        // blob: — ofisi na dereva wanaona picha za nyaraka zilizopakuliwa kwa token (si URL za wazi).
-        // tile.openstreetmap.org — picha za ramani ya maeneo (ofisi).
-        'img-src': ["'self'", 'data:', 'blob:', 'https://tile.openstreetmap.org', 'https://*.tile.openstreetmap.org'],
-        'frame-src': ["'self'", 'blob:'],
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:'],
+        fontSrc: ["'self'"],
+        connectSrc: ["'self'"],
+        formAction: ["'self'"],
+        frameAncestors: ["'none'"],
+        upgradeInsecureRequests: config.cookieSecure ? [] : null,
       },
     },
+    crossOriginEmbedderPolicy: false,
   });
-  await app.register(cors, { origin: env.corsOrigins.length > 0 ? env.corsOrigins : false });
-  // Mitandao ya simu Tanzania huweka watu wengi nyuma ya IP moja (CGNAT). Kwa hiyo mtumiaji aliyeingia anahesabiwa
-  // kwa akaunti yake (token iliyothibitishwa), si kwa IP; asiyeingia anahesabiwa kwa IP.
-  await app.register(rateLimit, {
-    max: 300,
-    timeWindow: '1 minute',
-    keyGenerator: (request) => {
-      const header = request.headers.authorization;
-      if (header?.startsWith('Bearer ')) {
-        try {
-          const payload = app.jwt.verify<{ sub?: string }>(header.slice(7));
-          if (payload.sub) return `user:${payload.sub}`;
-        } catch {
-          // token mbaya → hesabu kwa IP
-        }
-      }
-      return `ip:${request.ip}`;
-    },
+  await app.register(cookie);
+  await app.register(formbody);
+  await app.register(rateLimit, { global: false });
+  await app.register(fstatic, {
+    root: join(process.cwd(), 'public'),
+    prefix: '/static/',
+    maxAge: config.isProd ? '7d' : 0,
   });
-  await registerJwt(app);
-  registerErrorHandling(app);
 
-  await app.register(healthRoutes);
+  app.decorateRequest('user', null);
+  app.decorateRequest('sessionHash', null);
+  app.decorateRequest('csrf', '');
+  app.decorateRequest('flash', null);
+  app.decorateRequest('unread', 0);
+
+  app.addHook('onRequest', async (req, reply) => {
+    if (req.url.startsWith('/static/') || req.url === '/afya') return;
+    await loadSession(req, reply);
+    const path = req.url.split('?')[0];
+    if (!req.user && !PUBLIC.has(path) && !path.startsWith('/sajili')) {
+      return reply.redirect(req.method === 'GET' ? `/ingia${path !== '/' ? `?rudi=${encodeURIComponent(req.url)}` : ''}` : '/ingia');
+    }
+    if (req.user?.lazima_abadilishe_password && !['/akaunti', '/toka'].includes(path)) {
+      return reply.redirect('/akaunti');
+    }
+    if (req.user?.role === 'owner' && req.method === 'GET') {
+      const r = await db.query('SELECT COUNT(*)::int AS n FROM paypoint.arifa WHERE biashara_id = $1 AND NOT imesomwa', [req.user.biashara_id]);
+      req.unread = r.rows[0].n;
+    }
+  });
+
+  // Kila fomu (POST) lazima iwe na CSRF token sahihi
+  app.addHook('preHandler', async (req) => {
+    if (req.method === 'POST') checkCsrf(req);
+  });
+
+  app.setErrorHandler((error: Error & { statusCode?: number }, req: FastifyRequest, reply: FastifyReply) => {
+    if (error instanceof AppError) {
+      if (error.status === 401) return reply.redirect('/ingia');
+      return reply.status(error.status).type('text/html').send(errorPage(req, error.status, error.message));
+    }
+    if (error.statusCode === 429) {
+      return reply.status(429).type('text/html').send(errorPage(req, 429, 'Majaribio mengi mno. Subiri dakika chache kisha ujaribu tena.'));
+    }
+    req.log.error(error);
+    console.error(`[hitilafu] ${req.method} ${req.url}: ${error.message}`);
+    const status = error.statusCode && error.statusCode < 500 ? error.statusCode : 500;
+    return reply
+      .status(status)
+      .type('text/html')
+      .send(errorPage(req, status, status === 500 ? 'Kuna hitilafu kwenye mfumo. Jaribu tena baadaye.' : 'Ombi si sahihi.'));
+  });
+
+  app.setNotFoundHandler((req, reply) => reply.status(404).type('text/html').send(errorPage(req, 404, 'Ukurasa huu haupo.')));
+
+  app.get('/afya', async () => {
+    await db.query('SELECT 1');
+    return { ok: true };
+  });
+
+  // Majina ya kurasa kama kwenye prompt ya PayPoint
+  app.get('/sajili_duka', async (_q, r) => r.redirect('/sajili'));
+  app.get('/mteja', async (_q, r) => r.redirect('/wateja'));
+  app.get('/mfanyakazi/ongeza', async (_q, r) => r.redirect('/wafanyakazi/ongeza'));
+
   await app.register(authRoutes);
-  await app.register(adminRoutes);
-  await app.register(adminDriverRoutes);
-  await app.register(accountRoutes);
-  await app.register(profileRoutes);
-  await app.register(paymentRoutes);
+  await app.register(homeRoutes);
+  await app.register(txRoutes);
+  await app.register(customerRoutes);
   await app.register(staffRoutes);
-  await app.register(walletRoutes);
-  await app.register(ridePaymentRoutes);
-  await app.register(driverRoutes);
-  await app.register(placeRoutes);
-  await app.register(rideRoutes);
-  await app.register(streamRoutes);
-  await app.register(pushRoutes);
-  await app.register(subscriptionRoutes);
-  await app.register(ofisiRoutes);
-  await app.register(safetyRoutes);
-  await app.register(pakuaRoutes);
-  await app.register(ripotiRoutes);
-  await app.register(ofaRoutes);
-
-  // Kurasa za NAYA: /app/ (app moja ya abiria na dereva) na /admin/ (ofisi).
-  await app.register(fastifyStatic, { root: FRONTEND_DIR, prefix: '/', index: ['index.html'] });
-  await app.register(fastifyStatic, { root: LEAFLET_DIR, prefix: '/vendor/leaflet/', decorateReply: false });
-  app.get('/admin', async (_request, reply) => reply.redirect('/admin/'));
-  app.get('/app', async (_request, reply) => reply.redirect('/app/'));
-  app.get('/safari', async (_request, reply) => reply.redirect('/safari/'));
-  app.get('/masharti', async (_request, reply) => reply.redirect('/masharti/'));
-  // Mwanzo na anwani ya zamani ya app ya dereva → app moja ya NAYA.
-  // Link kuu ya NAYA: ukurasa wa kupakua app (Android → APK; iPhone na kompyuta → maelekezo).
-  app.get('/', async (_request, reply) => reply.redirect('/pakua/'));
-  app.get('/dereva', async (_request, reply) => reply.redirect('/app/'));
-  app.get('/dereva/', async (_request, reply) => reply.redirect('/app/'));
-
+  await app.register(floatRoutes);
+  await app.register(dukaRoutes);
+  await app.register(settingsRoutes);
+  await app.register(reportRoutes);
   return app;
 }

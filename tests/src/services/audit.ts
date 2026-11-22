@@ -1,36 +1,32 @@
-// Kumbukumbu ya hatua za ofisi: nani alifanya nini, kwa nani, lini. Haifutwi wala kubadilishwa.
-import { type Db, many } from '../db/pool.js';
+import type { Db } from '../db.js';
 
-export interface AuditEntry {
-  actorId: string | null;
-  action: string;
-  targetType: string;
-  targetId: string | null;
-  details?: Record<string, unknown>;
-}
+export type Actor = { id: string | null; biashara_id: string; jina: string | null };
 
-export async function writeAudit(client: Db, entry: AuditEntry): Promise<void> {
-  await client.query(
-    `INSERT INTO naya.audit_logs (actor_id, action, target_type, target_id, details)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [entry.actorId, entry.action, entry.targetType, entry.targetId, JSON.stringify(entry.details ?? {})],
+/** Andika kumbukumbu (audit log). Haibadilishwi wala kufutwa. */
+export async function audit(c: Db, actor: Actor, kitendo: string, maelezo: string, ip?: string | null): Promise<void> {
+  await c.query(
+    `INSERT INTO paypoint.kumbukumbu (biashara_id, mtumiaji_id, jina, kitendo, maelezo, ip) VALUES ($1, $2, $3, $4, $5, $6)`,
+    [actor.biashara_id, actor.id, actor.jina, kitendo, maelezo.slice(0, 500), ip ?? null],
   );
 }
 
-export interface AuditView {
-  action: string;
-  details: Record<string, unknown>;
-  actorName: string | null;
-  createdAt: Date;
+export async function notifyOwner(c: Db, biasharaId: string, aina: string, ujumbe: string): Promise<void> {
+  await c.query(`INSERT INTO paypoint.arifa (biashara_id, aina, ujumbe) VALUES ($1, $2, $3)`, [biasharaId, aina, ujumbe.slice(0, 400)]);
 }
 
-export const auditFor = (client: Db, targetType: string, targetId: string, limit = 20) =>
-  many<AuditView>(
-    client,
-    `SELECT a.action, a.details, u.full_name AS "actorName", a.created_at AS "createdAt"
-       FROM naya.audit_logs a LEFT JOIN naya.users u ON u.id = a.actor_id
-      WHERE a.target_type = $1 AND a.target_id = $2
-      ORDER BY a.created_at DESC, a.id DESC
-      LIMIT $3`,
-    [targetType, targetId, limit],
-  );
+export const KITENDO_LABEL: Record<string, string> = {
+  login: 'Kuingia',
+  login_failed: 'Kuingia kumeshindwa',
+  logout: 'Kutoka',
+  tuma: 'Tuma',
+  toa: 'Toa',
+  batilisha: 'Kubatilisha',
+  float: 'Float / cash',
+  mfanyakazi: 'Wafanyakazi',
+  mteja: 'Wateja',
+  duka: 'Maduka',
+  kamisheni: 'Kamisheni',
+  hesabu: 'Hesabu ya siku',
+  password: 'Password',
+  usajili: 'Usajili',
+};

@@ -3,7 +3,7 @@
   "build": { "buildCommand": "npm run build" },
   "deploy": {
     "startCommand": "npm start",
-    "healthcheckPath": "/health",
+    "healthcheckPath": "/afya",
     "healthcheckTimeout": 60,
     "restartPolicyType": "ON_FAILURE"
   }

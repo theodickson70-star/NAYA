@@ -1,0 +1,10 @@
+{
+  "name": "PayPoint — Kituo Chako cha Pesa",
+  "short_name": "PayPoint",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F6F8F7",
+  "theme_color": "#06502F",
+  "lang": "sw",
+  "icons": [{ "src": "/static/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
